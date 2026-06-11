@@ -69,14 +69,16 @@ uploadBox.addEventListener('dragleave', () => {
 uploadBox.addEventListener('drop', (e) => {
     e.preventDefault();
     uploadBox.classList.remove('dragover');
-    setFiles(Array.from(e.dataTransfer.files));
+    addFiles(Array.from(e.dataTransfer.files));
 });
 
 fileInput.addEventListener('change', (e) => {
-    setFiles(Array.from(e.target.files));
+    addFiles(Array.from(e.target.files));
+    // Auswahl zurücksetzen, damit dieselbe Datei erneut gewählt werden kann
+    fileInput.value = '';
 });
 
-function setFiles(files) {
+function addFiles(files) {
     const invalid = files.filter(f => !f.name.toLowerCase().endsWith('.xlsx'));
     if (invalid.length > 0) {
         showMessage(`Bitte nur XLSX-Dateien auswählen. Ungültig: ${invalid.map(f => f.name).join(', ')}`, 'error');
@@ -84,12 +86,41 @@ function setFiles(files) {
     }
     if (files.length === 0) return;
 
-    selectedFiles = files;
     messageDiv.innerHTML = '';
-    fileList.innerHTML = selectedFiles
-        .map(f => `<span class="file-badge">${escapeHtml(f.name)}</span>`)
-        .join('');
-    analyzeBtn.disabled = false;
+
+    // Bereits hinzugefügte Dateien (gleicher Name) nicht doppelt aufnehmen
+    files.forEach(file => {
+        if (!selectedFiles.some(f => f.name === file.name)) {
+            selectedFiles.push(file);
+        }
+    });
+
+    renderFileList();
+}
+
+function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    renderFileList();
+}
+
+function renderFileList() {
+    fileList.innerHTML = '';
+    selectedFiles.forEach((file, index) => {
+        const badge = document.createElement('span');
+        badge.className = 'file-badge';
+        badge.textContent = file.name;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'file-remove';
+        removeBtn.title = 'Datei entfernen';
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', () => removeFile(index));
+
+        badge.appendChild(removeBtn);
+        fileList.appendChild(badge);
+    });
+    analyzeBtn.disabled = selectedFiles.length === 0;
 }
 
 // --- Auswertung ---

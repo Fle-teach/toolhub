@@ -234,10 +234,33 @@
         .file-badge {
             background: #667eea;
             color: white;
-            padding: 5px 12px;
+            padding: 5px 6px 5px 12px;
             border-radius: 4px;
             font-size: 12px;
             font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .file-remove {
+            background: rgba(255, 255, 255, 0.25);
+            border: none;
+            color: white;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            font-size: 14px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .file-remove:hover {
+            background: rgba(255, 255, 255, 0.5);
         }
 
         .analyze-row {
