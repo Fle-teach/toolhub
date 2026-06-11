@@ -227,6 +227,11 @@
             background-color: #8e44ad;
             border-left: 2px solid #2c3e50;
         }
+
+        th.sum-group {
+            background-color: #2980b9;
+            border-left: 2px solid #2c3e50;
+        }
         
         th.total-col {
             background-color: #e74c3c;
@@ -286,7 +291,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>📚 Schüler-Fehlzeiten Analyzer</h1>
+        <h1>📚 DKB-Fehlzeiten nach Fächern auswerten</h1>
         
         <div class="upload-area" id="uploadArea">
             <div class="upload-text">📁 Klicken Sie hier oder ziehen Sie eine XLSX-Datei hierher</div>
@@ -412,8 +417,22 @@
             reader.readAsArrayBuffer(file);
         }
 
+        // Fachname aus einer Zeile der Spalte "Verp. Unterricht" ableiten:
+        // alles nach "in Kurs <Jahrgang> " bis zum optionalen "(...)"-Anhang am Ende.
+        // Beispiele: '6. Rel in Kurs 11 rel 1 Freu  (Freu)' -> 'rel 1 Freu'
+        //            '6.  in Kurs 11 phil 3 Yil '           -> 'phil 3 Yil'
+        //            '2. E Camb in Kurs 12 E cam 1 Frej  (Frej)' -> 'E cam 1 Frej'
+        function extractSubject(line) {
+            const match = line.match(/in Kurs\s+\d+\s+(.+?)\s*(\([^)]*\))?\s*$/);
+            if (match && match[1].trim()) {
+                return match[1].trim();
+            }
+            return 'Unbekannt';
+        }
+
         function analyzeAbsences(data) {
             const studentSubjectAbsences = {};
+            const studentTotals = {}; // Summe aller Fehlstunden pro Schüler (über alle Fächer)
             let totalProcessedRows = 0;
             let totalIgnoredRows = 0;
             const subjects = new Set();
@@ -426,18 +445,11 @@
                     return;
                 }
 
-                // Prüfen ob Fehlstunden = 0 - dann ignorieren
-                const fehlstunden = row.Fehlstunden || row['Fehlstunden'] || '';
-                if (fehlstunden === 0 || fehlstunden === '0') {
-                    totalIgnoredRows++;
-                    return;
-                }
-
                 const studentName = row.Schüler || row['Schüler'] || '';
                 const lessons = row['Verp. Unterricht'] || '';
                 const status = row.Status || '';
                 const datum = row.Datum || row['Datum'] || '';
-                
+
                 if (!studentName || !lessons) {
                     return;
                 }
@@ -445,7 +457,7 @@
                 totalProcessedRows++;
 
                 // Prüfen ob unentschuldigt (alle Varianten)
-                const isUnexcused = status.includes('nicht (schriftlich) entschuldigt') || 
+                const isUnexcused = status.includes('nicht (schriftlich) entschuldigt') ||
                                    status.includes('ohne Information - noch offen') ||
                                    status.includes('Unentschuldigt') ||
                                    status.includes('Attest noch ausstehend');
@@ -453,35 +465,34 @@
                 // Initialisiere Schüler wenn noch nicht vorhanden
                 if (!studentSubjectAbsences[studentName]) {
                     studentSubjectAbsences[studentName] = {};
+                    studentTotals[studentName] = { total: 0, unexcused: 0 };
                 }
 
                 // Verpasste Unterrichtsstunden analysieren
-                const lessonLines = lessons.split(/\r?\n/);
-                const processedHoursThisRow = new Set(); // Bereits verarbeitete Stunden in dieser Zeile
-                
+                const lessonLines = String(lessons).split(/\r?\n/);
+                const processedHoursThisRow = new Set(); // Bereits verarbeitete Stundennummern in diesem Feld
+
                 lessonLines.forEach(line => {
                     const trimmedLine = line.trim();
                     if (!trimmedLine) return;
 
-                    // Stundennummer und Fach extrahieren
-                    const parts = trimmedLine.split(/\s+/);
-                    if (parts.length < 2) return;
+                    // Stundennummer extrahieren (z.B. "5." -> "5"); ohne Nummer dient die ganze Zeile als Schlüssel
+                    const numberMatch = trimmedLine.match(/^(\d+)\./);
+                    const lessonNumber = numberMatch ? numberMatch[1] : trimmedLine;
 
-                    const lessonNumber = parts[0]; // z.B. "1.", "8."
-                    const subject = parts[1];
-                    
                     // Eindeutigen Schlüssel für diese Unterrichtsstunde erstellen (OHNE Fach!)
                     const lessonKey = `${studentName}_${datum}_${lessonNumber}`;
-                    
-                    // Prüfen ob diese Stunde bereits verarbeitet wurde (global oder in dieser Zeile)
+
+                    // Bei doppelter Nummerierung zählt nur das erste Vorkommen
                     if (processedLessons.has(lessonKey) || processedHoursThisRow.has(lessonNumber)) {
                         return; // Überspringen, da bereits gezählt
                     }
-                    
-                    // Stunde als verarbeitet markieren (global und für diese Zeile)
+
+                    // Stunde als verarbeitet markieren (global und für dieses Feld)
                     processedLessons.add(lessonKey);
                     processedHoursThisRow.add(lessonNumber);
-                    
+
+                    const subject = extractSubject(trimmedLine);
                     subjects.add(subject);
 
                     // Initialisiere Fach wenn noch nicht vorhanden
@@ -494,8 +505,10 @@
 
                     // Erhöhe Zähler
                     studentSubjectAbsences[studentName][subject].total++;
+                    studentTotals[studentName].total++;
                     if (isUnexcused) {
                         studentSubjectAbsences[studentName][subject].unexcused++;
+                        studentTotals[studentName].unexcused++;
                     }
                 });
             });
@@ -503,41 +516,43 @@
             // Globale Daten speichern
             globalData = {
                 studentSubjectAbsences,
+                studentTotals,
                 totalProcessedRows,
                 totalIgnoredRows
             };
-            
+
             allSubjects = Array.from(subjects).sort();
-            
+
             createSubjectFilters();
             displayResults();
         }
 
         function createSubjectFilters() {
-            subjectFilters.innerHTML = allSubjects.map(subject => `
+            // Standardmäßig ist kein Fach ausgewählt
+            subjectFilters.innerHTML = allSubjects.map((subject, index) => `
                 <div class="subject-filter">
-                    <input type="checkbox" id="subject_${subject}" checked onchange="displayResults()">
-                    <label for="subject_${subject}">${subject}</label>
+                    <input type="checkbox" id="subject_${index}" onchange="displayResults()">
+                    <label for="subject_${index}">${subject}</label>
                 </div>
             `).join('');
         }
 
         function getSelectedSubjects() {
-            return allSubjects.filter(subject => 
-                document.getElementById(`subject_${subject}`).checked
+            return allSubjects.filter((subject, index) =>
+                document.getElementById(`subject_${index}`).checked
             );
         }
 
         function selectAllSubjects() {
-            allSubjects.forEach(subject => {
-                document.getElementById(`subject_${subject}`).checked = true;
+            allSubjects.forEach((subject, index) => {
+                document.getElementById(`subject_${index}`).checked = true;
             });
             displayResults();
         }
 
         function deselectAllSubjects() {
-            allSubjects.forEach(subject => {
-                document.getElementById(`subject_${subject}`).checked = false;
+            allSubjects.forEach((subject, index) => {
+                document.getElementById(`subject_${index}`).checked = false;
             });
             displayResults();
         }
@@ -545,21 +560,17 @@
         function displayResults() {
             if (!globalData) return;
 
-            const { studentSubjectAbsences, totalProcessedRows, totalIgnoredRows } = globalData;
+            const { studentSubjectAbsences, studentTotals, totalProcessedRows, totalIgnoredRows } = globalData;
             const selectedSubjects = getSelectedSubjects();
-            
-            // Statistiken berechnen
+
+            // Statistiken berechnen (über alle Fächer, unabhängig vom Filter)
             const students = Object.keys(studentSubjectAbsences);
             let totalAbsences = 0;
             let totalUnexcused = 0;
 
             students.forEach(student => {
-                selectedSubjects.forEach(subject => {
-                    if (studentSubjectAbsences[student][subject]) {
-                        totalAbsences += studentSubjectAbsences[student][subject].total;
-                        totalUnexcused += studentSubjectAbsences[student][subject].unexcused;
-                    }
-                });
+                totalAbsences += studentTotals[student].total;
+                totalUnexcused += studentTotals[student].unexcused;
             });
 
             // Zusammenfassung anzeigen
@@ -569,16 +580,16 @@
                     <div class="stat-label">Schüler</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-number">${selectedSubjects.length}</div>
+                    <div class="stat-number">${selectedSubjects.length} / ${allSubjects.length}</div>
                     <div class="stat-label">Ausgewählte Fächer</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-number">${totalAbsences}</div>
-                    <div class="stat-label">Gesamte Fehlzeiten</div>
+                    <div class="stat-label">Fehlstunden (alle Fächer)</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-number">${totalUnexcused}</div>
-                    <div class="stat-label">Unentschuldigt</div>
+                    <div class="stat-label">Unentschuldigt (alle Fächer)</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-number">${totalProcessedRows}</div>
@@ -590,14 +601,19 @@
                 </div>
             `;
 
-            // Tabellenkopf erstellen
+            // Tabellenkopf erstellen: Summe über alle Fächer + ausgewählte Fächer
             let headerHTML = '<tr><th class="student-header">Schüler</th>';
+            headerHTML += '<th class="sum-group" colspan="2">Summe (alle Fächer)</th>';
             selectedSubjects.forEach(subject => {
                 headerHTML += `
                     <th class="subject-group" colspan="2">${subject}</th>
                 `;
             });
             headerHTML += '</tr><tr><th></th>';
+            headerHTML += `
+                <th class="total-col">Gesamt</th>
+                <th class="unexcused-col">Unentschuldigt</th>
+            `;
             selectedSubjects.forEach(subject => {
                 headerHTML += `
                     <th class="total-col">Gesamt</th>
@@ -611,6 +627,11 @@
             const sortedStudents = students.sort();
             const bodyRows = sortedStudents.map(student => {
                 let rowHTML = `<td class="student-name">${student}</td>`;
+                const sums = studentTotals[student];
+                rowHTML += `
+                    <td class="total-cell ${sums.total === 0 ? 'zero' : ''}">${sums.total}</td>
+                    <td class="unexcused-cell ${sums.unexcused === 0 ? 'zero' : ''}">${sums.unexcused}</td>
+                `;
                 selectedSubjects.forEach(subject => {
                     const data = studentSubjectAbsences[student][subject] || { total: 0, unexcused: 0 };
                     rowHTML += `
@@ -630,15 +651,15 @@
         function exportToExcel() {
             if (!globalData) return;
 
-            const { studentSubjectAbsences } = globalData;
+            const { studentSubjectAbsences, studentTotals } = globalData;
             const selectedSubjects = getSelectedSubjects();
             const students = Object.keys(studentSubjectAbsences).sort();
 
             // Daten für Export vorbereiten
             const exportData = [];
-            
+
             // Header erstellen
-            const headers = ['Schüler'];
+            const headers = ['Schüler', 'Summe (alle Fächer) - Gesamt', 'Summe (alle Fächer) - Unentschuldigt'];
             selectedSubjects.forEach(subject => {
                 headers.push(`${subject} - Gesamt`);
                 headers.push(`${subject} - Unentschuldigt`);
@@ -647,7 +668,8 @@
 
             // Datenzeilen erstellen
             students.forEach(student => {
-                const row = [student];
+                const sums = studentTotals[student];
+                const row = [student, sums.total, sums.unexcused];
                 selectedSubjects.forEach(subject => {
                     const data = studentSubjectAbsences[student][subject] || { total: 0, unexcused: 0 };
                     row.push(data.total);
@@ -659,14 +681,11 @@
             // Excel-Datei erstellen
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.aoa_to_sheet(exportData);
-            
-            // Spaltenbreiten setzen
-            const colWidths = [{ wch: 25 }]; // Schülerspalte
-            selectedSubjects.forEach(() => {
-                colWidths.push({ wch: 12 }); // Gesamt
-                colWidths.push({ wch: 15 }); // Unentschuldigt
-            });
-            ws['!cols'] = colWidths;
+
+            // Spaltenbreiten an den längsten Inhalt der jeweiligen Spalte anpassen
+            ws['!cols'] = headers.map((_, colIndex) => ({
+                wch: Math.max(...exportData.map(row => String(row[colIndex] ?? '').length)) + 2
+            }));
 
             XLSX.utils.book_append_sheet(wb, ws, 'Fehlzeiten');
             
