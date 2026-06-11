@@ -1,6 +1,5 @@
-Hinweis: Die Dateien 'app.js' und 'xlsx.full.min.js' müssen sich im gleichen Ordner wie die Datei 'index.html' befinden und dürfen nicht gelöscht werden.
-
 Die vollständige Anleitung ist auch direkt in der Anwendung unter 'Hinweise zur Nutzung' abrufbar.
+(Für die Nutzung ist eine Internetverbindung erforderlich.)
 
 Schritt 1 - Tabellarische Übersicht über alle Förderbedarfe erzeugen
 
@@ -34,4 +33,3 @@ Schritt 2 - Personalisierte Lernfördervereinbarungen
 5. PDF (unten links) wählen, um eine PDF zu erzeugen
 6. Dateinamen und Speicherort wählen
 7. 'Sichern' -> 'Ja' -> 'OK'
-(Die Meldung 'Datensatz X ist leer' ist unbedenklich. (Sie kommt nur zustande weil die letzte Zeile der Tabelle leer ist.))

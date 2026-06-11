@@ -112,16 +112,6 @@
             margin-bottom: 4px;
         }
 
-        .help-content .note {
-            background: #fff8e6;
-            border-left: 4px solid #f0ad4e;
-            padding: 10px 15px;
-            border-radius: 4px;
-            margin-top: 15px;
-            font-size: 13px;
-            color: #666;
-        }
-
         .settings-section {
             margin-bottom: 30px;
         }
@@ -471,10 +461,6 @@
                         <li>Andernfalls die Datenquelle manuell ändern: <em>Sendungen</em> → <em>Empfänger auswählen</em> → <em>Vorhandene Liste verwenden…</em> → exportierte Übersicht auswählen → <em>OK</em>.</li>
                         <li><em>Fertig stellen und zusammenführen</em> → <em>Dokumente drucken…</em> und als PDF (unten links) speichern: Dateinamen und Speicherort wählen, dann <em>Sichern</em> → <em>Ja</em> → <em>OK</em>.</li>
                     </ol>
-                    <div class="note">
-                        Die Meldung „Datensatz X ist leer“ beim Seriendruck ist unbedenklich – sie entsteht nur, weil die letzte Zeile der Tabelle leer ist.<br>
-                        Die Dateien <code>app.js</code> und <code>xlsx.full.min.js</code> müssen im gleichen Ordner wie diese HTML-Datei liegen und dürfen nicht gelöscht werden.
-                    </div>
                 </div>
             </details>
 
@@ -551,7 +537,7 @@
         </div>
     </div>
 
-    <script src="xlsx.full.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

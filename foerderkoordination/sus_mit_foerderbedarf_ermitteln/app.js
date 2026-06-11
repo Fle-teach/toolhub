@@ -301,6 +301,12 @@ exportBtn.addEventListener('click', () => {
     });
 
     const worksheet = XLSX.utils.aoa_to_sheet(rows);
+
+    // Spaltenbreiten an den längsten Inhalt der jeweiligen Spalte anpassen
+    worksheet['!cols'] = rows[0].map((_, colIndex) => ({
+        wch: Math.max(...rows.map(row => String(row[colIndex] ?? '').length)) + 2
+    }));
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Förderbedarf');
 
