@@ -1,0 +1,18 @@
+
+Versionsupdate v1.3 - 02.05.25
+
+Ausgabe als XLSX-Datei
+
+
+
+Versionsupdate v1.2 - 27.06.24
+
+Spalte Angebot bleibt leer.
+
+
+
+Versionsupdates v1.1 - 02.05.24
+
+Umstellung des CSV-Trennzeichens auf Semikolon, damit die CSV-Datei weniger umständlich von Word und Excel verarbeitet werden kann
+
+UTF-8 BOM (\uFEFF) und charset=utf-8 hinzugefügt, damit Sonderzeichen automatisch richtig angezeigt werden

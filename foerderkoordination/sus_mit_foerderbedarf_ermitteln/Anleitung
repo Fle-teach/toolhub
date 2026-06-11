@@ -1,0 +1,31 @@
+Hinweis: Die Dateien 'app.js' und 'xlsx.full.min.js' müssen sich im gleichen Ordner wie die Datei 'Förderbedarfffeststellungs-Tool.html' befinden und dürfen nicht gelöscht werden.
+
+Schritt 1 - Tabellarische Übersicht über alle Förderbedarfe erzeugen
+
+1. Förderbedarffeststellungs-Tool.html öffnen
+2. Auf 'Durchsuchen...' klicken
+3. Beliebig viele von DIVIS generierte Notenübersichten (im XLSX-Format) auswählen und öffnen
+4. Auf 'Auswerten' klicken
+5. Die tabellarische Übersicht über alle Förderbedarfe befindet sich nun im Downloads-Ordner (Dateiname: 'Übersicht_Förderbedarf_<betroffene_Klassen>.csv')
+
+
+Schritt 2 - Personalisierte Lernfördervereinbarungen
+
+1. LFVblanco_SERIENDRUCK_NEU.doc öffnen
+
+--- Auswahl der zu verwendenden Tabelle mit Förderbedarfen ---
+2. Falls eine Popup-Meldung "[...]Word konnte die Datenquelle [...] nicht finden." kommt, auf 'Datenquelle suchen...' klicken.
+	a) Die zuvor generierte tabellarische Übersicht über alle Förderbedarfe auswählen.
+	b) Auf 'OK' klicken
+3. Falls keine Popup-Meldung erscheint, kann die Datenquelle folgendermaßen geändert werden:
+	a) Auf 'Sendungen' klicken
+	b) Klicke auf 'Empfänger auswählen' -> 'vorhandene Liste verwenden...'
+	c) Die zuvor generierte tabellarische Übersicht über alle Förderbedarfe auswählen.
+	d) Auf 'OK' klicken
+
+--- Erzeugen der fertigen PDF-Datei
+4. Klicke auf 'Fertig stellen und zusammenführen' -> 'Dokumente drucken...'
+5. PDF (unten links) wählen, um eine PDF zu erzeugen
+6. Dateinamen und Speicherort wählen
+7. 'Sichern' -> 'Ja' -> 'OK'
+(Die Meldung 'Datensatz X ist leer' ist unbedenklich. (Sie kommt nur zustande weil die letzte Zeile der Tabelle leer ist.))

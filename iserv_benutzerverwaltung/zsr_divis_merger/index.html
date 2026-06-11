@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZSR-DiViS-Merger - Optimiert</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 ZSR- & DiViS-Daten für IServ-Import zusammenführen</h1>
+
+        <div class="file-section">
+            <h3>1. DiViS-Datei auswählen (export_schueler_....xlsx)</h3>
+            <input type="file" id="divisFile" accept=".xlsx" class="file-input" />
+            <p><strong>Erforderliche Spalten:</strong> Nachname, Namenszusatz, Vorname, Rufname, Geburtsdatum, Klassenname, Vorname (Mutter), Nachname (Mutter), E-Mail (Mutter), Straße (Mutter), Vorname (Vater), Nachname (Vater), E-Mail (Vater), Straße (Vater), Personensorgeberechtigte</p>
+        </div>
+
+        <div class="file-section">
+            <h3>2. ZSR-Datei auswählen (S_L_Aufgenommen.xlsx)</h3>
+            <input type="file" id="zsrFile" accept=".xlsx" class="file-input" />
+            <p><strong>Erforderliche Spalten:</strong> ZSR-ID, Nachname, Bestandteil Familienname, Vorname, Geburtsdatum</p>
+        </div>
+
+        <!-- Kurszuordnungen-Datei Upload entfernt -->
+
+        <div class="file-section">
+            <h3>3. Kurse-Dateien (Klassenverband und Klassenübergreifend) auswählen (export_angebotSchueler_....xlsx) <span class="optional">[Optional]</span></h3>
+            <input type="file" id="electiveFile" accept=".xlsx" class="file-input" multiple />
+            <p><strong>Erwartete Struktur:</strong> Mehrere Tabellenblätter, 1 Tabellenblatt ≙ 1 Kurs, Blattname = Kursname, Kurs enthält Lehrer und Schüler</p>
+            <!-- <p class="info-text">🎯 <strong>Individuelle Kurse:</strong> Kurse werden in die "Gruppen"-Spalte von Schülern und Lehrern eingetragen. Teilnehmer werden über Geburtsdatum und Namen zugeordnet.</p> -->
+        </div>
+
+        <div class="file-section">
+            <h3>4. Klassenlehrer-Datei auswählen <span class="optional">[Optional]</span></h3>
+            <input type="file" id="classTeacherFile" accept=".xlsx" class="file-input" />
+            <p><strong>Erforderliche Spalten:</strong> Klasse, Schüler, Klassenleitung [Kürzel], Stufe, Schulform, Klassenart</p>
+            <!-- <p class="info-text">👨‍🏫 <strong>Klassenleitungen:</strong> Die erste Zeile wird übersprungen. Lehrer werden anhand ihrer Kürzel in eckigen Klammern erkannt und die zugehörigen Klassen- und Jahrgangsgruppen werden in der Lehrer-CSV ergänzt.</p> -->
+        </div>
+
+        <div class="toolbar" style="margin: 20px 0;">
+            <div class="toolbar-left">
+                <button id="processButton" class="btn-primary" disabled>🔄 Zusammenführen</button>
+            </div>
+            <div class="toolbar-right">
+                <button id="downloadSchuelerButton" class="btn-success" style="display: none;" disabled>📥 Schülerimport herunterladen</button>
+                <button id="downloadElternButton" class="btn-success" style="display: none;" disabled>👨‍👩‍👧‍👦 Elternimport herunterladen</button>
+                <button id="downloadLehrerButton" class="btn-success" style="display: none;" disabled>👩‍🏫 Lehrerimport herunterladen</button>
+            </div>
+        </div>
+
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">Verarbeitung läuft...</div>
+        </div>
+
+        <div id="alertsContainer" style="margin-top:10px;">
+            <div id="alerts"></div>
+            <div style="text-align: right; margin-top: 6px;">
+                <button id="clearAlertsButton" class="btn-link" style="display: none;">Alle Hinweise verbergen</button>
+            </div>
+        </div>
+
+        <div class="stats" id="statsContainer" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-number" id="zsrCount">0</div>
+                <div class="stat-label">ZSR-Datensätze</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="divisCount">0</div>
+                <div class="stat-label">DiViS-Datensätze</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="mergedCount">0</div>
+                <div class="stat-label">Zusammengeführt</div>
+            </div>
+        </div>
+
+        <!-- Performance-Info entfernt -->
+
+        <!-- download buttons moved into toolbar above -->
+
+        <!-- Tabellen für Warnmeldungen -->
+        <div class="table-container" id="nameDeviationContainer">
+            <h4 class="table-header">⚠️ Namensabweichungen (nur in Export enthaltene Schüler)</h4>
+            <table id="nameDeviationTable">
+                <thead>
+                    <tr>
+                        <th>ZSR-ID</th>
+                        <th>Nachname ZSR</th>
+                        <th>Vorname ZSR</th>
+                        <th>Geburtsdatum ZSR</th>
+                        <th>Nachname DiViS</th>
+                        <th>Vorname DiViS</th>
+                        <th>Geburtsdatum DiViS</th>
+                        <th>Klasse</th>
+                        <th>Levenshtein-Distanz</th>
+                    </tr>
+                </thead>
+                <tbody id="nameDeviationBody"></tbody>
+            </table>
+        </div>
+
+        <div class="table-container" id="noZsrFoundContainer">
+            <h4 class="table-header">❌ Kein ZSR-Datensatz gefunden</h4>
+            <table id="noZsrFoundTable">
+                <thead>
+                    <tr>
+                        <th>Nachname</th>
+                        <th>Vorname</th>
+                        <th>Geburtsdatum</th>
+                        <th>Klasse</th>
+                    </tr>
+                </thead>
+                <tbody id="noZsrFoundBody"></tbody>
+            </table>
+        </div>
+
+        <div class="table-container" id="excludedRecordsContainer">
+            <h4 class="table-header">🔄 Durch besseren Match ersetzt</h4>
+            <table id="excludedRecordsTable">
+                <thead>
+                    <tr>
+                        <th>Nachname</th>
+                        <th>Vorname</th>
+                        <th>Geburtsdatum</th>
+                        <th>Klasse</th>
+                        <th>Ursprüngliche Distanz</th>
+                        <th>Bessere Distanz</th>
+                    </tr>
+                </thead>
+                <tbody id="excludedRecordsBody"></tbody>
+            </table>
+        </div>
+
+        <div class="table-container" id="excludedZsrRecordsContainer">
+            <h4 class="table-header">📋 ZSR-Datensätze ohne DiViS-Match</h4>
+            <table id="excludedZsrRecordsTable">
+                <thead>
+                    <tr>
+                        <th>Auskunftssperre Leib/Leben</th>
+                        <th>Auskunftssperre Adoption</th>
+                        <th>ZSR-ID</th>
+                        <th>Nachname</th>
+                        <th>Vorname</th>
+                        <th>Geburtsdatum</th>
+                    </tr>
+                </thead>
+                <tbody id="excludedZsrRecordsBody"></tbody>
+            </table>
+        </div>
+
+        <div class="table-container" id="inconsistencyContainer">
+            <h4 class="table-header">🔍 Namens-/Adress-Inkonsistenzen bei Eltern</h4>
+            <table id="inconsistencyTable">
+                <thead>
+                    <tr>
+                        <th colspan="3">Kind 1</th>
+                        <th colspan="3">Kind 2</th>
+                        <th colspan="7">Elterndaten</th>
+                    </tr>
+                    <tr>
+                        <th>ZSR-ID</th>
+                        <th>Vorname</th>
+                        <th>Nachname</th>
+                        <th>ZSR-ID</th>
+                        <th>Vorname</th>
+                        <th>Nachname</th>
+                        <th>E-Mail</th>
+                        <th>Vorname (1)</th>
+                        <th>Nachname (1)</th>
+                        <th>Vorname (2)</th>
+                        <th>Nachname (2)</th>
+                        <th>Adresse (1)</th>
+                        <th>Adresse (2)</th>
+                    </tr>
+                </thead>
+                <tbody id="inconsistencyBody"></tbody>
+            </table>
+        </div>
+
+        <div class="table-container" id="emailInconsistencyContainer">
+            <h4 class="table-header">📧 E-Mail-/Adress-Inkonsistenzen bei Eltern</h4>
+            <table id="emailInconsistencyTable">
+                <thead>
+                    <tr>
+                        <th colspan="6">Elterndaten</th>
+                        <th colspan="6">Kinder</th>
+                    </tr>
+                    <tr>
+                        <th>Vorname</th>
+                        <th>Nachname</th>
+                        <th>E-Mail (1)</th>
+                        <th>E-Mail (2)</th>
+                        <th>Adresse (1)</th>
+                        <th>Adresse (2)</th>
+                        <th>ZSR-ID (1)</th>
+                        <th>Vorname (1)</th>
+                        <th>Nachname (1)</th>
+                        <th>ZSR-ID (2)</th>
+                        <th>Vorname (2)</th>
+                        <th>Nachname (2)</th>
+                    </tr>
+                </thead>
+                <tbody id="emailInconsistencyBody"></tbody>
+            </table>
+        </div>
+
+        <div class="table-container" id="deletedRecordsContainer">
+            <h4 class="table-header">🗑️ Gelöschte Elterndatensätze (nicht sorgeberechtigt)</h4>
+            <table id="deletedRecordsTable">
+                <thead>
+                    <tr>
+                        <th>ZSR-ID</th>
+                        <th>Vorname Kind</th>
+                        <th>Nachname Kind</th>
+                        <th>Vorname</th>
+                        <th>Nachname</th>
+                        <th>E-Mail</th>
+                        <th>Straße</th>
+                        <th>Personensorgeberechtigte</th>
+                    </tr>
+                </thead>
+                <tbody id="deletedRecordsBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <div id="loadingMessage">Dateien werden verarbeitet...</div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
