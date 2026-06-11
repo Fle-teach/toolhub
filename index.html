@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+
+
+  <style>
+    body {
+      font-family: "Open Sans", "Calibri", "Ubuntu", "Arial", "Tahoma", sans-serif;
+      color: #111111;
+      background-color: #eef8fe;
+      margin: 0px;
+      padding: 0px;
+    }
+
+    h1 {
+      font-weight: 600;
+      text-align: center;
+      margin-top: 10px;
+      margin-bottom: 10px;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    #h1a {
+      color:rgb(169, 0, 0);
+    }
+
+    #h1b {
+      color: #00437a;
+    }
+
+    #h1c {
+      color: goldenrod;
+    }
+
+    h2 {
+      font-weight: 400;
+      margin-top: 10px;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    h3 {
+      font-weight: 600;
+      padding-top: 50px;
+    }
+
+    h4 {
+      font-style: italic;
+      padding-top: 50px;
+    }
+
+  .container {
+    display: block;
+    border-radius: 8px;
+    padding: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    border-top: 20px solid #4299e1;
+    border-bottom: 20px solid #4299e1;
+    background-color: #82c1f5;
+  }
+
+  .flex-container {
+    display: flex;
+    flex-wrap: wrap;
+    border-radius: 8px;
+    padding: 10px;
+  }
+
+  .toolbox-grid {
+    gap: 16px;
+  }
+
+  .toolbox-grid .container {
+    flex: 1 1 100%;
+    margin: 0;
+  }
+
+  @media (min-width: 800px) {
+    .toolbox-grid .container {
+      flex-basis: calc((100% - 16px) / 2);
+      max-width: calc((100% - 16px) / 2);
+    }
+  }
+
+  @media (min-width: 1200px) {
+    .toolbox-grid .container {
+      flex-basis: calc((100% - 32px) / 3);
+      max-width: calc((100% - 32px) / 3);
+    }
+  }
+
+  @media (min-width: 1600px) {
+    .toolbox-grid .container {
+      flex-basis: calc((100% - 48px) / 4);
+      max-width: calc((100% - 48px) / 4);
+    }
+  }
+
+  .container .flex-container {
+    display: flex;
+    flex-wrap: wrap;
+    background-color: #00437a;
+    border-radius: 8px;
+    padding: 10px;
+  }
+
+  .flex-container a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f1f1f1;
+    border-radius: 8px;
+    margin: 10px;
+    padding: 10px;
+    text-align: center;
+    text-decoration: none;
+    color: #111111;
+    transition: all 0.3s ease;
+    border: 4px solid #4299e1;
+    width: 100%;
+    min-height: 38px; 
+  }
+
+  a:hover {
+    background: #fae8cf;
+    border: 6px solid #4299e1;
+    margin: 6px;
+    padding: 12px;
+  }
+  </style>
+</head>
+<body>
+
+<h1><em id="h1a">tool</em><em id="h1b">hub</em></h1>
+
+<div class="flex-container toolbox-grid">
+<div class="container">
+  <h2>Förderkoordination</h2>
+  <div class="flex-container">
+    <a href="foerderkoordination/sus_mit_foerderbedarf_ermitteln/Foerderbedarffeststellungs-Tool.html">SuS mit Förderbedarf ermitteln</a>
+    <a href="foerderkoordination-lernfoerdervereinbarungen-erstellen.html">Lernfördervereinbarungen erstellen</a>
+    <a href="foerderkoordination/foerderlisten-kombinieren.html">Förderlisten kombinieren</a>
+  </div>
+</div>
+
+<div class="container">
+  <h2>IServ-Benutzerverwaltung</h2>
+  <div class="flex-container">
+    <a href="iserv-benutzerverwaltung-import.html">Schüler-, Eltern-, Lehrer-, und Kursdaten aus DiViS in IServ importieren</a>
+  </div>
+</div>
+
+<div class="container">
+  <h2>IServ-Formulare</h2>
+  <div class="flex-container">
+    <a href="iserv-formulare-fehlende-abgaben-ermitteln.html">Fehlende Abgaben ermitteln</a>
+    <a href="iserv-formulare-doppelte-abgaben-entfernen.html">Doppelte Abgaben entfernen</a>
+  </div>
+</div>
+
+<div class="container">
+  <h2>IServ-Klassenbuch</h2>
+  <div class="flex-container">
+    <a href="iserv-klassenbuch-fehlzeiten-nach-faechern-auswerten.html">Fehlzeiten nach Fächern auswerten</a>
+  </div>
+</div>
+
+<div class="container">
+  <h2>IServ-Stundenplan</h2>
+  <div class="flex-container">
+    <a href="iserv-stundenplanimport-vorverarbeitung.html">UNTIS-Export für Import in IServ vorverarbeiten</a>
+  </div>
+</div>
+
+<div class="container">
+  <h2>LEGs</h2>
+  <div class="flex-container">
+    <a href="legs-schuelerabgaben-in-fuer-kuk-ausfuellbare-boegen-umwandeln.html">Schülerabgaben(CSV) in für KuK ausfüllbare Bögen(DOCX) umwandeln</a>
+  </div>
+</div>
+
+<div class="container">
+  <h2>Neue Klassenzusammensetzung</h2>
+  <div class="flex-container">
+    <a href="neue-klassenzusammensetzungen-erstellen.html">Neue Klassenzusammensetzungen für den Jahrgangswechsel 6/7 erstellen</a>
+  </div>
+</div>
+
+</div>
+
+</body>
+</html>
