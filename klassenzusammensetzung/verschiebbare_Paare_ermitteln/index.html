@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verschiebbare Schülergruppen ermitteln</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .upload-section {
+            margin-bottom: 30px;
+        }
+
+        .upload-box {
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-box:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+
+        .upload-box.dragover {
+            border-color: #764ba2;
+            background: #e8ebff;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .upload-text {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .upload-text strong {
+            color: #667eea;
+        }
+
+        .upload-hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .results-section {
+            display: none;
+        }
+
+        .results-section.visible {
+            display: block;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: #f8f9ff;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            border-radius: 4px;
+        }
+
+        .stat-card h3 {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .group-section {
+            margin-bottom: 40px;
+        }
+
+        .group-header {
+            background: #f8f9ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .group-header h3 {
+            margin: 0;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .group-header .count {
+            color: #667eea;
+            font-weight: bold;
+            background: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+        }
+
+        .pairs-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .pairs-table thead {
+            background: #f8f9ff;
+        }
+
+        .pairs-table th {
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #e0e0e0;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .pairs-table td {
+            padding: 10px 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .pairs-table tbody tr:hover {
+            background: #f8f9ff;
+        }
+
+        .student-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .student-badge {
+            background: #667eea;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .separator {
+            color: #ccc;
+            font-weight: bold;
+        }
+
+        .error {
+            background: #fee;
+            border: 1px solid #fcc;
+            color: #c33;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            background: #efe;
+            border: 1px solid #cfc;
+            color: #3c3;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+
+        .no-results p {
+            font-size: 16px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .export-btn {
+            background: #4caf50;
+            color: white;
+        }
+
+        .export-btn:hover {
+            background: #45a049;
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .group-row {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .group-row:hover {
+            background-color: #e8ebff !important;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 0;
+            border-radius: 8px;
+            width: 90%;
+            height: 90vh;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-close:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        #graphContainer {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 0 0 8px 8px;
+            overflow: hidden;
+        }
+
+        .graph-info {
+            padding: 10px 20px;
+            background: #f8f9ff;
+            border-bottom: 1px solid #ddd;
+            font-size: 13px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Verschiebbare Schülergruppen</h1>
+            <p>Ermittelt geschlossene Schülergruppen basierend auf gegenseitigen Wünschen mit höchster Priorität</p>
+        </header>
+
+        <div class="content">
+            <div class="upload-section">
+                <div class="upload-box" id="uploadBox">
+                    <div class="upload-text">
+                        <strong>CSV-Datei hier ablegen</strong> oder klicken zum Auswählen
+                    </div>
+                    <div class="upload-hint">
+                        Erforderliche Spalten: Schüler, Nachname, Vorname, Alte Klasse, Wunsch 1 - Höchste Priorität
+                    </div>
+                </div>
+                <input type="file" id="fileInput" accept=".csv" />
+            </div>
+
+            <div id="message"></div>
+
+            <div class="results-section" id="resultsSection">
+                <div class="stats">
+                    <div class="stat-card">
+                        <h3>Eingabe</h3>
+                        <div class="value" id="totalStudents">0</div>
+                        <p style="font-size: 12px; color: #666; margin-top: 5px;">Schüler insgesamt</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Geschlossene Gruppen</h3>
+                        <div class="value" id="groupCount">0</div>
+                        <p style="font-size: 12px; color: #666; margin-top: 5px;">Gruppen</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Schüler in Gruppen</h3>
+                        <div class="value" id="studentInGroups">0</div>
+                        <p style="font-size: 12px; color: #666; margin-top: 5px;">Schüler</p>
+                    </div>
+                </div>
+
+                <div id="tableContainer"></div>
+
+                <div class="button-group">
+                    <button class="export-btn" id="exportBtn">Als CSV exportieren</button>
+                    <button class="btn-secondary" id="resetBtn">Zurücksetzen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for graph visualization -->
+    <div id="graphModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="graphModalTitle">Gruppenwünsche</h2>
+                <button class="modal-close" id="graphCloseBtn">&times;</button>
+            </div>
+            <div class="graph-info" id="graphInfo"></div>
+            <div id="graphContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        class GroupFinder {
+            constructor() {
+                this.data = [];
+                this.students = new Map();
+                this.groups = [];
+            }
+
+            parseCSV(text) {
+                const lines = text.trim().split('\n');
+                const headers = this.parseCSVLine(lines[0]);
+
+                const requiredColumns = ['Schüler', 'Nachname', 'Vorname', 'Alte Klasse', 'Wunsch 1 - Höchste Priorität'];
+                const missingColumns = requiredColumns.filter(col => !headers.includes(col));
+
+                if (missingColumns.length > 0) {
+                    throw new Error(`Fehlende Spalten: ${missingColumns.join(', ')}`);
+                }
+
+                const data = [];
+                for (let i = 1; i < lines.length; i++) {
+                    if (lines[i].trim() === '') continue;
+                    const values = this.parseCSVLine(lines[i]);
+                    const row = {};
+                    headers.forEach((header, index) => {
+                        row[header] = values[index]?.trim() || '';
+                    });
+                    data.push(row);
+                }
+
+                return data;
+            }
+
+            parseCSVLine(line) {
+                const result = [];
+                let current = '';
+                let inQuotes = false;
+
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    const nextChar = line[i + 1];
+
+                    if (char === '"') {
+                        if (inQuotes && nextChar === '"') {
+                            current += '"';
+                            i++;
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (char === ',' && !inQuotes) {
+                        result.push(current);
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+
+                result.push(current);
+                return result;
+            }
+
+            analyze(data) {
+                this.data = data;
+                this.students.clear();
+                this.groups = [];
+
+                // Create student map and build directed graph
+                const directedGraph = new Map(); // studentId -> [studentIds they wish for]
+                const undirectedGraph = new Map(); // for finding connected components
+
+                data.forEach((row) => {
+                    const studentId = row['Schüler']?.trim() || '';
+                    if (studentId) {
+                        this.students.set(studentId, {
+                            id: studentId,
+                            name: row['Nachname'] + ' ' + row['Vorname'],
+                            wish1: row['Wunsch 1 - Höchste Priorität']?.trim() || ''
+                        });
+
+                        if (!directedGraph.has(studentId)) {
+                            directedGraph.set(studentId, []);
+                        }
+                        if (!undirectedGraph.has(studentId)) {
+                            undirectedGraph.set(studentId, new Set());
+                        }
+                    }
+                });
+
+                // Build the graphs
+                for (const [studentId, student] of this.students) {
+                    if (student.wish1 && this.students.has(student.wish1)) {
+                        directedGraph.get(studentId).push(student.wish1);
+                        // Add undirected edge (both directions)
+                        undirectedGraph.get(studentId).add(student.wish1);
+                        undirectedGraph.get(student.wish1).add(studentId);
+                    }
+                }
+
+                // Find connected components using undirected graph
+                const connectedComponents = this.findConnectedComponents(undirectedGraph);
+
+                // Filter components: keep only those with no external incoming edges
+                this.groups = connectedComponents
+                    .filter(component => !this.hasExternalIncomingEdges(component, directedGraph))
+                    .map(component => ({
+                        members: component.sort(),
+                        size: component.length
+                    }))
+                    .sort((a, b) => b.size - a.size);
+
+                // Debug output
+                console.log('Directed graph:', directedGraph);
+                console.log('Undirected graph:', undirectedGraph);
+                console.log('All connected components:', connectedComponents);
+                console.log('Filtered groups (no external incoming):', this.groups);
+
+                return this.groups;
+            }
+
+            findConnectedComponents(undirectedGraph) {
+                const visited = new Set();
+                const components = [];
+
+                const dfs = (node, component) => {
+                    visited.add(node);
+                    component.push(node);
+                    const neighbors = undirectedGraph.get(node) || new Set();
+                    for (const neighbor of neighbors) {
+                        if (!visited.has(neighbor)) {
+                            dfs(neighbor, component);
+                        }
+                    }
+                };
+
+                for (const node of undirectedGraph.keys()) {
+                    if (!visited.has(node)) {
+                        const component = [];
+                        dfs(node, component);
+                        components.push(component);
+                    }
+                }
+
+                return components;
+            }
+
+            hasExternalIncomingEdges(component, directedGraph) {
+                const componentSet = new Set(component);
+
+                // Check if any student outside the component wishes for someone inside
+                for (const [studentId, student] of this.students) {
+                    // If student is outside the component
+                    if (!componentSet.has(studentId)) {
+                        // Check if they wish for someone inside the component
+                        if (student.wish1 && componentSet.has(student.wish1)) {
+                            return true;
+                        }
+                    }
+                }
+
+                return false;
+            }
+
+            exportToCSV() {
+                if (this.groups.length === 0) {
+                    return '';
+                }
+
+                const rows = [];
+                this.groups.forEach(group => {
+                    const membersList = group.members.join(', ');
+                    rows.push([group.size, membersList]);
+                });
+
+                const headers = ['Gruppengröße', 'Schüler'];
+                return [headers, ...rows]
+                    .map(row => row.map(cell => `"${cell}"`).join(','))
+                    .join('\n');
+            }
+        }
+
+        const finder = new GroupFinder();
+
+        // DOM elements
+        const uploadBox = document.getElementById('uploadBox');
+        const fileInput = document.getElementById('fileInput');
+        const messageDiv = document.getElementById('message');
+        const resultsSection = document.getElementById('resultsSection');
+        const tableContainer = document.getElementById('tableContainer');
+        const totalStudentsEl = document.getElementById('totalStudents');
+        const groupCountEl = document.getElementById('groupCount');
+        const studentInGroupsEl = document.getElementById('studentInGroups');
+        const exportBtn = document.getElementById('exportBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const graphModal = document.getElementById('graphModal');
+        const graphCloseBtn = document.getElementById('graphCloseBtn');
+        const graphModalTitle = document.getElementById('graphModalTitle');
+        const graphInfo = document.getElementById('graphInfo');
+        const graphContainer = document.getElementById('graphContainer');
+
+        let currentNetwork = null;
+
+        // File upload handling
+        uploadBox.addEventListener('click', () => fileInput.click());
+
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.classList.add('dragover');
+        });
+
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.classList.remove('dragover');
+        });
+
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFile(e.target.files[0]);
+        });
+
+        function handleFile(file) {
+            if (!file) return;
+
+            if (!file.name.endsWith('.csv')) {
+                showMessage('Bitte wählen Sie eine CSV-Datei aus.', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const text = e.target.result;
+                    const data = finder.parseCSV(text);
+                    const groups = finder.analyze(data);
+                    displayResults(groups, data.length);
+                } catch (error) {
+                    showMessage(`Fehler: ${error.message}`, 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function displayResults(groups, totalStudents) {
+            messageDiv.innerHTML = '';
+            resultsSection.classList.add('visible');
+
+            totalStudentsEl.textContent = totalStudents;
+            groupCountEl.textContent = groups.length;
+
+            const totalInGroups = groups.reduce((sum, g) => sum + g.size, 0);
+            studentInGroupsEl.textContent = totalInGroups;
+
+            if (groups.length === 0) {
+                tableContainer.innerHTML = '<div class="no-results"><p>Keine geschlossenen Schülergruppen gefunden.</p></div>';
+                return;
+            }
+
+            // Group by size
+            const groupedBySize = new Map();
+            groups.forEach(group => {
+                if (!groupedBySize.has(group.size)) {
+                    groupedBySize.set(group.size, []);
+                }
+                groupedBySize.get(group.size).push(group);
+            });
+
+            let html = '';
+            const sizes = Array.from(groupedBySize.keys()).sort((a, b) => b - a);
+
+            sizes.forEach(size => {
+                const groupsOfSize = groupedBySize.get(size);
+                html += `
+                    <div class="group-section">
+                        <div class="group-header">
+                            <h3>Gruppen der Größe ${size}</h3>
+                            <div class="count">${groupsOfSize.length} ${groupsOfSize.length === 1 ? 'Gruppe' : 'Gruppen'}</div>
+                        </div>
+                        <table class="pairs-table">
+                            <thead>
+                                <tr>
+                                    <th>Schüler</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                groupsOfSize.forEach(group => {
+                    const badgeHtml = group.members
+                        .map(id => `<span class="student-badge">${id}</span>`)
+                        .join('');
+                    html += `
+                        <tr>
+                            <td>
+                                <div class="student-group">
+                                    ${badgeHtml}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            });
+
+            tableContainer.innerHTML = html;
+        }
+
+        function showMessage(text, type) {
+            messageDiv.innerHTML = `<div class="${type}">${text}</div>`;
+        }
+
+        exportBtn.addEventListener('click', () => {
+            const csv = finder.exportToCSV();
+            if (!csv) {
+                showMessage('Keine Daten zum Exportieren.', 'error');
+                return;
+            }
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'schuelgruppen.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        resetBtn.addEventListener('click', () => {
+            fileInput.value = '';
+            messageDiv.innerHTML = '';
+            resultsSection.classList.remove('visible');
+            tableContainer.innerHTML = '';
+            finder.groups = [];
+            finder.data = [];
+            finder.students.clear();
+        });
+
+        // Modal event listeners
+        graphCloseBtn.addEventListener('click', () => {
+            graphModal.classList.remove('show');
+            if (currentNetwork) {
+                currentNetwork.destroy();
+                currentNetwork = null;
+            }
+        });
+
+        graphModal.addEventListener('click', (e) => {
+            if (e.target === graphModal) {
+                graphModal.classList.remove('show');
+                if (currentNetwork) {
+                    currentNetwork.destroy();
+                    currentNetwork = null;
+                }
+            }
+        });
+
+        function showGroupGraph(groupMembers) {
+            graphModal.classList.add('show');
+            graphModalTitle.textContent = `Gruppenwünsche (${groupMembers.length} Schüler)`;
+
+            // Build nodes and edges for this group
+            const nodes = [];
+            const edges = [];
+            const processedEdges = new Set();
+
+            groupMembers.forEach(memberId => {
+                const student = finder.students.get(memberId);
+                if (student) {
+                    nodes.push({
+                        id: memberId,
+                        label: memberId,
+                        title: `${memberId}`,
+                        color: {
+                            background: '#667eea',
+                            border: '#764ba2'
+                        },
+                        font: {
+                            color: 'white',
+                            size: 14,
+                            face: 'sans-serif'
+                        },
+                        shape: 'box',
+                        margin: 10,
+                        widthConstraint: {
+                            minimum: 50
+                        }
+                    });
+
+                    // Add edge if wish1 is in group
+                    if (student.wish1 && groupMembers.includes(student.wish1)) {
+                        const edgeKey = `${memberId}-${student.wish1}`;
+
+                        if (!processedEdges.has(edgeKey)) {
+                            // Check if there's a mutual wish
+                            const targetStudent = finder.students.get(student.wish1);
+                            const isMutual = targetStudent && targetStudent.wish1 === memberId;
+
+                            // Determine curve direction based on whether it's mutual
+                            let curveType = 'continuous';
+                            if (isMutual) {
+                                // For mutual wishes, use different curves to show both directions clearly
+                                const reverseEdgeKey = `${student.wish1}-${memberId}`;
+                                if (processedEdges.has(reverseEdgeKey)) {
+                                    // This is the second edge in a mutual pair
+                                    curveType = 'curvedCCW';
+                                } else {
+                                    // This is the first edge in a mutual pair
+                                    curveType = 'curvedCW';
+                                }
+                            }
+
+                            edges.push({
+                                from: memberId,
+                                to: student.wish1,
+                                arrows: 'to',
+                                smooth: {
+                                    type: curveType,
+                                    forceDirection: 'vertical'
+                                },
+                                color: {
+                                    color: isMutual ? '#4caf50' : '#667eea',
+                                    opacity: 0.9
+                                },
+                                width: isMutual ? 2.5 : 2,
+                                font: {
+                                    size: 12,
+                                    color: isMutual ? '#4caf50' : '#667eea',
+                                    align: 'middle'
+                                }
+                            });
+
+                            processedEdges.add(edgeKey);
+                        }
+                    }
+                }
+            });
+
+            // Count edges for info
+            const wishEdges = edges.length;
+            const mutualPairs = edges.filter(e => {
+                const targetStudent = finder.students.get(e.to);
+                return targetStudent && targetStudent.wish1 === e.from;
+            }).length / 2;
+
+            graphInfo.innerHTML = `${groupMembers.length} Schüler • ${wishEdges} Wunsch-Kanten • ${Math.round(mutualPairs)} gegenseitige Paare`;
+
+            // Add legend
+            const legend = document.createElement('div');
+            legend.style.cssText = 'position: absolute; top: 10px; left: 10px; background: white; padding: 10px 15px; border-radius: 4px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 10;';
+            legend.innerHTML = '<div style="margin-bottom: 8px;"><span style="color: #4caf50; font-weight: bold;">●</span> Gegenseitiger Wunsch</div><div><span style="color: #667eea; font-weight: bold;">●</span> Einseitiger Wunsch</div>';
+            graphContainer.appendChild(legend);
+
+            const data = { nodes, edges };
+            const options = {
+                physics: {
+                    enabled: true,
+                    barnesHut: {
+                        gravitationalConstant: -4000,
+                        centralGravity: 0.3,
+                        springLength: 200,
+                        springConstant: 0.04,
+                        damping: 0.7
+                    },
+                    solver: 'barnesHut',
+                    stabilization: {
+                        iterations: 200
+                    }
+                },
+                interaction: {
+                    navigationButtons: true,
+                    keyboard: true,
+                    zoomView: true,
+                    dragView: true
+                }
+            };
+
+            // Clear previous network if exists
+            if (currentNetwork) {
+                currentNetwork.destroy();
+            }
+
+            currentNetwork = new vis.Network(graphContainer, data, options);
+        }
+
+        // Update displayResults to make groups clickable
+        const originalDisplayResults = displayResults;
+        function displayResults(groups, totalStudents) {
+            messageDiv.innerHTML = '';
+            resultsSection.classList.add('visible');
+
+            totalStudentsEl.textContent = totalStudents;
+            groupCountEl.textContent = groups.length;
+
+            const totalInGroups = groups.reduce((sum, g) => sum + g.size, 0);
+            studentInGroupsEl.textContent = totalInGroups;
+
+            if (groups.length === 0) {
+                tableContainer.innerHTML = '<div class="no-results"><p>Keine geschlossenen Schülergruppen gefunden.</p></div>';
+                return;
+            }
+
+            // Group by size
+            const groupedBySize = new Map();
+            groups.forEach(group => {
+                if (!groupedBySize.has(group.size)) {
+                    groupedBySize.set(group.size, []);
+                }
+                groupedBySize.get(group.size).push(group);
+            });
+
+            let html = '';
+            const sizes = Array.from(groupedBySize.keys()).sort((a, b) => b - a);
+
+            sizes.forEach(size => {
+                const groupsOfSize = groupedBySize.get(size);
+                html += `
+                    <div class="group-section">
+                        <div class="group-header">
+                            <h3>Gruppen der Größe ${size}</h3>
+                            <div class="count">${groupsOfSize.length} ${groupsOfSize.length === 1 ? 'Gruppe' : 'Gruppen'}</div>
+                        </div>
+                        <table class="pairs-table">
+                            <thead>
+                                <tr>
+                                    <th>Schüler (klick für Wünschegraph)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                groupsOfSize.forEach(group => {
+                    const badgeHtml = group.members
+                        .map(id => `<span class="student-badge">${id}</span>`)
+                        .join('');
+                    html += `
+                        <tr class="group-row" onclick="showGroupGraph([${group.members.map(m => `'${m}'`).join(', ')}])">
+                            <td>
+                                <div class="student-group">
+                                    ${badgeHtml}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            });
+
+            tableContainer.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

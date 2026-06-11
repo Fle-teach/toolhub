@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automatische Klassenzusammensetzung</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Automatische Klassenzusammensetzung</h1>
+        
+        <div class="upload-section">
+            <div class="file-input-group">
+                <label for="wishesFile">Wünsche-Datei (CSV):</label>
+                <input type="file" id="wishesFile" accept=".csv">
+            </div>
+            
+            <div class="file-input-group">
+                <label for="studentDataFile">Schülerdaten-Datei (CSV):</label>
+                <input type="file" id="studentDataFile" accept=".csv">
+            </div>
+            
+            <div class="generation-options">
+                <div class="option-group">
+                    <label for="classCount">Anzahl der Klassen:</label>
+                    <input type="number" id="classCount" min="2" max="10" value="4">
+                </div>
+                
+                <div class="option-group">
+                    <label>
+                        <input type="checkbox" id="includeIgnored">
+                        Ignorierte Schüler in normale Klassen einteilen
+                    </label>
+                </div>
+                
+                <div class="option-group">
+                    <label>
+                        <input type="checkbox" id="showMutualPairs">
+                        Gegenseitige Wünsche (höchste Priorität) hervorheben
+                    </label>
+                </div>
+                
+                <div class="option-group">
+                    <label>
+                        <input type="checkbox" id="showFulfilledPriority">
+                        Erfüllte Wunschpriorität anzeigen (1-3)
+                    </label>
+                </div>
+                
+                <div class="distribution-rules">
+                    <h4>Verteilungsregeln</h4>
+                    
+                    <div class="rule-group">
+                        <label for="maxSameGender">Max. Schüler mit gleichem Geschlecht pro Klasse:</label>
+                        <input type="number" id="maxSameGender" min="0" value="0">
+                        <span class="rule-hint">(0 = keine Beschränkung)</span>
+                    </div>
+                    
+                    <div class="rule-group">
+                        <label for="maxSameOldClass">Max. Schüler aus gleicher alter Klasse:</label>
+                        <input type="number" id="maxSameOldClass" min="0" value="0">
+                        <span class="rule-hint">(0 = keine Beschränkung)</span>
+                    </div>
+                    
+                    <div class="rule-group">
+                        <label for="minSameOldClass">Min. Schüler aus gleicher alter Klasse:</label>
+                        <input type="number" id="minSameOldClass" min="0" value="2">
+                        <span class="rule-hint">(Niemand soll alleine sein)</span>
+                    </div>
+                    
+                    <h4 style="margin-top: 15px;">Erweiterte Regeln</h4>
+                    
+                    <div class="rule-group">
+                        <label for="maxClassSize">Max. Schülerzahl pro Klasse:</label>
+                        <input type="number" id="maxClassSize" min="0" value="0">
+                        <span class="rule-hint">(0 = keine Beschränkung)</span>
+                    </div>
+                    
+                    <div class="rule-group">
+                        <label for="minClassSize">Min. Schülerzahl pro Klasse:</label>
+                        <input type="number" id="minClassSize" min="0" value="0">
+                        <span class="rule-hint">(0 = keine Beschränkung)</span>
+                    </div>
+                    
+                    <div class="rule-group">
+                        <label for="maxActive">Max. aktive Schüler pro Klasse:</label>
+                        <input type="number" id="maxActive" min="0" value="0">
+                        <span class="rule-hint">(0 = keine Beschränkung)</span>
+                    </div>
+                    
+                    <div class="rule-group">
+                        <label for="maxGrade1">Max. Schüler mit Note 1:</label>
+                        <input type="number" id="maxGrade1" min="0" value="0">
+                        <span class="rule-hint">(0 = keine Beschränkung)</span>
+                    </div>
+                    
+                    <div class="rule-group">
+                        <label for="maxGrade3">Max. Schüler mit Note 3:</label>
+                        <input type="number" id="maxGrade3" min="0" value="0">
+                        <span class="rule-hint">(0 = keine Beschränkung)</span>
+                    </div>
+                    
+                    <div class="rule-group">
+                        <label for="minDistinctOldClasses">Min. unterschiedliche alte Klassen:</label>
+                        <input type="number" id="minDistinctOldClasses" min="0" value="0">
+                        <span class="rule-hint">(0 = keine Beschränkung)</span>
+                    </div>
+                    
+                    <div class="rule-group">
+                        <label>
+                            <input type="checkbox" id="mutualWishOneRequired">
+                            Gegenseitige Wünsche (Priorität 1) erzwingen
+                        </label>
+                        <span class="rule-hint">(Wenn beide sich an #1 wünschen, müssen sie in derselben Klasse sein)</span>
+                    </div>
+                </div>
+                
+            </div>
+            
+            <div class="button-group">
+                <button class="btn-primary" onclick="generateClasses()" id="generateBtn" disabled>
+                    Klassen generieren
+                </button>
+                <button class="btn-secondary" onclick="pauseOptimization()" id="pauseBtn" style="display: none;">
+                    Pausieren
+                </button>
+                <button class="btn-primary" onclick="resumeOptimization()" id="resumeBtn" style="display: none;">
+                    Fortsetzen
+                </button>
+                <button class="btn-secondary" onclick="stopOptimization()" id="stopBtn" style="display: none;">
+                    Beenden
+                </button>
+                <button class="btn-secondary" onclick="resetAll()">
+                    Zurücksetzen
+                </button>
+            </div>
+            
+            <div class="optimization-status" id="optimizationStatus">
+                <h4>Kontinuierliche Optimierung läuft...</h4>
+                <div class="optimization-metrics">
+                    <div class="metric">
+                        <div class="metric-value" id="currentIterations">0</div>
+                        <div class="metric-label">Iterationen</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="currentScore">0</div>
+                        <div class="metric-label">Bester Score</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="improvementRate">0%</div>
+                        <div class="metric-label">Verbesserungen</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
+        </div>
+        
+        <div class="stats-section" id="statsSection" style="display: none;">
+            <div class="score-container">
+                <div class="total-score">
+                    Gesamtscore: <span class="score-value" id="totalScore">0</span>
+                </div>
+                <div class="score-details" id="scoreDetails"></div>
+            </div>
+            <div class="action-buttons">
+                <button class="btn-export" onclick="exportClasses()">
+                    Zusammenstellung exportieren
+                </button>
+                <button class="btn-import" onclick="document.getElementById('importFile').click()">
+                    Zusammenstellung importieren
+                </button>
+                <input type="file" id="importFile" accept=".json" onchange="importClasses(event)">
+            </div>
+        </div>
+        
+        <div class="legend">
+            <h3>Farblegende</h3>
+            <div class="legend-items">
+                <div class="legend-item">
+                    <div class="legend-color selected"></div>
+                    <span class="legend-text">Ausgewählter Schüler</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color wish-high"></div>
+                    <span class="legend-text">Wunsch 1 (höchste Priorität)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color wish-medium"></div>
+                    <span class="legend-text">Wunsch 2 (mittlere Priorität)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color wish-low"></div>
+                    <span class="legend-text">Wunsch 3 (niedrige Priorität)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color wished-by-high"></div>
+                    <span class="legend-text">Wird als Wunsch 1 gewünscht</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color wished-by-medium"></div>
+                    <span class="legend-text">Wird als Wunsch 2 gewünscht</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color wished-by-low"></div>
+                    <span class="legend-text">Wird als Wunsch 3 gewünscht</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color excluded"></div>
+                    <span class="legend-text">Ausschluss vorhanden</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color exclusion-conflict"></div>
+                    <span class="legend-text">Ausschluss innerhalb derselben Klasse</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color mutual-pair"></div>
+                    <span class="legend-text">Gegenseitige Wünsche (mit Symbol)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color mutual-pair-separated"></div>
+                    <span class="legend-text">Gegenseitige Wünsche (Priorität 1) in verschiedenen Klassen</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color priority-indicator"></div>
+                    <span class="legend-text">Erfüllte Priorität (1=grün, 2=gelb, 3=grau, 0=keine Wünsche, X=kein Wunsch erfüllt)</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="classesContainer" class="classes-container"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
