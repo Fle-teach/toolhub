@@ -152,6 +152,14 @@
             font-weight: 500;
             cursor: pointer;
         }
+
+        .subject-filter.sum-filter {
+            border-left: 4px solid #2980b9;
+        }
+
+        .subject-filter.sum-filter label {
+            color: #2980b9;
+        }
         
         .filter-buttons {
             display: flex;
@@ -418,12 +426,13 @@
         }
 
         // Fachname aus einer Zeile der Spalte "Verp. Unterricht" ableiten:
-        // alles nach "in Kurs <Jahrgang> " bis zum optionalen "(...)"-Anhang am Ende.
+        // alles nach "in Kurs " (Jahrgang optional) bis zum optionalen "(...)"-Anhang am Ende.
         // Beispiele: '6. Rel in Kurs 11 rel 1 Freu  (Freu)' -> 'rel 1 Freu'
         //            '6.  in Kurs 11 phil 3 Yil '           -> 'phil 3 Yil'
         //            '2. E Camb in Kurs 12 E cam 1 Frej  (Frej)' -> 'E cam 1 Frej'
+        //            '8. Mup in Kurs Popchor Dö  (Dö)'      -> 'Popchor Dö'
         function extractSubject(line) {
-            const match = line.match(/in Kurs\s+\d+\s+(.+?)\s*(\([^)]*\))?\s*$/);
+            const match = line.match(/in Kurs\s+(?:\d+\s+)?(.+?)\s*(\([^)]*\))?\s*$/);
             if (match && match[1].trim()) {
                 return match[1].trim();
             }
@@ -521,20 +530,31 @@
                 totalIgnoredRows
             };
 
-            allSubjects = Array.from(subjects).sort();
+            // Alphabetisch sortieren (sprachgerecht, Groß-/Kleinschreibung ignorieren)
+            allSubjects = Array.from(subjects).sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base' }));
 
             createSubjectFilters();
             displayResults();
         }
 
         function createSubjectFilters() {
-            // Standardmäßig ist kein Fach ausgewählt
-            subjectFilters.innerHTML = allSubjects.map((subject, index) => `
+            // Standardmäßig ist weder die Summe noch ein Fach ausgewählt
+            subjectFilters.innerHTML = `
+                <div class="subject-filter sum-filter">
+                    <input type="checkbox" id="sumFilter" onchange="displayResults()">
+                    <label for="sumFilter">Summe (alle Fächer)</label>
+                </div>
+            ` + allSubjects.map((subject, index) => `
                 <div class="subject-filter">
                     <input type="checkbox" id="subject_${index}" onchange="displayResults()">
                     <label for="subject_${index}">${subject}</label>
                 </div>
             `).join('');
+        }
+
+        function isSumSelected() {
+            const sumFilter = document.getElementById('sumFilter');
+            return sumFilter ? sumFilter.checked : false;
         }
 
         function getSelectedSubjects() {
@@ -544,6 +564,7 @@
         }
 
         function selectAllSubjects() {
+            document.getElementById('sumFilter').checked = true;
             allSubjects.forEach((subject, index) => {
                 document.getElementById(`subject_${index}`).checked = true;
             });
@@ -551,6 +572,7 @@
         }
 
         function deselectAllSubjects() {
+            document.getElementById('sumFilter').checked = false;
             allSubjects.forEach((subject, index) => {
                 document.getElementById(`subject_${index}`).checked = false;
             });
@@ -601,19 +623,25 @@
                 </div>
             `;
 
-            // Tabellenkopf erstellen: Summe über alle Fächer + ausgewählte Fächer
+            const showSum = isSumSelected();
+
+            // Tabellenkopf erstellen: optional Summe über alle Fächer + ausgewählte Fächer
             let headerHTML = '<tr><th class="student-header">Schüler</th>';
-            headerHTML += '<th class="sum-group" colspan="2">Summe (alle Fächer)</th>';
+            if (showSum) {
+                headerHTML += '<th class="sum-group" colspan="2">Summe (alle Fächer)</th>';
+            }
             selectedSubjects.forEach(subject => {
                 headerHTML += `
                     <th class="subject-group" colspan="2">${subject}</th>
                 `;
             });
             headerHTML += '</tr><tr><th></th>';
-            headerHTML += `
-                <th class="total-col">Gesamt</th>
-                <th class="unexcused-col">Unentschuldigt</th>
-            `;
+            if (showSum) {
+                headerHTML += `
+                    <th class="total-col">Gesamt</th>
+                    <th class="unexcused-col">Unentschuldigt</th>
+                `;
+            }
             selectedSubjects.forEach(subject => {
                 headerHTML += `
                     <th class="total-col">Gesamt</th>
@@ -627,11 +655,13 @@
             const sortedStudents = students.sort();
             const bodyRows = sortedStudents.map(student => {
                 let rowHTML = `<td class="student-name">${student}</td>`;
-                const sums = studentTotals[student];
-                rowHTML += `
-                    <td class="total-cell ${sums.total === 0 ? 'zero' : ''}">${sums.total}</td>
-                    <td class="unexcused-cell ${sums.unexcused === 0 ? 'zero' : ''}">${sums.unexcused}</td>
-                `;
+                if (showSum) {
+                    const sums = studentTotals[student];
+                    rowHTML += `
+                        <td class="total-cell ${sums.total === 0 ? 'zero' : ''}">${sums.total}</td>
+                        <td class="unexcused-cell ${sums.unexcused === 0 ? 'zero' : ''}">${sums.unexcused}</td>
+                    `;
+                }
                 selectedSubjects.forEach(subject => {
                     const data = studentSubjectAbsences[student][subject] || { total: 0, unexcused: 0 };
                     rowHTML += `
@@ -658,8 +688,14 @@
             // Daten für Export vorbereiten
             const exportData = [];
 
+            const showSum = isSumSelected();
+
             // Header erstellen
-            const headers = ['Schüler', 'Summe (alle Fächer) - Gesamt', 'Summe (alle Fächer) - Unentschuldigt'];
+            const headers = ['Schüler'];
+            if (showSum) {
+                headers.push('Summe (alle Fächer) - Gesamt');
+                headers.push('Summe (alle Fächer) - Unentschuldigt');
+            }
             selectedSubjects.forEach(subject => {
                 headers.push(`${subject} - Gesamt`);
                 headers.push(`${subject} - Unentschuldigt`);
@@ -668,8 +704,12 @@
 
             // Datenzeilen erstellen
             students.forEach(student => {
-                const sums = studentTotals[student];
-                const row = [student, sums.total, sums.unexcused];
+                const row = [student];
+                if (showSum) {
+                    const sums = studentTotals[student];
+                    row.push(sums.total);
+                    row.push(sums.unexcused);
+                }
                 selectedSubjects.forEach(subject => {
                     const data = studentSubjectAbsences[student][subject] || { total: 0, unexcused: 0 };
                     row.push(data.total);
