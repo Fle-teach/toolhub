@@ -1,12 +1,18 @@
-Hinweis: Die Dateien 'app.js' und 'xlsx.full.min.js' müssen sich im gleichen Ordner wie die Datei 'Förderbedarfffeststellungs-Tool.html' befinden und dürfen nicht gelöscht werden.
+Hinweis: Die Dateien 'app.js' und 'xlsx.full.min.js' müssen sich im gleichen Ordner wie die Datei 'index.html' befinden und dürfen nicht gelöscht werden.
+
+Die vollständige Anleitung ist auch direkt in der Anwendung unter 'Hinweise zur Nutzung' abrufbar.
 
 Schritt 1 - Tabellarische Übersicht über alle Förderbedarfe erzeugen
 
-1. Förderbedarffeststellungs-Tool.html öffnen
-2. Auf 'Durchsuchen...' klicken
-3. Beliebig viele von DIVIS generierte Notenübersichten (im XLSX-Format) auswählen und öffnen
-4. Auf 'Auswerten' klicken
-5. Die tabellarische Übersicht über alle Förderbedarfe befindet sich nun im Downloads-Ordner (Dateiname: 'Übersicht_Förderbedarf_<betroffene_Klassen>.csv')
+1. index.html öffnen
+2. Bei Bedarf die Kriterien unter 'Einstellungen' anpassen (Noten jeweils durch Komma getrennt). Standardwerte:
+   - Noten Hauptfach: 4-, 5+, 5-, 6+
+   - Noten Nebenfach: 5+, 5-, 6+
+   - Hauptfächer: D, Ma, E
+   Über 'Auf Standardwerte zurücksetzen' können die Vorgaben jederzeit wiederhergestellt werden.
+3. Beliebig viele von DIVIS generierte Notenübersichten (im XLSX-Format) per Klick oder Drag & Drop in das Upload-Feld laden
+4. Auf 'Auswerten' klicken - die gefundenen Förderbedarfe werden direkt auf der Seite angezeigt, gruppiert nach Klassen
+5. Auf 'Als XLSX exportieren' klicken - die tabellarische Übersicht über alle Förderbedarfe befindet sich nun im Downloads-Ordner (Dateiname: 'Übersicht_Förderbedarf_<betroffene_Klassen>.xlsx')
 
 
 Schritt 2 - Personalisierte Lernfördervereinbarungen
