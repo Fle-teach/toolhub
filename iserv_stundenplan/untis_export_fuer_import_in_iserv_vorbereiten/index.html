@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV-Filter Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            padding: 30px;
+            text-align: center;
+            margin: 20px 0;
+            background-color: #fafafa;
+        }
+        .upload-area.dragover {
+            border-color: #007bff;
+            background-color: #e3f2fd;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .btn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .stats {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .error {
+            color: #dc3545;
+            margin-top: 10px;
+        }
+        .success {
+            color: #28a745;
+            margin-top: 10px;
+        }
+        .preview {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CSV-Filter Tool</h1>
+        <p>Wähle eine CSV-Datei aus. Alle Datensätze, die in der 42. Spalte keinen Wert enthalten oder keinen Zahlenwert beginnen, werden entfernt.</p>
+        
+        <div class="upload-area" id="uploadArea">
+            <p>📁 CSV-Datei hier ablegen oder</p>
+            <label for="fileInput" class="btn">Datei auswählen</label>
+            <input type="file" id="fileInput" accept=".csv,.txt">
+        </div>
+
+        <div id="results" style="display: none;">
+            <div class="stats">
+                <h3>Verarbeitungsergebnisse:</h3>
+                <p id="originalCount"></p>
+                <p id="filteredCount"></p>
+                <p id="removedCount"></p>
+            </div>
+
+            <button id="downloadBtn" class="btn">
+                Gefilterte CSV herunterladen
+            </button>
+
+            <div id="preview" class="preview">
+                <h4>Vorschau der ersten 5 Zeilen (gefiltert):</h4>
+                <pre id="previewContent"></pre>
+            </div>
+        </div>
+
+        <div id="error" class="error"></div>
+        <div id="success" class="success"></div>
+    </div>
+
+    <script>
+        let filteredData = '';
+        let originalFilename = '';
+
+        // DOM-Elemente
+        const fileInput = document.getElementById('fileInput');
+        const uploadArea = document.getElementById('uploadArea');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const errorDiv = document.getElementById('error');
+        const successDiv = document.getElementById('success');
+        const previewDiv = document.getElementById('preview');
+        const previewContent = document.getElementById('previewContent');
+        const resultsDiv = document.getElementById('results');
+
+        // Drag & Drop Funktionalität
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        // Datei-Input
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            // Zurücksetzen
+            errorDiv.textContent = '';
+            successDiv.textContent = '';
+            resultsDiv.style.display = 'none';
+            
+            originalFilename = file.name;
+            
+            if (!file.name.toLowerCase().endsWith('.csv') && !file.name.toLowerCase().endsWith('.txt')) {
+                errorDiv.textContent = 'Bitte wählen Sie eine CSV-Datei aus.';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    processCSV(e.target.result);
+                } catch (error) {
+                    errorDiv.textContent = 'Fehler beim Verarbeiten der Datei: ' + error.message;
+                }
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function processCSV(csvText) {
+            // CSV parsen - berücksichtigt Anführungszeichen und Kommas innerhalb von Anführungszeichen
+            const lines = csvText.split(/\r?\n/);
+            const filteredLines = [];
+            let originalCount = 0;
+            let removedCount = 0;
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line === '') continue;
+
+                originalCount++;
+                
+                // CSV-Zeile parsen
+                const columns = parseCSVLine(line);
+                
+                // Prüfe, ob die 42. Spalte existiert und mit einer Zahl oder einem Unterstrich beginnt
+                // Index 41, da wir bei 0 beginnen
+                if (columns.length >= 42) {
+                    const col42Value = columns[41].trim();
+                    if (col42Value !== '' && /^[\d_]/.test(col42Value)) {
+                        // Behalte die Zeile
+                        filteredLines.push(line);
+                    } else {
+                        removedCount++;
+                    }
+                } else {
+                    // Weniger als 42 Spalten -> entfernen
+                    removedCount++;
+                }
+            }
+
+            filteredData = filteredLines.join('\n');
+            
+            // Ergebnisse anzeigen
+            document.getElementById('originalCount').textContent = `Originale Zeilen: ${originalCount}`;
+            document.getElementById('filteredCount').textContent = `Verbleibende Zeilen: ${filteredLines.length}`;
+            document.getElementById('removedCount').textContent = `Entfernte Zeilen: ${removedCount}`;
+            resultsDiv.style.display = 'block';
+
+            // Vorschau anzeigen
+            if (filteredLines.length > 0) {
+                const previewLines = filteredLines.slice(0, 5);
+                previewContent.textContent = previewLines.join('\n');
+            } else {
+                previewContent.textContent = 'Keine Zeilen übrig nach dem Filtern.';
+            }
+
+            successDiv.textContent = `Verarbeitung abgeschlossen! ${removedCount} von ${originalCount} Zeilen wurden entfernt.`;
+        }
+
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                const nextChar = line[i + 1];
+                
+                if (char === '"') {
+                    if (inQuotes && nextChar === '"') {
+                        current += '"';
+                        i++; // Überspringe das nächste Anführungszeichen
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            
+            result.push(current);
+            return result;
+        }
+
+        // Download-Funktion
+        downloadBtn.addEventListener('click', () => {
+            if (!filteredData) return;
+
+            const blob = new Blob([filteredData], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            
+            // Erstelle neuen Dateinamen
+            const baseName = originalFilename.replace(/\.[^/.]+$/, "");
+            const newFilename = `${baseName}_gefiltert.TXT`;
+            
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', newFilename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        });
+    </script>
+</body>
+</html>

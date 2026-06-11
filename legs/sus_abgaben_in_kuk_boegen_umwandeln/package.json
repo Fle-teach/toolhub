@@ -1,0 +1,33 @@
+{
+  "name": "serienbrief-generator",
+  "version": "1.0.0",
+  "description": "JavaScript-Webanwendung zur Automatisierung von Serienbriefverarbeitung mit DOCX und CSV",
+  "main": "index.html",
+  "scripts": {
+    "start": "node server.js",
+    "start:python": "python3 server.py",
+    "serve": "http-server -c-1 -p 8000",
+    "dev": "http-server -c-1 -o"
+  },
+  "keywords": [
+    "serienbrief",
+    "mail-merge",
+    "docx",
+    "csv",
+    "automation",
+    "javascript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "dependencies": {},
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "engines": {
+    "node": ">=12.0.0"
+  }
+}

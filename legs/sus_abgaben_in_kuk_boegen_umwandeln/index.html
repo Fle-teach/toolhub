@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serienbrief-Generator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>📄 Serienbrief-Generator</h1>
+        
+        <div class="upload-section">
+            <div class="upload-box">
+                <label for="docxFile" class="upload-label">
+                    <span class="upload-icon">📎</span>
+                    <span class="upload-text">DOCX-Template auswählen</span>
+                </label>
+                <input type="file" id="docxFile" accept=".docx" class="file-input">
+                <p class="file-name" id="docxFileName">Keine Datei gewählt</p>
+            </div>
+
+            <div class="upload-box">
+                <label for="csvFile" class="upload-label">
+                    <span class="upload-icon">📊</span>
+                    <span class="upload-text">CSV-Datensätze auswählen</span>
+                </label>
+                <input type="file" id="csvFile" accept=".csv" class="file-input">
+                <p class="file-name" id="csvFileName">Keine Datei gewählt</p>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h3>Schriftgröße pro Seite (nach Zeichenanzahl)</h3>
+            
+            <div class="font-tier-container">
+                <div class="font-tier">
+                    <label for="fontSize0">Stufe 1 - Schriftgröße (pt):</label>
+                    <input type="number" id="fontSize0" value="11" min="6" max="24" step="0.5">
+                    <label for="fontThreshold0">ab 0 Zeichen (Standard)</label>
+                    <input type="number" id="fontThreshold0" value="0" min="0" max="100000" step="50" disabled>
+                </div>
+                
+                <div class="font-tier">
+                    <label for="fontSize1">Stufe 2 - Schriftgröße (pt):</label>
+                    <input type="number" id="fontSize1" value="10" min="6" max="24" step="0.5">
+                    <label for="fontThreshold1">ab (Zeichen pro Seite):</label>
+                    <input type="number" id="fontThreshold1" value="500" min="0" max="100000" step="50">
+                </div>
+                
+                <div class="font-tier">
+                    <label for="fontSize2">Stufe 3 - Schriftgröße (pt):</label>
+                    <input type="number" id="fontSize2" value="9" min="6" max="24" step="0.5">
+                    <label for="fontThreshold2">ab (Zeichen pro Seite):</label>
+                    <input type="number" id="fontThreshold2" value="1000" min="0" max="100000" step="50">
+                </div>
+                
+                <div class="font-tier">
+                    <label for="fontSize3">Stufe 4 - Schriftgröße (pt):</label>
+                    <input type="number" id="fontSize3" value="8" min="6" max="24" step="0.5">
+                    <label for="fontThreshold3">ab (Zeichen pro Seite):</label>
+                    <input type="number" id="fontThreshold3" value="1500" min="0" max="100000" step="50">
+                </div>
+            </div>
+        </div>
+
+        <div class="actions-section">
+            <button id="processBtn" class="btn btn-primary" disabled>Serienbriefe generieren</button>
+            <div class="threshold-group">
+                <label for="longContentThreshold" class="threshold-label">Schwellenwert Zeichenanzahl:</label>
+                <input type="number" id="longContentThreshold" value="100" min="0" max="10000" step="50">
+                <button id="updateDataOverviewBtn" class="btn btn-secondary" disabled>Übersicht aktualisieren</button>
+            </div>
+        </div>
+
+        <div id="downloadSection" class="download-section" style="display: none;">
+            <h3>Download</h3>
+            <button id="downloadAllBtn" class="btn btn-success">Alle Serienbriefe herunterladen (ZIP)</button>
+            <p id="downloadInfo" class="download-info"></p>
+        </div>
+
+        <div id="preview" class="preview-section" style="display: none;">
+            <h3>Erwartete Seitenanzahl pro Klasse</h3>
+            <div id="previewContent" class="preview-content"></div>
+        </div>
+
+        <div id="status" class="status-message"></div>
+
+    </div>
+
+    <div id="dataOverviewSection" class="data-overview-section" style="display: none;">
+            <h3>Datensätze mit langen Inhalten (Zeichenanzahl)</h3>
+            <div id="dataOverviewContainer" class="data-overview-container"></div>
+    </div>
+
+    <!-- Externe Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <!-- Eigene Scripts -->
+    <script src="csv-parser.js"></script>
+    <script src="docx-handler.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
