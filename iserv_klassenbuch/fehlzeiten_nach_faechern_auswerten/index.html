@@ -324,6 +324,67 @@
         .zero {
             color: #27ae60;
         }
+
+        td.clickable {
+            cursor: pointer;
+            text-decoration: underline dotted;
+        }
+
+        td.clickable:hover {
+            background-color: #d6eaf8 !important;
+        }
+
+        .detail-popup {
+            position: absolute;
+            display: none;
+            background: white;
+            border: 1px solid #d5dbdb;
+            border-radius: 8px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+            padding: 14px 16px;
+            z-index: 100;
+            min-width: 260px;
+            max-width: 400px;
+            max-height: 320px;
+            overflow-y: auto;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        .detail-popup .detail-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 2px;
+        }
+
+        .detail-popup .detail-subtitle {
+            color: #7f8c8d;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        .detail-popup .detail-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #f0f0f0;
+            color: #2c3e50;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .detail-popup .detail-entry:last-child {
+            border-bottom: none;
+        }
+
+        .detail-popup .detail-badge {
+            background: #c0392b;
+            color: white;
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-size: 11px;
+            white-space: nowrap;
+        }
         
         .error {
             background-color: #e74c3c;
@@ -339,11 +400,11 @@
         <h1>📚 DKB-Fehlzeiten nach Fächern auswerten</h1>
 
         <div class="guide-link">
-            📥 <a href="https://goa-hh.de/iserv/fs/file/local/Groups/Kollegium/Digitales%20Klassenbuch/Fachgenaue%20Fehlzeitenübersicht%20erstellen/Anleitung%20Fehlzeiten%20herunterladen.pdf" target="_blank" rel="noopener">Anleitung: Fehlzeiten aus dem DKB herunterladen (PDF, IServ-Anmeldung erforderlich)</a>
+            📥 <a href="https://goa-hh.de/iserv/fs/file/local/Groups/Kollegium/Digitales%20Klassenbuch/Fachgenaue%20Fehlzeitenübersicht%20erstellen/Anleitung%20Fehlzeiten%20herunterladen.pdf" target="_blank" rel="noopener">Anleitung: Fehlzeiten aus dem DKB in IServ herunterladen</a>
         </div>
 
         <div class="upload-area" id="uploadArea">
-            <div class="upload-text">📁 Klicken Sie hier oder ziehen Sie eine XLSX-Datei hierher</div>
+            <div class="upload-text">📁 Klicken Sie hier oder ziehen die Dateien mit den Fehlzeiten aus dem DKB hierher.</div>
             <div class="upload-hint">Unterstützte Formate: .xlsx (Excel-Dateien)</div>
             <input type="file" id="fileInput" class="file-input" accept=".xlsx" />
         </div>
@@ -380,6 +441,8 @@
             </div>
         </div>
     </div>
+
+    <div id="detailPopup" class="detail-popup"></div>
 
     <script>
         const uploadArea = document.getElementById('uploadArea');
@@ -566,13 +629,19 @@
                     if (!studentSubjectAbsences[studentName][subject]) {
                         studentSubjectAbsences[studentName][subject] = {
                             total: 0,
-                            unexcused: 0
+                            unexcused: 0,
+                            entries: []
                         };
                     }
 
-                    // Erhöhe Zähler
+                    // Erhöhe Zähler und merke Datum/Stunde für die Detail-Ansicht
                     studentSubjectAbsences[studentName][subject].total++;
                     studentTotals[studentName].total++;
+                    studentSubjectAbsences[studentName][subject].entries.push({
+                        datum: String(datum),
+                        stunde: parseInt(lessonNumber, 10),
+                        unexcused: isUnexcused
+                    });
                     if (isUnexcused) {
                         studentSubjectAbsences[studentName][subject].unexcused++;
                         studentTotals[studentName].unexcused++;
@@ -734,23 +803,31 @@
             headerHTML += '</tr>';
             tableHeader.innerHTML = headerHTML;
 
-            // Tabellenkörper erstellen
+            // Tabellenkörper erstellen; Zellen mit Werten > 0 sind klickbar (Detail-Popup)
             const sortedStudents = students.sort();
-            const bodyRows = sortedStudents.map(student => {
+            currentRender = { students: sortedStudents, subjects: selectedSubjects };
+            hideDetailPopup();
+
+            const detailCell = (value, cssClass, studentIndex, subjectRef, mode) => {
+                const clickable = value > 0;
+                const classes = `${cssClass}${value === 0 ? ' zero' : ''}${clickable ? ' clickable' : ''}`;
+                const attrs = clickable
+                    ? ` data-student="${studentIndex}" data-subject="${subjectRef}" data-mode="${mode}" title="Klicken für Details"`
+                    : '';
+                return `<td class="${classes}"${attrs}>${value}</td>`;
+            };
+
+            const bodyRows = sortedStudents.map((student, studentIndex) => {
                 let rowHTML = `<td class="student-name">${student}</td>`;
-                selectedSubjects.forEach(subject => {
+                selectedSubjects.forEach((subject, subjectIndex) => {
                     const data = studentSubjectAbsences[student][subject] || { total: 0, unexcused: 0 };
-                    rowHTML += `
-                        <td class="total-cell ${data.total === 0 ? 'zero' : ''}">${data.total}</td>
-                        <td class="unexcused-cell ${data.unexcused === 0 ? 'zero' : ''}">${data.unexcused}</td>
-                    `;
+                    rowHTML += detailCell(data.total, 'total-cell', studentIndex, subjectIndex, 'total');
+                    rowHTML += detailCell(data.unexcused, 'unexcused-cell', studentIndex, subjectIndex, 'unexcused');
                 });
                 if (showSum) {
                     const sums = studentTotals[student];
-                    rowHTML += `
-                        <td class="total-cell ${sums.total === 0 ? 'zero' : ''}">${sums.total}</td>
-                        <td class="unexcused-cell ${sums.unexcused === 0 ? 'zero' : ''}">${sums.unexcused}</td>
-                    `;
+                    rowHTML += detailCell(sums.total, 'total-cell', studentIndex, 'sum', 'total');
+                    rowHTML += detailCell(sums.unexcused, 'unexcused-cell', studentIndex, 'sum', 'unexcused');
                 }
                 if (showLate) {
                     const lateMinutes = studentTotals[student].lateMinutes;
@@ -765,6 +842,106 @@
 
             processing.style.display = 'none';
             results.style.display = 'block';
+        }
+
+        // --- Detail-Popup: zeigt beim Klick auf eine Zelle, wie die Fehlzeiten zustande kommen ---
+
+        const detailPopup = document.getElementById('detailPopup');
+        let currentRender = { students: [], subjects: [] };
+        let openPopupKey = null;
+
+        function hideDetailPopup() {
+            detailPopup.style.display = 'none';
+            openPopupKey = null;
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // "11.06.2026" -> "2026-06-11" (sortierbar)
+        function dateSortKey(datum) {
+            const m = String(datum).match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+            if (!m) return String(datum);
+            return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+        }
+
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('#detailPopup')) return;
+            const cell = e.target.closest('td.clickable');
+            if (!cell) {
+                hideDetailPopup();
+                return;
+            }
+            toggleDetailPopup(cell);
+        });
+
+        function toggleDetailPopup(cell) {
+            const { student: studentIndex, subject: subjectRef, mode } = cell.dataset;
+            const key = `${studentIndex}|${subjectRef}|${mode}`;
+
+            // Erneuter Klick auf dieselbe Zelle schließt das Popup wieder
+            if (openPopupKey === key) {
+                hideDetailPopup();
+                return;
+            }
+
+            const student = currentRender.students[Number(studentIndex)];
+            const isSum = subjectRef === 'sum';
+            const subject = isSum ? null : currentRender.subjects[Number(subjectRef)];
+            const subjectData = globalData.studentSubjectAbsences[student] || {};
+
+            // Einträge sammeln (bei der Summe über alle Fächer, mit Fachangabe)
+            let entries = [];
+            if (isSum) {
+                Object.keys(subjectData).forEach(subj => {
+                    (subjectData[subj].entries || []).forEach(entry => entries.push({ ...entry, fach: subj }));
+                });
+            } else {
+                entries = ((subjectData[subject] || {}).entries || []).map(entry => ({ ...entry }));
+            }
+            if (mode === 'unexcused') {
+                entries = entries.filter(entry => entry.unexcused);
+            }
+            entries.sort((a, b) =>
+                dateSortKey(a.datum).localeCompare(dateSortKey(b.datum)) || a.stunde - b.stunde
+            );
+
+            const title = isSum ? `Alle Fächer – ${student}` : `${subject} – ${student}`;
+            const unexcusedCount = entries.filter(entry => entry.unexcused).length;
+            const subtitle = mode === 'unexcused'
+                ? `${entries.length} unentschuldigte Fehlstunde${entries.length === 1 ? '' : 'n'}`
+                : `${entries.length} Fehlstunde${entries.length === 1 ? '' : 'n'}, davon ${unexcusedCount} unentschuldigt`;
+
+            const listHTML = entries.map(entry => `
+                <div class="detail-entry">
+                    <span>${escapeHtml(entry.datum)} – ${entry.stunde}. Stunde${entry.fach ? ` – ${escapeHtml(entry.fach)}` : ''}</span>
+                    ${entry.unexcused && mode !== 'unexcused' ? '<span class="detail-badge">unentschuldigt</span>' : ''}
+                </div>
+            `).join('');
+
+            detailPopup.innerHTML = `
+                <div class="detail-title">${escapeHtml(title)}</div>
+                <div class="detail-subtitle">${subtitle}</div>
+                ${listHTML || '<div class="detail-entry">Keine Einträge</div>'}
+            `;
+
+            // Unterhalb der Zelle positionieren, am rechten Rand begrenzen
+            detailPopup.style.display = 'block';
+            const rect = cell.getBoundingClientRect();
+            const top = rect.bottom + window.scrollY + 4;
+            let left = rect.left + window.scrollX;
+            const maxLeft = window.scrollX + document.documentElement.clientWidth - detailPopup.offsetWidth - 10;
+            if (left > maxLeft) {
+                left = Math.max(10, maxLeft);
+            }
+            detailPopup.style.left = `${left}px`;
+            detailPopup.style.top = `${top}px`;
+            openPopupKey = key;
         }
 
         function exportToExcel() {
