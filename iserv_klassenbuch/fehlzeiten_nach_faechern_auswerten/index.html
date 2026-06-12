@@ -27,6 +27,21 @@
             margin-bottom: 30px;
         }
         
+        .guide-link {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 15px;
+        }
+
+        .guide-link a {
+            color: #3498db;
+            font-weight: 500;
+        }
+
+        .guide-link a:hover {
+            color: #2980b9;
+        }
+
         .upload-area {
             border: 3px dashed #3498db;
             border-radius: 10px;
@@ -322,7 +337,11 @@
 <body>
     <div class="container">
         <h1>📚 DKB-Fehlzeiten nach Fächern auswerten</h1>
-        
+
+        <div class="guide-link">
+            📥 <a href="https://goa-hh.de/iserv/fs/file/local/Groups/Kollegium/Digitales%20Klassenbuch/Fachgenaue%20Fehlzeitenübersicht%20erstellen/Anleitung%20Fehlzeiten%20herunterladen.pdf" target="_blank" rel="noopener">Anleitung: Fehlzeiten aus dem DKB herunterladen (PDF, IServ-Anmeldung erforderlich)</a>
+        </div>
+
         <div class="upload-area" id="uploadArea">
             <div class="upload-text">📁 Klicken Sie hier oder ziehen Sie eine XLSX-Datei hierher</div>
             <div class="upload-hint">Unterstützte Formate: .xlsx (Excel-Dateien)</div>
@@ -585,7 +604,7 @@
                 </div>
                 <div class="subject-filter late-filter">
                     <input type="checkbox" id="lateFilter" onchange="displayResults()">
-                    <label for="lateFilter">Verspätungen (Min.)</label>
+                    <label for="lateFilter">Verspätungen (alle Fächer, in Min.)</label>
                 </div>
             ` + allSubjects.map((subject, index) => `
                 <div class="subject-filter">
@@ -667,7 +686,7 @@
                 </div>
                 <div class="stat-item">
                     <div class="stat-number">${totalLateMinutes}</div>
-                    <div class="stat-label">Verspätungen (Min.)</div>
+                    <div class="stat-label">Verspätungen (alle Fächer, in Min.)</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-number">${totalProcessedRows}</div>
@@ -682,20 +701,27 @@
             const showSum = isSumSelected();
             const showLate = isLateSelected();
 
-            // Tabellenkopf erstellen: optional Summe, Verspätungen + ausgewählte Fächer
+            // Tabellenkopf erstellen: ausgewählte Fächer, danach (ganz rechts) optional
+            // Summe und Verspätungen
             let headerHTML = '<tr><th class="student-header">Schüler</th>';
-            if (showSum) {
-                headerHTML += '<th class="sum-group" colspan="2">Summe (alle Fächer)</th>';
-            }
-            if (showLate) {
-                headerHTML += '<th class="late-group">Verspätungen</th>';
-            }
             selectedSubjects.forEach(subject => {
                 headerHTML += `
                     <th class="subject-group" colspan="2">${subject}</th>
                 `;
             });
+            if (showSum) {
+                headerHTML += '<th class="sum-group" colspan="2">Summe (alle Fächer)</th>';
+            }
+            if (showLate) {
+                headerHTML += '<th class="late-group">Verspätungen (alle Fächer)</th>';
+            }
             headerHTML += '</tr><tr><th></th>';
+            selectedSubjects.forEach(subject => {
+                headerHTML += `
+                    <th class="total-col">Gesamt</th>
+                    <th class="unexcused-col">Unentschuldigt</th>
+                `;
+            });
             if (showSum) {
                 headerHTML += `
                     <th class="total-col">Gesamt</th>
@@ -705,12 +731,6 @@
             if (showLate) {
                 headerHTML += '<th class="late-col">Minuten</th>';
             }
-            selectedSubjects.forEach(subject => {
-                headerHTML += `
-                    <th class="total-col">Gesamt</th>
-                    <th class="unexcused-col">Unentschuldigt</th>
-                `;
-            });
             headerHTML += '</tr>';
             tableHeader.innerHTML = headerHTML;
 
@@ -718,6 +738,13 @@
             const sortedStudents = students.sort();
             const bodyRows = sortedStudents.map(student => {
                 let rowHTML = `<td class="student-name">${student}</td>`;
+                selectedSubjects.forEach(subject => {
+                    const data = studentSubjectAbsences[student][subject] || { total: 0, unexcused: 0 };
+                    rowHTML += `
+                        <td class="total-cell ${data.total === 0 ? 'zero' : ''}">${data.total}</td>
+                        <td class="unexcused-cell ${data.unexcused === 0 ? 'zero' : ''}">${data.unexcused}</td>
+                    `;
+                });
                 if (showSum) {
                     const sums = studentTotals[student];
                     rowHTML += `
@@ -731,13 +758,6 @@
                         <td class="late-cell ${lateMinutes === 0 ? 'zero' : ''}">${lateMinutes}</td>
                     `;
                 }
-                selectedSubjects.forEach(subject => {
-                    const data = studentSubjectAbsences[student][subject] || { total: 0, unexcused: 0 };
-                    rowHTML += `
-                        <td class="total-cell ${data.total === 0 ? 'zero' : ''}">${data.total}</td>
-                        <td class="unexcused-cell ${data.unexcused === 0 ? 'zero' : ''}">${data.unexcused}</td>
-                    `;
-                });
                 return `<tr>${rowHTML}</tr>`;
             });
 
@@ -760,24 +780,29 @@
             const showSum = isSumSelected();
             const showLate = isLateSelected();
 
-            // Header erstellen
+            // Header erstellen (Summe und Verspätungen ganz rechts)
             const headers = ['Schüler'];
+            selectedSubjects.forEach(subject => {
+                headers.push(`${subject} - Gesamt`);
+                headers.push(`${subject} - Unentschuldigt`);
+            });
             if (showSum) {
                 headers.push('Summe (alle Fächer) - Gesamt');
                 headers.push('Summe (alle Fächer) - Unentschuldigt');
             }
             if (showLate) {
-                headers.push('Verspätungen (Min.)');
+                headers.push('Verspätungen (alle Fächer, in Min.)');
             }
-            selectedSubjects.forEach(subject => {
-                headers.push(`${subject} - Gesamt`);
-                headers.push(`${subject} - Unentschuldigt`);
-            });
             exportData.push(headers);
 
             // Datenzeilen erstellen
             students.forEach(student => {
                 const row = [student];
+                selectedSubjects.forEach(subject => {
+                    const data = studentSubjectAbsences[student][subject] || { total: 0, unexcused: 0 };
+                    row.push(data.total);
+                    row.push(data.unexcused);
+                });
                 if (showSum) {
                     const sums = studentTotals[student];
                     row.push(sums.total);
@@ -786,11 +811,6 @@
                 if (showLate) {
                     row.push(studentTotals[student].lateMinutes);
                 }
-                selectedSubjects.forEach(subject => {
-                    const data = studentSubjectAbsences[student][subject] || { total: 0, unexcused: 0 };
-                    row.push(data.total);
-                    row.push(data.unexcused);
-                });
                 exportData.push(row);
             });
 
