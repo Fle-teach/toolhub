@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Schüler-Fehlzeiten Analyzer</title>
+    <title>Fehlzeiten nach Fächern auswerten - toolhub</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body {
@@ -404,7 +404,7 @@
         </div>
 
         <div class="upload-area" id="uploadArea">
-            <div class="upload-text">📁 Klicken Sie hier oder ziehen die Dateien mit den Fehlzeiten aus dem DKB hierher.</div>
+            <div class="upload-text">📁 Hier klicken oder Dateien mit den Fehlzeiten aus dem DKB hierher ziehen</div>
             <div class="upload-hint">Unterstützte Formate: .xlsx (Excel-Dateien)</div>
             <input type="file" id="fileInput" class="file-input" accept=".xlsx" />
         </div>
@@ -554,7 +554,7 @@
             const ensureStudent = (studentName) => {
                 if (!studentSubjectAbsences[studentName]) {
                     studentSubjectAbsences[studentName] = {};
-                    studentTotals[studentName] = { total: 0, unexcused: 0, lateMinutes: 0 };
+                    studentTotals[studentName] = { total: 0, unexcused: 0, lateMinutes: 0, lateEntries: [] };
                 }
             };
 
@@ -569,7 +569,14 @@
                 const zeitraum = String(row.Zeitraum || row['Zeitraum'] || '');
                 for (const lateMatch of zeitraum.matchAll(/(\d+)\s*Min\.\s*zu\s*spät/g)) {
                     ensureStudent(studentName);
-                    studentTotals[studentName].lateMinutes += parseInt(lateMatch[1], 10);
+                    const minuten = parseInt(lateMatch[1], 10);
+                    studentTotals[studentName].lateMinutes += minuten;
+                    // Datum/Zeitraum für die Detail-Ansicht merken
+                    studentTotals[studentName].lateEntries.push({
+                        datum: String(row.Datum || row['Datum'] || ''),
+                        minuten: minuten,
+                        zeitraum: zeitraum.replace(/\s*\(\d+\s*Min\.\s*zu\s*spät\)\s*/, ' ').trim()
+                    });
                 }
 
                 // Prüfen ob Status "(keine Fehlzeit)" enthält - dann keine Fehlstunden zählen
@@ -830,10 +837,7 @@
                     rowHTML += detailCell(sums.unexcused, 'unexcused-cell', studentIndex, 'sum', 'unexcused');
                 }
                 if (showLate) {
-                    const lateMinutes = studentTotals[student].lateMinutes;
-                    rowHTML += `
-                        <td class="late-cell ${lateMinutes === 0 ? 'zero' : ''}">${lateMinutes}</td>
-                    `;
+                    rowHTML += detailCell(studentTotals[student].lateMinutes, 'late-cell', studentIndex, 'late', 'late');
                 }
                 return `<tr>${rowHTML}</tr>`;
             });
@@ -891,6 +895,13 @@
             }
 
             const student = currentRender.students[Number(studentIndex)];
+
+            // Verspätungen: eigene Detail-Liste (Datum, Minuten, Zeitraum)
+            if (subjectRef === 'late') {
+                showLateDetailPopup(cell, student, key);
+                return;
+            }
+
             const isSum = subjectRef === 'sum';
             const subject = isSum ? null : currentRender.subjects[Number(subjectRef)];
             const subjectData = globalData.studentSubjectAbsences[student] || {};
@@ -930,7 +941,34 @@
                 ${listHTML || '<div class="detail-entry">Keine Einträge</div>'}
             `;
 
-            // Unterhalb der Zelle positionieren, am rechten Rand begrenzen
+            positionAndShowPopup(cell, key);
+        }
+
+        function showLateDetailPopup(cell, student, key) {
+            const entries = (globalData.studentTotals[student].lateEntries || [])
+                .slice()
+                .sort((a, b) => dateSortKey(a.datum).localeCompare(dateSortKey(b.datum)));
+
+            const totalMinutes = entries.reduce((sum, entry) => sum + entry.minuten, 0);
+            const subtitle = `${entries.length} Verspätung${entries.length === 1 ? '' : 'en'}, insgesamt ${totalMinutes} Min.`;
+
+            const listHTML = entries.map(entry => `
+                <div class="detail-entry">
+                    <span>${escapeHtml(entry.datum)} – ${entry.minuten} Min. zu spät${entry.zeitraum ? ` (${escapeHtml(entry.zeitraum)})` : ''}</span>
+                </div>
+            `).join('');
+
+            detailPopup.innerHTML = `
+                <div class="detail-title">${escapeHtml(`Verspätungen – ${student}`)}</div>
+                <div class="detail-subtitle">${subtitle}</div>
+                ${listHTML || '<div class="detail-entry">Keine Einträge</div>'}
+            `;
+
+            positionAndShowPopup(cell, key);
+        }
+
+        // Popup unterhalb der Zelle positionieren, am rechten Rand begrenzen
+        function positionAndShowPopup(cell, key) {
             detailPopup.style.display = 'block';
             const rect = cell.getBoundingClientRect();
             const top = rect.bottom + window.scrollY + 4;
