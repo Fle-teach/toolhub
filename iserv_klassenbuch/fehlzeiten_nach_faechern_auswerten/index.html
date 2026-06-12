@@ -160,6 +160,14 @@
         .subject-filter.sum-filter label {
             color: #2980b9;
         }
+
+        .subject-filter.late-filter {
+            border-left: 4px solid #e67e22;
+        }
+
+        .subject-filter.late-filter label {
+            color: #e67e22;
+        }
         
         .filter-buttons {
             display: flex;
@@ -239,6 +247,20 @@
         th.sum-group {
             background-color: #2980b9;
             border-left: 2px solid #2c3e50;
+        }
+
+        th.late-group {
+            background-color: #e67e22;
+            border-left: 2px solid #2c3e50;
+        }
+
+        th.late-col {
+            background-color: #d35400;
+        }
+
+        .late-cell {
+            font-weight: 600;
+            color: #d35400;
         }
         
         th.total-col {
@@ -447,19 +469,38 @@
             const subjects = new Set();
             const processedLessons = new Set(); // Zur Vermeidung von Doppelzählungen (pro Schüler/Datum/Stunde)
 
+            const ensureStudent = (studentName) => {
+                if (!studentSubjectAbsences[studentName]) {
+                    studentSubjectAbsences[studentName] = {};
+                    studentTotals[studentName] = { total: 0, unexcused: 0, lateMinutes: 0 };
+                }
+            };
+
             data.forEach(row => {
-                // Prüfen ob Status "(keine Fehlzeit)" enthält - dann ignorieren
+                const studentName = row.Schüler || row['Schüler'] || '';
+                if (!studentName) return;
+
+                // Verspätungen aus der Spalte "Zeitraum" aufsummieren - unabhängig von
+                // Fächern und Status, z.B. "1. Std.  (15 Min. zu spät)". Muss vor dem
+                // "(keine Fehlzeit)"-Filter passieren, da Verspätungen meist genau
+                // diesen Status tragen.
+                const zeitraum = String(row.Zeitraum || row['Zeitraum'] || '');
+                for (const lateMatch of zeitraum.matchAll(/(\d+)\s*Min\.\s*zu\s*spät/g)) {
+                    ensureStudent(studentName);
+                    studentTotals[studentName].lateMinutes += parseInt(lateMatch[1], 10);
+                }
+
+                // Prüfen ob Status "(keine Fehlzeit)" enthält - dann keine Fehlstunden zählen
                 if (row.Status && row.Status.includes('(keine Fehlzeit)')) {
                     totalIgnoredRows++;
                     return;
                 }
 
-                const studentName = row.Schüler || row['Schüler'] || '';
                 const lessons = row['Verp. Unterricht'] || '';
                 const status = row.Status || '';
                 const datum = row.Datum || row['Datum'] || '';
 
-                if (!studentName || !lessons) {
+                if (!lessons) {
                     return;
                 }
 
@@ -471,11 +512,7 @@
                                    status.includes('Unentschuldigt') ||
                                    status.includes('Attest noch ausstehend');
 
-                // Initialisiere Schüler wenn noch nicht vorhanden
-                if (!studentSubjectAbsences[studentName]) {
-                    studentSubjectAbsences[studentName] = {};
-                    studentTotals[studentName] = { total: 0, unexcused: 0 };
-                }
+                ensureStudent(studentName);
 
                 // Verpasste Unterrichtsstunden analysieren
                 const lessonLines = String(lessons).split(/\r?\n/);
@@ -485,9 +522,11 @@
                     const trimmedLine = line.trim();
                     if (!trimmedLine) return;
 
-                    // Stundennummer extrahieren (z.B. "5." -> "5"); ohne Nummer dient die ganze Zeile als Schlüssel
+                    // Fehlstunden existieren nur hinter einer Nummerierung (z.B. "5.");
+                    // Zeilen ohne Nummerierung (z.B. nur "-") werden nicht gezählt
                     const numberMatch = trimmedLine.match(/^(\d+)\./);
-                    const lessonNumber = numberMatch ? numberMatch[1] : trimmedLine;
+                    if (!numberMatch) return;
+                    const lessonNumber = numberMatch[1];
 
                     // Eindeutigen Schlüssel für diese Unterrichtsstunde erstellen (OHNE Fach!)
                     const lessonKey = `${studentName}_${datum}_${lessonNumber}`;
@@ -538,11 +577,15 @@
         }
 
         function createSubjectFilters() {
-            // Standardmäßig ist weder die Summe noch ein Fach ausgewählt
+            // Standardmäßig ist weder Summe noch Verspätungen noch ein Fach ausgewählt
             subjectFilters.innerHTML = `
                 <div class="subject-filter sum-filter">
                     <input type="checkbox" id="sumFilter" onchange="displayResults()">
                     <label for="sumFilter">Summe (alle Fächer)</label>
+                </div>
+                <div class="subject-filter late-filter">
+                    <input type="checkbox" id="lateFilter" onchange="displayResults()">
+                    <label for="lateFilter">Verspätungen (Min.)</label>
                 </div>
             ` + allSubjects.map((subject, index) => `
                 <div class="subject-filter">
@@ -557,6 +600,11 @@
             return sumFilter ? sumFilter.checked : false;
         }
 
+        function isLateSelected() {
+            const lateFilter = document.getElementById('lateFilter');
+            return lateFilter ? lateFilter.checked : false;
+        }
+
         function getSelectedSubjects() {
             return allSubjects.filter((subject, index) =>
                 document.getElementById(`subject_${index}`).checked
@@ -565,6 +613,7 @@
 
         function selectAllSubjects() {
             document.getElementById('sumFilter').checked = true;
+            document.getElementById('lateFilter').checked = true;
             allSubjects.forEach((subject, index) => {
                 document.getElementById(`subject_${index}`).checked = true;
             });
@@ -573,6 +622,7 @@
 
         function deselectAllSubjects() {
             document.getElementById('sumFilter').checked = false;
+            document.getElementById('lateFilter').checked = false;
             allSubjects.forEach((subject, index) => {
                 document.getElementById(`subject_${index}`).checked = false;
             });
@@ -589,10 +639,12 @@
             const students = Object.keys(studentSubjectAbsences);
             let totalAbsences = 0;
             let totalUnexcused = 0;
+            let totalLateMinutes = 0;
 
             students.forEach(student => {
                 totalAbsences += studentTotals[student].total;
                 totalUnexcused += studentTotals[student].unexcused;
+                totalLateMinutes += studentTotals[student].lateMinutes;
             });
 
             // Zusammenfassung anzeigen
@@ -614,6 +666,10 @@
                     <div class="stat-label">Unentschuldigt (alle Fächer)</div>
                 </div>
                 <div class="stat-item">
+                    <div class="stat-number">${totalLateMinutes}</div>
+                    <div class="stat-label">Verspätungen (Min.)</div>
+                </div>
+                <div class="stat-item">
                     <div class="stat-number">${totalProcessedRows}</div>
                     <div class="stat-label">Verarbeitete Zeilen</div>
                 </div>
@@ -624,11 +680,15 @@
             `;
 
             const showSum = isSumSelected();
+            const showLate = isLateSelected();
 
-            // Tabellenkopf erstellen: optional Summe über alle Fächer + ausgewählte Fächer
+            // Tabellenkopf erstellen: optional Summe, Verspätungen + ausgewählte Fächer
             let headerHTML = '<tr><th class="student-header">Schüler</th>';
             if (showSum) {
                 headerHTML += '<th class="sum-group" colspan="2">Summe (alle Fächer)</th>';
+            }
+            if (showLate) {
+                headerHTML += '<th class="late-group">Verspätungen</th>';
             }
             selectedSubjects.forEach(subject => {
                 headerHTML += `
@@ -641,6 +701,9 @@
                     <th class="total-col">Gesamt</th>
                     <th class="unexcused-col">Unentschuldigt</th>
                 `;
+            }
+            if (showLate) {
+                headerHTML += '<th class="late-col">Minuten</th>';
             }
             selectedSubjects.forEach(subject => {
                 headerHTML += `
@@ -660,6 +723,12 @@
                     rowHTML += `
                         <td class="total-cell ${sums.total === 0 ? 'zero' : ''}">${sums.total}</td>
                         <td class="unexcused-cell ${sums.unexcused === 0 ? 'zero' : ''}">${sums.unexcused}</td>
+                    `;
+                }
+                if (showLate) {
+                    const lateMinutes = studentTotals[student].lateMinutes;
+                    rowHTML += `
+                        <td class="late-cell ${lateMinutes === 0 ? 'zero' : ''}">${lateMinutes}</td>
                     `;
                 }
                 selectedSubjects.forEach(subject => {
@@ -689,12 +758,16 @@
             const exportData = [];
 
             const showSum = isSumSelected();
+            const showLate = isLateSelected();
 
             // Header erstellen
             const headers = ['Schüler'];
             if (showSum) {
                 headers.push('Summe (alle Fächer) - Gesamt');
                 headers.push('Summe (alle Fächer) - Unentschuldigt');
+            }
+            if (showLate) {
+                headers.push('Verspätungen (Min.)');
             }
             selectedSubjects.forEach(subject => {
                 headers.push(`${subject} - Gesamt`);
@@ -709,6 +782,9 @@
                     const sums = studentTotals[student];
                     row.push(sums.total);
                     row.push(sums.unexcused);
+                }
+                if (showLate) {
+                    row.push(studentTotals[student].lateMinutes);
                 }
                 selectedSubjects.forEach(subject => {
                     const data = studentSubjectAbsences[student][subject] || { total: 0, unexcused: 0 };
