@@ -339,19 +339,20 @@ button:disabled {
 
 .legend-color.wished-by-high {
     background: white;
-    border: 9px solid #8e44ad;
-    padding: 2px;
+    outline: 6px solid #8e44ad;
+    outline-offset: -6px;
 }
 
 .legend-color.wished-by-medium {
     background: white;
-    border: 4px dashed #9b59b6;
-    padding: 4px;
+    outline: 4px dashed #9b59b6;
+    outline-offset: -4px;
 }
 
 .legend-color.wished-by-low {
     background: white;
-    border: 3px dotted #9870aa;
+    outline: 2px dotted #9870aa;
+    outline-offset: -2px;
 }
 
 .legend-color.excluded {
@@ -405,33 +406,16 @@ button:disabled {
     font-size: 16px;
 }
 
-.legend-color.priority-indicator {
-    background: white;
-    border: 2px solid #ddd;
-    position: relative;
-    overflow: hidden;
+/* Legende: erfüllte Priorität als echte Mini-Badges (gleiche Stile wie in der Anzeige). */
+.legend-priority-badges {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    align-items: center;
 }
 
-.legend-color.priority-indicator::before {
-    content: '1 2 3';
-    position: absolute;
-    top: 40%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 9px;
-    font-weight: bold;
-    letter-spacing: 1px;
-}
-
-.legend-color.priority-indicator::after {
-    content: '0 X';
-    position: absolute;
-    top: 72%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 9px;
-    font-weight: bold;
-    letter-spacing: 1px;
+.legend-priority-badges .student-priority-number {
+    margin: 0;
 }
 
 .legend-text {
@@ -501,6 +485,35 @@ button:disabled {
     border-radius: 5px;
     margin-bottom: 10px;
     font-size: 0.85em;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* Spaltenabstand bewusst größer als der Abstand zwischen Bezeichnung und Daten,
+       damit Zellen klar getrennt, Bezeichnung und Wert aber zusammengehörig wirken. */
+    gap: 4px 32px;
+    align-items: start;
+}
+
+/* Zeilen, die volle Breite brauchen (Verletzungshinweise) */
+.class-stats .stat-row-wide {
+    grid-column: 1 / -1;
+}
+
+/* Bezeichnung und Daten dicht beieinander (nicht auseinandergedrückt) */
+.class-stats .stat-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: baseline;
+    gap: 2px 6px;
+    margin-bottom: 0;
+}
+
+.class-stats .stat-row span:last-child {
+    text-align: left;
+    margin-left: 0;
+    flex: 0 1 auto;
+    min-width: 0;
+    word-break: break-word;
 }
 
 .stat-row {
@@ -642,7 +655,8 @@ button:disabled {
 }
 
 .student-priority-number.priority-3 {
-    background: #6c757d;
+    background: #f4511e;
+    color: white;
 }
 
 .student-priority-number.priority-none {
@@ -666,10 +680,6 @@ button:disabled {
         transparent 4px,
         transparent 8px
     );
-}
-
-.student.has-symbol {
-    padding-right: 35px;
 }
 
 .student:hover {
@@ -701,18 +711,21 @@ button:disabled {
     background: #9bfec6 !important;
 }
 
+/* "Wird gewünscht"-Hervorhebung als inset-Outline statt dicker Border, damit Padding
+   und Boxgröße unverändert bleiben (kein Verschieben des Inhalts beim Auswählen). */
 .student.wished-by-high {
-    border: 9px solid #8e44ad !important;
-    padding: 2px !important; 
+    outline: 6px solid #8e44ad;
+    outline-offset: -6px;
 }
 
 .student.wished-by-medium {
-    border: 6px dashed #9b59b6 !important;
-    padding: 4px !important;
+    outline: 4px dashed #9b59b6;
+    outline-offset: -4px;
 }
 
 .student.wished-by-low {
-    border: 3px dotted #9870aa !important;
+    outline: 2px dotted #9870aa;
+    outline-offset: -2px;
 }
 
 .student.excluded {
@@ -779,23 +792,31 @@ button:disabled {
 .display-options-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 6px 20px;
+    gap: 10px 16px;
 }
 
 .display-options-grid .option-group {
     margin-bottom: 0;
+    background: #fff;
+    border: 1px solid #d3dae1;
+    border-radius: 6px;
+    padding: 8px 10px;
 }
 
 .rules-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 6px 24px;
+    gap: 10px 16px;
     align-items: start;
 }
 
 .rules-grid .rule-group {
-    margin-bottom: 6px;
+    margin-bottom: 0;
     flex-wrap: wrap;
+    background: #fff;
+    border: 1px solid #d3dae1;
+    border-radius: 6px;
+    padding: 8px 10px;
 }
 
 .rules-grid .rule-group .rule-hint {
@@ -856,7 +877,7 @@ button:disabled {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #f5c518;
+    color: #f5dd8f;   /* blasseres Gelb */
     font-size: 22px;
     line-height: 1;
 }

@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Re-render on display-option toggles (gender highlight, type, grades)
-    ['showGenderHighlight', 'showType', 'showGrades'].forEach(id => {
+    ['showGenderHighlight', 'showType', 'showGrades', 'showGroupSummary'].forEach(id => {
         document.getElementById(id).addEventListener('change', function() {
             if (Object.keys(currentClasses).length > 0) {
                 displayClasses();
@@ -89,26 +89,106 @@ function handleStudentDataFile(e) {
     reader.readAsText(file);
 }
 
+// Erkennt das Trennzeichen anhand der Kopfzeile (nur Vorkommen außerhalb von
+// Anführungszeichen zählen). Unterstützt Komma, Semikolon, Tab und Pipe.
+function detectDelimiter(headerLine) {
+    const candidates = [',', ';', '\t', '|'];
+    let best = ',';
+    let bestCount = -1;
+    for (const delim of candidates) {
+        let count = 0;
+        let inQuotes = false;
+        for (let i = 0; i < headerLine.length; i++) {
+            const ch = headerLine[i];
+            if (ch === '"') inQuotes = !inQuotes;
+            else if (ch === delim && !inQuotes) count++;
+        }
+        if (count > bestCount) {
+            bestCount = count;
+            best = delim;
+        }
+    }
+    return best;
+}
+
+// Tokenisiert getrennten Text RFC-4180-nah: berücksichtigt Anführungszeichen
+// (inkl. verdoppelter "" als Escape) und akzeptiert \n, \r\n und \r als Zeilenenden.
+function parseDelimitedText(text, delimiter) {
+    const rows = [];
+    let row = [];
+    let field = '';
+    let inQuotes = false;
+    const n = text.length;
+
+    for (let i = 0; i < n; i++) {
+        const ch = text[i];
+
+        if (inQuotes) {
+            if (ch === '"') {
+                if (text[i + 1] === '"') { field += '"'; i++; }
+                else inQuotes = false;
+            } else {
+                field += ch;
+            }
+            continue;
+        }
+
+        if (ch === '"') {
+            inQuotes = true;
+        } else if (ch === delimiter) {
+            row.push(field);
+            field = '';
+        } else if (ch === '\n' || ch === '\r') {
+            row.push(field);
+            rows.push(row);
+            row = [];
+            field = '';
+            if (ch === '\r' && text[i + 1] === '\n') i++;
+        } else {
+            field += ch;
+        }
+    }
+
+    // Letztes Feld/Zeile abschließen
+    row.push(field);
+    rows.push(row);
+
+    // Komplett leere Zeilen verwerfen (z. B. abschließender Zeilenumbruch)
+    return rows.filter(r => r.some(cell => cell.trim() !== ''));
+}
+
 function parseCSV(csvText, type) {
-    const lines = csvText.trim().split('\n');
-    const headers = lines[0].split(',').map(h => h.trim());
+    // BOM entfernen
+    const text = csvText.replace(/^﻿/, '');
+
+    const firstLine = (text.split(/\r\n|\r|\n/).find(line => line.trim() !== '') || '');
+    const delimiter = detectDelimiter(firstLine);
+
+    const rawRows = parseDelimitedText(text, delimiter);
+
+    if (rawRows.length < 2) {
+        showError('Die Datei enthält keine verwertbaren Daten (Kopfzeile + mindestens eine Datenzeile erforderlich).');
+        return;
+    }
+
+    const headers = rawRows[0].map(h => h.trim());
     const data = [];
-    
-    for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
+
+    for (let i = 1; i < rawRows.length; i++) {
+        const values = rawRows[i];
         const row = {};
         headers.forEach((header, index) => {
-            row[header] = values[index] || '';
+            row[header] = (values[index] !== undefined ? values[index] : '').trim();
         });
         data.push(row);
     }
-    
+
     if (type === 'wishes') {
         wishesData = data;
     } else {
         studentData = data;
     }
-    
+
     checkIfReady();
 }
 
@@ -272,6 +352,7 @@ function getConstraintConfig() {
         maxFemale: parseInt(document.getElementById('maxFemale').value) || 0,
         maxMale: parseInt(document.getElementById('maxMale').value) || 0,
         minSameGenderOldClass: parseInt(document.getElementById('minSameGenderOldClass').value) || 0,
+        maxSameGenderOldClass: parseInt(document.getElementById('maxSameGenderOldClass').value) || 0,
         mutualWishOneRequired: document.getElementById('mutualWishOneRequired').checked || false
     };
 }
@@ -354,6 +435,20 @@ function getExtendedConstraintFeasibilityError(activeStudents, classCount, const
         }
         if (undersized.length > 0) {
             return `Unmögliche Mindestgrenze (gleiches Geschlecht/alte Klasse): Folgende Geschlecht/Alt-Klasse-Gruppen haben weniger als ${constraints.minSameGenderOldClass} Schüler und können die Regel nie erfüllen: ${undersized.join(', ')}. Bitte Min-Wert reduzieren oder betroffene Schüler ignorieren.`;
+        }
+    }
+
+    if (constraints.maxSameGenderOldClass > 0) {
+        const genderLabel = { m: 'männlich', w: 'weiblich', d: 'divers' };
+        if (constraints.minSameGenderOldClass > 1 && constraints.minSameGenderOldClass > constraints.maxSameGenderOldClass) {
+            return `Widersprüchliche Regeln: Min. (${constraints.minSameGenderOldClass}) gleiches Geschlecht aus alter Klasse ist größer als Max. (${constraints.maxSameGenderOldClass}). Bitte Werte anpassen.`;
+        }
+        for (const key in oldClassGenderCounts) {
+            if (Math.ceil(oldClassGenderCounts[key] / constraints.maxSameGenderOldClass) > classCount) {
+                const [oldClass, genderClass] = key.split('||');
+                const label = genderLabel[genderClass] || genderClass;
+                return `Unmögliche Verteilung: ${oldClassGenderCounts[key]} ${label}e Schüler aus alter Klasse "${oldClass}" passen nicht in ${classCount} Klassen mit max. ${constraints.maxSameGenderOldClass} gleichen Geschlechts aus gleicher alter Klasse.`;
+            }
         }
     }
 
@@ -582,6 +677,16 @@ function isClassValidByHardConstraints(studentsInClass, constraints, options = {
     if (checkMinimumRules && constraints.minSameGenderOldClass > 1) {
         for (const key in oldClassGenderCounts) {
             if (oldClassGenderCounts[key] > 0 && oldClassGenderCounts[key] < constraints.minSameGenderOldClass) {
+                return false;
+            }
+        }
+    }
+
+    // Check maxSameGenderOldClass: höchstens so viele Schüler gleichen Geschlechts aus
+    // derselben alten Klasse (harte Obergrenze, gilt immer).
+    if (constraints.maxSameGenderOldClass > 0) {
+        for (const key in oldClassGenderCounts) {
+            if (oldClassGenderCounts[key] > constraints.maxSameGenderOldClass) {
                 return false;
             }
         }
@@ -1149,6 +1254,14 @@ function calculateHardConstraintPenalty(classNames, constraints) {
             });
         }
 
+        if (constraints.maxSameGenderOldClass > 0) {
+            Object.values(oldClassGenderCounts).forEach(count => {
+                if (count > constraints.maxSameGenderOldClass) {
+                    penalty += (count - constraints.maxSameGenderOldClass) * 100;
+                }
+            });
+        }
+
         if (constraints.maxSameOldClass > 0) {
             Object.values(oldClassCounts).forEach(count => {
                 if (count > constraints.maxSameOldClass) {
@@ -1471,8 +1584,13 @@ function resumeOptimization() {
     optimizationRunning = true;
     optimizerStagnation = 0;
 
+    // Vollständigen Lauf-Button-Zustand setzen, damit Fortsetzen auch direkt aus dem
+    // Import-Zustand (statt nur nach Pause) korrekt funktioniert.
+    document.getElementById('generateBtn').style.display = 'none';
     document.getElementById('pauseBtn').style.display = 'inline-block';
     document.getElementById('resumeBtn').style.display = 'none';
+    document.getElementById('stopBtn').style.display = 'inline-block';
+    document.getElementById('optimizationStatus').style.display = 'block';
     document.getElementById('currentScore').textContent = bestScore;
 
     const classNames = Object.keys(currentClasses).filter(name => name !== 'Ignorierte Schüler');
@@ -1659,6 +1777,7 @@ function calculateClassMaxPenalty(studentsInClass, constraints) {
 
     const genderCounts = {};
     const oldClassCounts = {};
+    const oldClassGenderCounts = {};
     let femaleCount = 0;
     let maleCount = 0;
     let activeCount = 0;
@@ -1673,6 +1792,8 @@ function calculateClassMaxPenalty(studentsInClass, constraints) {
         const grade = normalizeGrade(student);
         genderCounts[gender] = (genderCounts[gender] || 0) + 1;
         oldClassCounts[oldClass] = (oldClassCounts[oldClass] || 0) + 1;
+        const ogKey = oldClass + '||' + genderClass;
+        oldClassGenderCounts[ogKey] = (oldClassGenderCounts[ogKey] || 0) + 1;
         if (genderClass === 'w') femaleCount++;
         if (genderClass === 'm') maleCount++;
         if (activity === 'a') activeCount++;
@@ -1692,6 +1813,13 @@ function calculateClassMaxPenalty(studentsInClass, constraints) {
     }
     if (constraints.maxMale > 0 && maleCount > constraints.maxMale) {
         penalty += (maleCount - constraints.maxMale) * PENALTY_PER_EXCESS;
+    }
+    if (constraints.maxSameGenderOldClass > 0) {
+        for (const key in oldClassGenderCounts) {
+            if (oldClassGenderCounts[key] > constraints.maxSameGenderOldClass) {
+                penalty += (oldClassGenderCounts[key] - constraints.maxSameGenderOldClass) * PENALTY_PER_EXCESS;
+            }
+        }
     }
     if (constraints.maxSameOldClass > 0) {
         for (const c in oldClassCounts) {
@@ -2094,15 +2222,16 @@ function createClassStats(students, constraintFlags = getClassConstraintFlags(st
     const oldClassEntries = Object.entries(oldClassCounts)
         .sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'de'));
 
-    // Konkrete Schüler ermitteln, die die Min-Regel "gleiches Geschlecht je alte Klasse"
-    // verletzen (sie sind die einzige/n ihres Geschlechts aus ihrer alten Klasse).
+    // Verletzungstext der Regel "gleiches Geschlecht je alte Klasse": bei Unterschreitung
+    // werden die betroffenen Schüler namentlich genannt, bei Überschreitung die Gruppen.
     let genderOldClassRow = '';
     if (constraintFlags.genderOldClass) {
-        const violatorNames = getGenderOldClassViolators(students).map(s => s['Schüler']);
-        const namesText = violatorNames.length
-            ? violatorNames.join(', ')
-            : 'Mindestanzahl unterschritten';
-        genderOldClassRow = `<div class="stat-row constraint-violation"><span class="stat-label">Geschlecht je alte Klasse:</span><span>${escapeHtml(namesText)}</span></div>`;
+        const issues = getGenderOldClassIssues(students);
+        const parts = [];
+        if (issues.minNames.length) parts.push('zu wenige – ' + issues.minNames.join(', '));
+        if (issues.maxLabels.length) parts.push('zu viele – ' + issues.maxLabels.join(', '));
+        const text = parts.length ? parts.join(' | ') : 'Mindest-/Höchstanzahl verletzt';
+        genderOldClassRow = `<div class="stat-row stat-row-wide constraint-violation"><span class="stat-label">Geschlecht je alte Klasse:</span><span>${escapeHtml(text)}</span></div>`;
     }
 
     stats.innerHTML = `
@@ -2110,7 +2239,6 @@ function createClassStats(students, constraintFlags = getClassConstraintFlags(st
             <span class="stat-label">Geschlecht:</span>
             <span>m: ${genderCounts.m}, w: ${genderCounts.w}, d: ${genderCounts.d}</span>
         </div>
-        ${genderOldClassRow}
         <div class="stat-row ${constraintFlags.activity ? 'constraint-violation' : ''}">
             <span class="stat-label">Typ:</span>
             <span>still: ${typeCounts.s}, aktiv: ${typeCounts.a}</span>
@@ -2123,21 +2251,21 @@ function createClassStats(students, constraintFlags = getClassConstraintFlags(st
             <span class="stat-label">Alte Klassen:</span>
             <span>${oldClassEntries.map(([k, v]) => `${escapeHtml(String(k))}: ${v}`).join(', ')}</span>
         </div>
-        ${constraintFlags.classSize ? '<div class="stat-row constraint-violation"><span class="stat-label">Klassengröße:</span><span>Min/Max verletzt</span></div>' : ''}
-        ${constraintFlags.oldClassDiversity ? '<div class="stat-row constraint-violation"><span class="stat-label">Vielfalt alte Klassen:</span><span>Mindestanzahl unterschritten</span></div>' : ''}
-        ${constraintFlags.exclusion ? '<div class="stat-row constraint-violation"><span class="stat-label">Ausschlüsse:</span><span>Konflikt in dieser Klasse</span></div>' : ''}
+        ${genderOldClassRow}
+        ${constraintFlags.classSize ? '<div class="stat-row stat-row-wide constraint-violation"><span class="stat-label">Klassengröße:</span><span>Min/Max verletzt</span></div>' : ''}
+        ${constraintFlags.oldClassDiversity ? '<div class="stat-row stat-row-wide constraint-violation"><span class="stat-label">Vielfalt alte Klassen:</span><span>Mindestanzahl unterschritten</span></div>' : ''}
+        ${constraintFlags.exclusion ? '<div class="stat-row stat-row-wide constraint-violation"><span class="stat-label">Ausschlüsse:</span><span>Konflikt in dieser Klasse</span></div>' : ''}
     `;
 
     return stats;
 }
 
-// Liefert die Schüler einer Klasse, die die Regel "Min. gleiches Geschlecht je alte
-// Klasse" verletzen: ihre (alte Klasse, Geschlecht)-Gruppe ist in dieser Klasse
-// vorhanden, aber kleiner als die geforderte Mindestzahl.
-function getGenderOldClassViolators(studentsInClass) {
+// Liefert die Probleme der Regel "gleiches Geschlecht je alte Klasse" für eine Klasse:
+// minNames = Schüler, deren (alte Klasse, Geschlecht)-Gruppe die Mindestzahl unterschreitet;
+// maxLabels = (alte Klasse/Geschlecht)-Gruppen, die die Höchstzahl überschreiten.
+function getGenderOldClassIssues(studentsInClass) {
     const constraints = getConstraintConfig();
-    if (constraints.minSameGenderOldClass <= 1) return [];
-
+    const genderLabel = { m: 'm', w: 'w', d: 'd' };
     const groups = {};
     for (const student of studentsInClass) {
         const key = normalizeOldClass(student) + '||' + getGenderClass(student);
@@ -2145,15 +2273,20 @@ function getGenderOldClassViolators(studentsInClass) {
         groups[key].push(student);
     }
 
-    const violators = [];
+    const minNames = [];
+    const maxLabels = [];
     for (const key in groups) {
-        const group = groups[key];
-        if (group.length > 0 && group.length < constraints.minSameGenderOldClass) {
-            violators.push(...group);
+        const count = groups[key].length;
+        if (constraints.minSameGenderOldClass > 1 && count > 0 && count < constraints.minSameGenderOldClass) {
+            for (const s of groups[key]) minNames.push(s['Schüler']);
+        }
+        if (constraints.maxSameGenderOldClass > 0 && count > constraints.maxSameGenderOldClass) {
+            const [oldClass, genderClass] = key.split('||');
+            maxLabels.push(`${oldClass}/${genderLabel[genderClass] || genderClass}: ${count}>${constraints.maxSameGenderOldClass}`);
         }
     }
-    violators.sort((a, b) => (a['Schüler'] || '').localeCompare(b['Schüler'] || '', 'de'));
-    return violators;
+    minNames.sort((a, b) => a.localeCompare(b, 'de'));
+    return { minNames, maxLabels, hasIssue: minNames.length > 0 || maxLabels.length > 0 };
 }
 
 function escapeHtml(text) {
@@ -2237,9 +2370,14 @@ function getClassConstraintFlags(studentsInClass, className = '') {
         flags.gender = true;
     }
 
-    if (constraints.minSameGenderOldClass > 1) {
+    if (constraints.minSameGenderOldClass > 1 || constraints.maxSameGenderOldClass > 0) {
         for (const key in oldClassGenderCounts) {
-            if (oldClassGenderCounts[key] > 0 && oldClassGenderCounts[key] < constraints.minSameGenderOldClass) {
+            const count = oldClassGenderCounts[key];
+            if (constraints.minSameGenderOldClass > 1 && count > 0 && count < constraints.minSameGenderOldClass) {
+                flags.genderOldClass = true;
+                break;
+            }
+            if (constraints.maxSameGenderOldClass > 0 && count > constraints.maxSameGenderOldClass) {
                 flags.genderOldClass = true;
                 break;
             }
@@ -2732,10 +2870,14 @@ function applyGroupSelectionVisuals(memberNames) {
     const groupEl = findGroupElementByKey(getGroupKey(memberNames));
     if (groupEl) {
         groupEl.classList.add('group-selected');
-        const summary = buildGroupSummaryElement(memberObjs);
-        const header = groupEl.querySelector('.group-header');
-        if (header) header.after(summary);
-        else groupEl.prepend(summary);
+        // Sammel-Stats nur einblenden, wenn die Option aktiv ist. Das Ausschluss-Highlight
+        // unten bleibt davon unberührt und ist immer aktiv.
+        if (document.getElementById('showGroupSummary').checked) {
+            const summary = buildGroupSummaryElement(memberObjs);
+            const header = groupEl.querySelector('.group-header');
+            if (header) header.after(summary);
+            else groupEl.prepend(summary);
+        }
     }
 
     memberNames.forEach(name => {
@@ -2951,16 +3093,20 @@ function exportClasses() {
     }
 
     const exportData = {
-        version: '1.5',
+        version: '1.6',
         exportDate: new Date().toISOString(),
         totalScore: calculateTotalScore(),
         classCount: Object.keys(currentClasses).filter(c => c !== 'Ignorierte Schüler').length,
+        // Rohdaten einbetten, damit beim Import keine CSV-Dateien erneut benötigt werden.
+        studentData: studentData,
+        wishesData: wishesData,
         includeIgnored: document.getElementById('includeIgnored').checked,
         showMutualPairs: document.getElementById('showMutualPairs').checked,
         showFulfilledPriority: document.getElementById('showFulfilledPriority').checked,
         showGenderHighlight: document.getElementById('showGenderHighlight').checked,
         showType: document.getElementById('showType').checked,
         showGrades: document.getElementById('showGrades').checked,
+        showGroupSummary: document.getElementById('showGroupSummary').checked,
         distributionRules: {
             maxSameGender: parseInt(document.getElementById('maxSameGender').value) || 0,
             maxSameOldClass: parseInt(document.getElementById('maxSameOldClass').value) || 0,
@@ -2974,6 +3120,7 @@ function exportClasses() {
             maxFemale: parseInt(document.getElementById('maxFemale').value) || 0,
             maxMale: parseInt(document.getElementById('maxMale').value) || 0,
             minSameGenderOldClass: parseInt(document.getElementById('minSameGenderOldClass').value) || 0,
+            maxSameGenderOldClass: parseInt(document.getElementById('maxSameGenderOldClass').value) || 0,
             mutualWishOneRequired: document.getElementById('mutualWishOneRequired').checked
         },
         classes: {},
@@ -3006,22 +3153,25 @@ function exportClasses() {
 function importClasses(event) {
     const file = event.target.files[0];
     if (!file) return;
-    
-    if (wishesData.length === 0 || studentData.length === 0) {
-        showError('Bitte laden Sie zuerst die Wünsche- und Schülerdaten-Dateien!');
-        event.target.value = '';
-        return;
-    }
-    
+
     const reader = new FileReader();
     reader.onload = function(e) {
         try {
             const importData = JSON.parse(e.target.result);
-            
+
             if (!importData.version || !importData.classes) {
                 throw new Error('Ungültiges Dateiformat');
             }
-            
+
+            // Eingebettete Rohdaten wiederherstellen (Format ab v1.6) — dann müssen die
+            // CSV-Dateien zum Weiterarbeiten nicht erneut hochgeladen werden.
+            if (Array.isArray(importData.studentData) && Array.isArray(importData.wishesData)) {
+                studentData = importData.studentData;
+                wishesData = importData.wishesData;
+            } else if (studentData.length === 0 || wishesData.length === 0) {
+                throw new Error('Diese Datei enthält keine eingebetteten Schüler-/Wünsche-Daten. Bitte zuerst die CSV-Dateien laden (oder eine neuere Zusammenstellung importieren).');
+            }
+
             if (importData.classCount) {
                 document.getElementById('classCount').value = importData.classCount;
             }
@@ -3042,6 +3192,9 @@ function importClasses(event) {
             }
             if (importData.showGrades !== undefined) {
                 document.getElementById('showGrades').checked = importData.showGrades;
+            }
+            if (importData.showGroupSummary !== undefined) {
+                document.getElementById('showGroupSummary').checked = importData.showGroupSummary;
             }
 
             // Import distribution rules
@@ -3082,18 +3235,23 @@ function importClasses(event) {
                 if (importData.distributionRules.minSameGenderOldClass !== undefined) {
                     document.getElementById('minSameGenderOldClass').value = importData.distributionRules.minSameGenderOldClass;
                 }
+                if (importData.distributionRules.maxSameGenderOldClass !== undefined) {
+                    document.getElementById('maxSameGenderOldClass').value = importData.distributionRules.maxSameGenderOldClass;
+                }
                 if (importData.distributionRules.mutualWishOneRequired !== undefined) {
                     document.getElementById('mutualWishOneRequired').checked = importData.distributionRules.mutualWishOneRequired;
                 }
             }
             
             currentClasses = {};
+            selectedStudent = null;
+            selectedGroupKey = null;
             manualExclusionHighlightStudentIds.clear();
             manualExclusionHighlightPairs.clear();
-            
+
             for (const className in importData.classes) {
                 currentClasses[className] = [];
-                
+
                 for (const studentName of importData.classes[className]) {
                     const student = studentData.find(s => s['Schüler'] === studentName);
                     if (student) {
@@ -3101,18 +3259,37 @@ function importClasses(event) {
                     }
                 }
             }
-            
+
+            // Importierte Zusammenstellung als aktuelle (beste) Lösung übernehmen, damit
+            // sie fortgesetzt werden kann, statt von vorne zu generieren (Letzteres kann
+            // an strengen Regeln scheitern, obwohl die importierte Lösung gültig ist).
+            optimizationRunning = false;
+            iterations = 0;
+            improvements = 0;
+            optimizerStagnation = 0;
+            bestClasses = JSON.parse(JSON.stringify(currentClasses));
+            bestScore = calculateTotalScore();
+
+            document.getElementById('generateBtn').disabled = false;
+
             displayClasses();
-            
+
+            // Button-Zustand: nach dem Import "Fortsetzen" statt "Klassen generieren".
+            document.getElementById('generateBtn').style.display = 'none';
+            document.getElementById('pauseBtn').style.display = 'none';
+            document.getElementById('resumeBtn').style.display = 'inline-block';
+            document.getElementById('stopBtn').style.display = 'none';
+            document.getElementById('optimizationStatus').style.display = 'none';
+
             showSuccess(`Klasseneinteilung erfolgreich importiert! (Score: ${importData.totalScore})`);
-            
+
         } catch (error) {
             showError('Fehler beim Importieren: ' + error.message);
         }
-        
+
         event.target.value = '';
     };
-    
+
     reader.readAsText(file);
 }
 
@@ -3131,13 +3308,22 @@ function resetAll() {
     document.getElementById('generateBtn').disabled = true;
     document.getElementById('classesContainer').innerHTML = '';
     document.getElementById('statsSection').style.display = 'none';
-    document.getElementById('showMutualPairs').checked = false;
-    document.getElementById('showFulfilledPriority').checked = false;
-    document.getElementById('showGenderHighlight').checked = false;
-    document.getElementById('showType').checked = false;
-    document.getElementById('showGrades').checked = false;
+
+    // Button-Zustand zurücksetzen (z. B. falls vorher importiert wurde -> "Fortsetzen").
+    optimizationRunning = false;
+    document.getElementById('generateBtn').style.display = 'inline-block';
+    document.getElementById('pauseBtn').style.display = 'none';
+    document.getElementById('resumeBtn').style.display = 'none';
+    document.getElementById('stopBtn').style.display = 'none';
+    document.getElementById('optimizationStatus').style.display = 'none';
+    document.getElementById('showMutualPairs').checked = true;
+    document.getElementById('showFulfilledPriority').checked = true;
+    document.getElementById('showGenderHighlight').checked = true;
+    document.getElementById('showType').checked = true;
+    document.getElementById('showGrades').checked = true;
+    document.getElementById('showGroupSummary').checked = false;
     selectedGroupKey = null;
-    document.getElementById('classCount').value = 4;
+    document.getElementById('classCount').value = 5;
     document.getElementById('includeIgnored').checked = false;
     document.getElementById('maxSameGender').value = 0;
     document.getElementById('maxSameOldClass').value = 0;
@@ -3151,7 +3337,8 @@ function resetAll() {
     document.getElementById('maxFemale').value = 0;
     document.getElementById('maxMale').value = 0;
     document.getElementById('minSameGenderOldClass').value = 2;
-    document.getElementById('mutualWishOneRequired').checked = false;
+    document.getElementById('maxSameGenderOldClass').value = 0;
+    document.getElementById('mutualWishOneRequired').checked = true;
 
     showSuccess('Alle Daten zurückgesetzt!');
 }

@@ -20,11 +20,19 @@
                 <label for="studentDataFile">Schülerdaten-Datei (CSV):</label>
                 <input type="file" id="studentDataFile" accept=".csv">
             </div>
-            
+
+            <div class="file-input-group">
+                <label>Oder gespeicherte Zusammenstellung laden (enthält Schüler- &amp; Wünsche-Daten):</label>
+                <button type="button" class="btn-import" onclick="document.getElementById('importFileStart').click()">
+                    Zusammenstellung importieren (JSON)
+                </button>
+                <input type="file" id="importFileStart" accept=".json" style="display:none" onchange="importClasses(event)">
+            </div>
+
             <div class="generation-options">
                 <div class="option-group">
                     <label for="classCount">Anzahl der Klassen:</label>
-                    <input type="number" id="classCount" min="2" max="10" value="4">
+                    <input type="number" id="classCount" min="2" max="10" value="5">
                 </div>
                 
                 <h4 class="section-title">Anzeige-Optionen</h4>
@@ -38,36 +46,43 @@
 
                     <div class="option-group">
                         <label>
-                            <input type="checkbox" id="showMutualPairs">
+                            <input type="checkbox" id="showMutualPairs" checked>
                             Gegenseitige Wünsche (höchste Priorität) hervorheben
                         </label>
                     </div>
 
                     <div class="option-group">
                         <label>
-                            <input type="checkbox" id="showFulfilledPriority">
+                            <input type="checkbox" id="showFulfilledPriority" checked>
                             Erfüllte Wunschpriorität anzeigen (1-3)
                         </label>
                     </div>
 
                     <div class="option-group">
                         <label>
-                            <input type="checkbox" id="showGenderHighlight">
+                            <input type="checkbox" id="showGenderHighlight" checked>
                             Geschlecht hervorheben (Border: m blau, w rosa)
                         </label>
                     </div>
 
                     <div class="option-group">
                         <label>
-                            <input type="checkbox" id="showType">
+                            <input type="checkbox" id="showType" checked>
                             Typ anzeigen (a aktiv / s still)
                         </label>
                     </div>
 
                     <div class="option-group">
                         <label>
-                            <input type="checkbox" id="showGrades">
+                            <input type="checkbox" id="showGrades" checked>
                             Noten anzeigen (1–3 mit Stern)
+                        </label>
+                    </div>
+
+                    <div class="option-group">
+                        <label>
+                            <input type="checkbox" id="showGroupSummary">
+                            Sammel-Stats bei Gruppenauswahl anzeigen
                         </label>
                     </div>
                 </div>
@@ -110,6 +125,12 @@
                         <label for="minSameGenderOldClass">Min. Schüler gleichen Geschlechts aus gleicher alter Klasse:</label>
                         <input type="number" id="minSameGenderOldClass" min="0" value="2">
                         <span class="rule-hint">(Niemand soll als einziges Mädchen/einziger Junge seiner alten Klasse dastehen; 0 = aus)</span>
+                    </div>
+
+                    <div class="rule-group">
+                        <label for="maxSameGenderOldClass">Max. Schüler gleichen Geschlechts aus gleicher alter Klasse:</label>
+                        <input type="number" id="maxSameGenderOldClass" min="0" value="0">
+                        <span class="rule-hint">(0 = keine Beschränkung)</span>
                     </div>
                     </div>
 
@@ -154,7 +175,7 @@
                     
                     <div class="rule-group">
                         <label>
-                            <input type="checkbox" id="mutualWishOneRequired">
+                            <input type="checkbox" id="mutualWishOneRequired" checked>
                             Gegenseitige Wünsche (Priorität 1) erzwingen
                         </label>
                         <span class="rule-hint">(Wenn beide sich an #1 wünschen, müssen sie in derselben Klasse sein)</span>
@@ -273,8 +294,14 @@
                     <span class="legend-text">Gegenseitige Wünsche (Priorität 1) in verschiedenen Klassen</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color priority-indicator"></div>
-                    <span class="legend-text">Erfüllte Priorität (1=grün, 2=gelb, 3=grau, 0=keine Wünsche, X=kein Wunsch erfüllt)</span>
+                    <div class="legend-priority-badges">
+                        <span class="student-priority-number priority-1">1</span>
+                        <span class="student-priority-number priority-2">2</span>
+                        <span class="student-priority-number priority-3">3</span>
+                        <span class="student-priority-number priority-none">0</span>
+                        <span class="student-priority-number priority-unfulfilled">X</span>
+                    </div>
+                    <span class="legend-text">Erfüllte Priorität (1=grün, 2=gelb, 3=orange-rot, 0=keine Wünsche, X=kein Wunsch erfüllt)</span>
                 </div>
                 <div class="legend-item">
                     <div class="legend-color group-swatch"></div>
