@@ -538,10 +538,62 @@ button:disabled {
 /* Students List */
 .students-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 4fr));
-    gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 10px;
     flex: 1;
     padding: 4px;
+    align-items: start;
+}
+
+/* Wish groups */
+.student-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border: 2px solid #c7d0da;
+    border-radius: 8px;
+    background: #fbfcfd;
+}
+
+.student-group.single-member {
+    border-style: dashed;
+    border-color: #e6e6e6;
+    background: transparent;
+    padding: 4px;
+}
+
+.student-group.dragging-group {
+    opacity: 0.4;
+}
+
+.group-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75em;
+    font-weight: bold;
+    color: #5a6675;
+    background: #eaeef3;
+    border-radius: 5px;
+    padding: 3px 8px;
+    cursor: grab;
+    user-select: none;
+}
+
+.group-header:active {
+    cursor: grabbing;
+}
+
+.group-grip {
+    font-size: 1.1em;
+    line-height: 1;
+    letter-spacing: -1px;
+}
+
+.legend-color.group-swatch {
+    background: #fbfcfd;
+    border: 2px solid #c7d0da;
 }
 
 .student {
@@ -715,4 +767,135 @@ button:disabled {
 .loading::after {
     content: '...';
     animation: pulse 1.5s infinite;
+}
+
+/* ===== Mehrspaltige, kompakte Optionen & Regeln ===== */
+.section-title {
+    margin: 18px 0 8px;
+    color: #495057;
+    font-size: 1.1em;
+}
+
+.display-options-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 6px 20px;
+}
+
+.display-options-grid .option-group {
+    margin-bottom: 0;
+}
+
+.rules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 6px 24px;
+    align-items: start;
+}
+
+.rules-grid .rule-group {
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+}
+
+.rules-grid .rule-group .rule-hint {
+    flex-basis: 100%;
+    margin-left: 0;
+}
+
+/* ===== Schüler-Anzeigeoptionen ===== */
+/* Geschlecht hervorheben: linke Border */
+.student.gender-m {
+    border-left: 5px solid #2f80ed;   /* blau – männlich */
+}
+
+.student.gender-w {
+    border-left: 5px solid #eb6fb0;   /* rosa – weiblich */
+}
+
+/* Typ-Badge: a aktiv (orange) / s still (lila), quadratischer Hintergrund */
+.student-type-badge {
+    font-size: 0.9em;
+    font-weight: bold;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.student-type-badge.type-a {
+    background: #ffe2bf;
+    color: #d2691e;
+}
+
+.student-type-badge.type-s {
+    background: #e7ddff;
+    color: #7b3fe4;
+}
+
+/* Noten-Badge: Notennummer vor gelbem Stern */
+.student-grade-badge {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.student-grade-badge .grade-star {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f5c518;
+    font-size: 22px;
+    line-height: 1;
+}
+
+.student-grade-badge .grade-num {
+    position: relative;
+    z-index: 1;
+    font-size: 0.7em;
+    font-weight: bold;
+    color: #5a4a00;
+}
+
+/* ===== Gruppen-Auswahl ===== */
+.student-group.group-selected {
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.35);
+    background: #eaf4fc;
+}
+
+.student.group-member-selected {
+    outline: 2px solid #3498db;
+    outline-offset: -2px;
+}
+
+.group-summary {
+    background: #eaf4fc;
+    border: 1px dashed #3498db;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 0.8em;
+    margin-bottom: 4px;
+}
+
+.group-summary-title {
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 4px;
+}
+
+.group-summary .stat-row {
+    margin-bottom: 2px;
 }

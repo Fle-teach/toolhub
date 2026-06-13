@@ -27,36 +27,73 @@
                     <input type="number" id="classCount" min="2" max="10" value="4">
                 </div>
                 
-                <div class="option-group">
-                    <label>
-                        <input type="checkbox" id="includeIgnored">
-                        Ignorierte Schüler in normale Klassen einteilen
-                    </label>
+                <h4 class="section-title">Anzeige-Optionen</h4>
+                <div class="display-options-grid">
+                    <div class="option-group">
+                        <label>
+                            <input type="checkbox" id="includeIgnored">
+                            Ignorierte Schüler in normale Klassen einteilen
+                        </label>
+                    </div>
+
+                    <div class="option-group">
+                        <label>
+                            <input type="checkbox" id="showMutualPairs">
+                            Gegenseitige Wünsche (höchste Priorität) hervorheben
+                        </label>
+                    </div>
+
+                    <div class="option-group">
+                        <label>
+                            <input type="checkbox" id="showFulfilledPriority">
+                            Erfüllte Wunschpriorität anzeigen (1-3)
+                        </label>
+                    </div>
+
+                    <div class="option-group">
+                        <label>
+                            <input type="checkbox" id="showGenderHighlight">
+                            Geschlecht hervorheben (Border: m blau, w rosa)
+                        </label>
+                    </div>
+
+                    <div class="option-group">
+                        <label>
+                            <input type="checkbox" id="showType">
+                            Typ anzeigen (a aktiv / s still)
+                        </label>
+                    </div>
+
+                    <div class="option-group">
+                        <label>
+                            <input type="checkbox" id="showGrades">
+                            Noten anzeigen (1–3 mit Stern)
+                        </label>
+                    </div>
                 </div>
-                
-                <div class="option-group">
-                    <label>
-                        <input type="checkbox" id="showMutualPairs">
-                        Gegenseitige Wünsche (höchste Priorität) hervorheben
-                    </label>
-                </div>
-                
-                <div class="option-group">
-                    <label>
-                        <input type="checkbox" id="showFulfilledPriority">
-                        Erfüllte Wunschpriorität anzeigen (1-3)
-                    </label>
-                </div>
-                
+
                 <div class="distribution-rules">
                     <h4>Verteilungsregeln</h4>
-                    
+
+                    <div class="rules-grid">
                     <div class="rule-group">
                         <label for="maxSameGender">Max. Schüler mit gleichem Geschlecht pro Klasse:</label>
                         <input type="number" id="maxSameGender" min="0" value="0">
                         <span class="rule-hint">(0 = keine Beschränkung)</span>
                     </div>
-                    
+
+                    <div class="rule-group">
+                        <label for="maxFemale">Max. weibliche Schüler (w) pro Klasse:</label>
+                        <input type="number" id="maxFemale" min="0" value="0">
+                        <span class="rule-hint">(0 = keine Beschränkung)</span>
+                    </div>
+
+                    <div class="rule-group">
+                        <label for="maxMale">Max. männliche Schüler (m) pro Klasse:</label>
+                        <input type="number" id="maxMale" min="0" value="0">
+                        <span class="rule-hint">(0 = keine Beschränkung)</span>
+                    </div>
+
                     <div class="rule-group">
                         <label for="maxSameOldClass">Max. Schüler aus gleicher alter Klasse:</label>
                         <input type="number" id="maxSameOldClass" min="0" value="0">
@@ -68,9 +105,17 @@
                         <input type="number" id="minSameOldClass" min="0" value="2">
                         <span class="rule-hint">(Niemand soll alleine sein)</span>
                     </div>
-                    
+
+                    <div class="rule-group">
+                        <label for="minSameGenderOldClass">Min. Schüler gleichen Geschlechts aus gleicher alter Klasse:</label>
+                        <input type="number" id="minSameGenderOldClass" min="0" value="2">
+                        <span class="rule-hint">(Niemand soll als einziges Mädchen/einziger Junge seiner alten Klasse dastehen; 0 = aus)</span>
+                    </div>
+                    </div>
+
                     <h4 style="margin-top: 15px;">Erweiterte Regeln</h4>
-                    
+
+                    <div class="rules-grid">
                     <div class="rule-group">
                         <label for="maxClassSize">Max. Schülerzahl pro Klasse:</label>
                         <input type="number" id="maxClassSize" min="0" value="0">
@@ -114,8 +159,9 @@
                         </label>
                         <span class="rule-hint">(Wenn beide sich an #1 wünschen, müssen sie in derselben Klasse sein)</span>
                     </div>
+                    </div>
                 </div>
-                
+
             </div>
             
             <div class="button-group">
@@ -166,6 +212,9 @@
                 <div class="score-details" id="scoreDetails"></div>
             </div>
             <div class="action-buttons">
+                <button class="btn-export" onclick="exportExcel()">
+                    Als Excel exportieren
+                </button>
                 <button class="btn-export" onclick="exportClasses()">
                     Zusammenstellung exportieren
                 </button>
@@ -227,12 +276,17 @@
                     <div class="legend-color priority-indicator"></div>
                     <span class="legend-text">Erfüllte Priorität (1=grün, 2=gelb, 3=grau, 0=keine Wünsche, X=kein Wunsch erfüllt)</span>
                 </div>
+                <div class="legend-item">
+                    <div class="legend-color group-swatch"></div>
+                    <span class="legend-text">Wunsch-Gruppe (gemeinsam abhängige Schüler – am Griff ⠿ als Ganzes verschiebbar)</span>
+                </div>
             </div>
         </div>
         
         <div id="classesContainer" class="classes-container"></div>
     </div>
 
+    <script src="xlsx.full.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

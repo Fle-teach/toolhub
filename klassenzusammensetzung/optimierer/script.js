@@ -3,6 +3,7 @@ let wishesData = [];
 let studentData = [];
 let currentClasses = {};
 let selectedStudent = null;
+let selectedGroupKey = null;
 let optimizationRunning = false;
 let bestClasses = null;
 let bestScore = 0;
@@ -16,6 +17,10 @@ let manualExclusionHighlightPairs = new Set();
 // Drag and drop variables
 let draggedStudent = null;
 let draggedFromClass = null;
+
+// Group drag variables (whole wish-group move)
+let draggedGroup = null;
+let draggedGroupFromClass = null;
 
 // Mutual pairs tracking
 let mutualPairs = [];
@@ -44,6 +49,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // Re-render on display-option toggles (gender highlight, type, grades)
+    ['showGenderHighlight', 'showType', 'showGrades'].forEach(id => {
+        document.getElementById(id).addEventListener('change', function() {
+            if (Object.keys(currentClasses).length > 0) {
+                displayClasses();
+            }
+        });
+    });
+
     // Checkbox handler for fulfilled priority
     document.getElementById('showFulfilledPriority').addEventListener('change', function() {
         if (Object.keys(currentClasses).length > 0) {
@@ -255,6 +269,9 @@ function getConstraintConfig() {
         maxGrade1: parseInt(document.getElementById('maxGrade1').value) || 0,
         maxGrade3: parseInt(document.getElementById('maxGrade3').value) || 0,
         minDistinctOldClasses: parseInt(document.getElementById('minDistinctOldClasses').value) || 0,
+        maxFemale: parseInt(document.getElementById('maxFemale').value) || 0,
+        maxMale: parseInt(document.getElementById('maxMale').value) || 0,
+        minSameGenderOldClass: parseInt(document.getElementById('minSameGenderOldClass').value) || 0,
         mutualWishOneRequired: document.getElementById('mutualWishOneRequired').checked || false
     };
 }
@@ -294,11 +311,19 @@ function getExtendedConstraintFeasibilityError(activeStudents, classCount, const
 
     const genderCounts = {};
     const oldClassCounts = {};
+    const oldClassGenderCounts = {};
+    let femaleTotal = 0;
+    let maleTotal = 0;
     for (const student of activeStudents) {
         const gender = normalizeGender(student);
+        const genderClass = getGenderClass(student);
         const oldClass = normalizeOldClass(student);
         genderCounts[gender] = (genderCounts[gender] || 0) + 1;
         oldClassCounts[oldClass] = (oldClassCounts[oldClass] || 0) + 1;
+        const ogKey = oldClass + '||' + genderClass;
+        oldClassGenderCounts[ogKey] = (oldClassGenderCounts[ogKey] || 0) + 1;
+        if (genderClass === 'w') femaleTotal++;
+        if (genderClass === 'm') maleTotal++;
     }
 
     if (constraints.maxSameGender > 0) {
@@ -306,6 +331,29 @@ function getExtendedConstraintFeasibilityError(activeStudents, classCount, const
             if (Math.ceil(genderCounts[gender] / constraints.maxSameGender) > classCount) {
                 return `Unmögliche Geschlechterverteilung: ${genderCounts[gender]} Schüler mit Geschlecht "${gender}" passen nicht in ${classCount} Klassen mit max. ${constraints.maxSameGender} pro Klasse.`;
             }
+        }
+    }
+
+    if (constraints.maxFemale > 0 && Math.ceil(femaleTotal / constraints.maxFemale) > classCount) {
+        return `Unmögliche Geschlechterverteilung: ${femaleTotal} weibliche Schüler passen nicht in ${classCount} Klassen mit max. ${constraints.maxFemale} pro Klasse.`;
+    }
+
+    if (constraints.maxMale > 0 && Math.ceil(maleTotal / constraints.maxMale) > classCount) {
+        return `Unmögliche Geschlechterverteilung: ${maleTotal} männliche Schüler passen nicht in ${classCount} Klassen mit max. ${constraints.maxMale} pro Klasse.`;
+    }
+
+    if (constraints.minSameGenderOldClass > 1) {
+        const genderLabel = { m: 'männlich', w: 'weiblich', d: 'divers' };
+        const undersized = [];
+        for (const key in oldClassGenderCounts) {
+            if (oldClassGenderCounts[key] > 0 && oldClassGenderCounts[key] < constraints.minSameGenderOldClass) {
+                const [oldClass, genderClass] = key.split('||');
+                const label = genderLabel[genderClass] || genderClass;
+                undersized.push(`"${oldClass}" (${label}: ${oldClassGenderCounts[key]})`);
+            }
+        }
+        if (undersized.length > 0) {
+            return `Unmögliche Mindestgrenze (gleiches Geschlecht/alte Klasse): Folgende Geschlecht/Alt-Klasse-Gruppen haben weniger als ${constraints.minSameGenderOldClass} Schüler und können die Regel nie erfüllen: ${undersized.join(', ')}. Bitte Min-Wert reduzieren oder betroffene Schüler ignorieren.`;
         }
     }
 
@@ -329,10 +377,10 @@ function getExtendedConstraintFeasibilityError(activeStudents, classCount, const
         }
     }
 
-    if (constraints.maxClassSize > 0 && constraints.minSameOldClass > 1) {
+    if (constraints.maxClassSize > 0 && (constraints.minSameOldClass > 1 || constraints.minSameGenderOldClass > 1)) {
         // Wenn maxClassSize so eng gewählt ist, dass nicht einmal der größte unvermeidbare
         // Chunk hineinpasst, ist die Konfiguration nicht erfüllbar.
-        const maxChunkSize = computeMaxChunkSize(activeStudents, constraints.minSameOldClass);
+        const maxChunkSize = computeMaxChunkSize(activeStudents, constraints);
         if (maxChunkSize > constraints.maxClassSize) {
             return `Unmögliche Verteilung: Eine alte Klasse erzeugt einen Block von ${maxChunkSize} Schülern, der nicht in eine neue Klasse mit max. ${constraints.maxClassSize} Schülern passt. Bitte Max-Klassengröße erhöhen oder Min-Wert reduzieren.`;
         }
@@ -343,6 +391,23 @@ function getExtendedConstraintFeasibilityError(activeStudents, classCount, const
 
 function normalizeGender(student) {
     return (student['Geschlecht (m/w/d)'] || 'unbekannt').toString().trim().toLowerCase();
+}
+
+// Kanonisiert das Geschlecht auf 'm' / 'w' / 'd', damit Regeln robust gegen
+// Schreibweisen wie "weiblich"/"männlich" greifen. Unbekannte Werte bleiben erhalten.
+function getGenderClass(student) {
+    const g = normalizeGender(student);
+    if (g === 'w' || g === 'weiblich' || g === 'f' || g === 'female') return 'w';
+    if (g === 'm' || g === 'männlich' || g === 'maennlich' || g === 'male') return 'm';
+    if (g === 'd' || g === 'divers') return 'd';
+    return g;
+}
+
+// Schlüssel für die Block-Bildung in der Startlösung. Ohne Gender-Regel nach alter
+// Klasse, mit Gender-Regel zusätzlich nach Geschlecht getrennt.
+function getChunkKey(student, useGender) {
+    const oldClass = normalizeOldClass(student);
+    return useGender ? oldClass + '||' + getGenderClass(student) : oldClass;
 }
 
 function normalizeOldClass(student) {
@@ -418,33 +483,58 @@ function addManualExclusionPairsForStudentInClass(student, className) {
     manualExclusionHighlightPairs.clear();
 
 function getForcedRelocateCompanions(fromClassName, student, constraints) {
-    if (!constraints || constraints.minSameOldClass <= 1) {
-        return [];
-    }
+    if (!constraints) return [];
 
     const sourceStudents = currentClasses[fromClassName] || [];
-    const movedOldClass = normalizeOldClass(student);
+    const movedName = student['Schüler'];
+    const companions = [];
+    const seen = new Set([movedName]);
 
-    const sameOldClassStudents = sourceStudents.filter(
-        s => normalizeOldClass(s) === movedOldClass
-    );
+    const addCompanions = (candidates) => {
+        for (const s of candidates) {
+            if (seen.has(s['Schüler'])) continue;
+            seen.add(s['Schüler']);
+            companions.push(s);
+        }
+    };
 
-    const remainingSameOldClassStudents = sameOldClassStudents.filter(
-        s => s['Schüler'] !== student['Schüler']
-    );
-
-    if (remainingSameOldClassStudents.length === 0 ||
-        remainingSameOldClassStudents.length >= constraints.minSameOldClass) {
-        return [];
+    // minSameOldClass: würde die Quelle sonst unter die Mindestzahl der alten Klasse
+    // fallen, nimm die verbleibenden gleichen Alt-Klassen-Schüler mit.
+    if (constraints.minSameOldClass > 1) {
+        const movedOldClass = normalizeOldClass(student);
+        const remaining = sourceStudents.filter(
+            s => s['Schüler'] !== movedName && normalizeOldClass(s) === movedOldClass
+        );
+        if (remaining.length > 0 && remaining.length < constraints.minSameOldClass) {
+            addCompanions(remaining);
+        }
     }
 
-    return remainingSameOldClassStudents;
+    // minSameGenderOldClass: analog für die (alte Klasse, Geschlecht)-Gruppe, damit kein
+    // einzelnes Mädchen/einziger Junge der alten Klasse in der Quelle zurückbleibt.
+    if (constraints.minSameGenderOldClass > 1) {
+        const movedOldClass = normalizeOldClass(student);
+        const movedGenderClass = getGenderClass(student);
+        const remaining = sourceStudents.filter(
+            s => s['Schüler'] !== movedName &&
+                 normalizeOldClass(s) === movedOldClass &&
+                 getGenderClass(s) === movedGenderClass
+        );
+        if (remaining.length > 0 && remaining.length < constraints.minSameGenderOldClass) {
+            addCompanions(remaining);
+        }
+    }
+
+    return companions;
 }
 
 function isClassValidByHardConstraints(studentsInClass, constraints, options = {}) {
     const checkMinimumRules = options.checkMinimumRules !== false;
     const genderCounts = {};
     const oldClassCounts = {};
+    const oldClassGenderCounts = {};
+    let femaleCount = 0;
+    let maleCount = 0;
     let activeCount = 0;
     let grade1Count = 0;
     let grade3Count = 0;
@@ -452,14 +542,19 @@ function isClassValidByHardConstraints(studentsInClass, constraints, options = {
 
     for (const student of studentsInClass) {
         const gender = normalizeGender(student);
+        const genderClass = getGenderClass(student);
         const oldClass = normalizeOldClass(student);
         const activity = normalizeActivity(student);
         const grade = normalizeGrade(student);
-        
+
         genderCounts[gender] = (genderCounts[gender] || 0) + 1;
         oldClassCounts[oldClass] = (oldClassCounts[oldClass] || 0) + 1;
+        const ogKey = oldClass + '||' + genderClass;
+        oldClassGenderCounts[ogKey] = (oldClassGenderCounts[ogKey] || 0) + 1;
         distinctOldClasses.add(oldClass);
-        
+
+        if (genderClass === 'w') femaleCount++;
+        if (genderClass === 'm') maleCount++;
         if (activity === 'a') activeCount++;
         if (grade === '1') grade1Count++;
         if (grade === '3') grade3Count++;
@@ -469,6 +564,24 @@ function isClassValidByHardConstraints(studentsInClass, constraints, options = {
     if (constraints.maxSameGender > 0) {
         for (const gender in genderCounts) {
             if (genderCounts[gender] > constraints.maxSameGender) {
+                return false;
+            }
+        }
+    }
+
+    // Check maxFemale / maxMale (geschlechtsspezifische Obergrenzen)
+    if (constraints.maxFemale > 0 && femaleCount > constraints.maxFemale) {
+        return false;
+    }
+    if (constraints.maxMale > 0 && maleCount > constraints.maxMale) {
+        return false;
+    }
+
+    // Check minSameGenderOldClass: niemand soll als einziges Mädchen/einziger Junge
+    // seiner alten Klasse in einer neuen Klasse stehen. Greift erst ab >=1 Schüler.
+    if (checkMinimumRules && constraints.minSameGenderOldClass > 1) {
+        for (const key in oldClassGenderCounts) {
+            if (oldClassGenderCounts[key] > 0 && oldClassGenderCounts[key] < constraints.minSameGenderOldClass) {
                 return false;
             }
         }
@@ -623,7 +736,7 @@ function buildInitialFeasibleSolution(students, classNames) {
     // (alle Reste landen in chunks[0]). Wir berechnen die tatsächlich auftretende größte Chunk-Größe
     // aus den Daten, damit der Headroom passt — sonst kann die Greedy-Platzierung den Mega-Chunk
     // nirgendwo unterbringen und alle 120 Versuche scheitern.
-    const maxChunkSize = computeMaxChunkSize(students, constraints.minSameOldClass);
+    const maxChunkSize = computeMaxChunkSize(students, constraints);
     const algorithmicHeadroom = studentsPerClassTarget + maxChunkSize + 1;
     const maxClassSize = Math.min(configuredMax, algorithmicHeadroom);
     const partnerMap = getMutualWishOnePartnerMap(students, constraints);
@@ -739,13 +852,18 @@ function buildInitialFeasibleSolution(students, classNames) {
 function describeMinViolationsForReason(classNames, constraints) {
     const violations = [];
 
+    const genderLabel = { m: 'männlich', w: 'weiblich', d: 'divers' };
+
     for (const className of classNames) {
         const studentsInClass = currentClasses[className];
         const oldClassCounts = {};
+        const oldClassGenderCounts = {};
         const distinctOldClasses = new Set();
         for (const student of studentsInClass) {
             const oldClass = normalizeOldClass(student);
             oldClassCounts[oldClass] = (oldClassCounts[oldClass] || 0) + 1;
+            const ogKey = oldClass + '||' + getGenderClass(student);
+            oldClassGenderCounts[ogKey] = (oldClassGenderCounts[ogKey] || 0) + 1;
             distinctOldClasses.add(oldClass);
         }
 
@@ -754,6 +872,17 @@ function describeMinViolationsForReason(classNames, constraints) {
                 const count = oldClassCounts[oldClass];
                 if (count > 0 && count < constraints.minSameOldClass) {
                     violations.push(`${className}: nur ${count} Schüler aus alter Klasse "${oldClass}" (Min: ${constraints.minSameOldClass})`);
+                }
+            }
+        }
+
+        if (constraints.minSameGenderOldClass > 1) {
+            for (const key in oldClassGenderCounts) {
+                const count = oldClassGenderCounts[key];
+                if (count > 0 && count < constraints.minSameGenderOldClass) {
+                    const [oldClass, genderClass] = key.split('||');
+                    const label = genderLabel[genderClass] || genderClass;
+                    violations.push(`${className}: nur ${count} ${label}e Schüler aus alter Klasse "${oldClass}" (Min: ${constraints.minSameGenderOldClass})`);
                 }
             }
         }
@@ -854,25 +983,38 @@ function deterministicNoise(input, seed) {
     return hash | 0;
 }
 
-function computeMaxChunkSize(students, minSameOldClass) {
-    if (minSameOldClass <= 1) return 1;
+// Liefert die effektive Block-Größe für die Startlösung. Ohne aktive Min-Regel = 1
+// (Einzelplatzierung). Mit Gender-Regel werden Blöcke nach (alte Klasse, Geschlecht)
+// gebildet und müssen mindestens so groß sein, dass sie sowohl die Gender- als auch
+// die Alt-Klassen-Mindestgrenze allein erfüllen.
+function getChunkConfig(constraints) {
+    const useGender = constraints.minSameGenderOldClass > 1;
+    const oldClassMin = constraints.minSameOldClass > 1 ? constraints.minSameOldClass : 1;
+    const genderMin = useGender ? constraints.minSameGenderOldClass : 1;
+    const chunkSize = useGender ? Math.max(oldClassMin, genderMin) : oldClassMin;
+    return { useGender, chunkSize };
+}
 
-    const sizesByOldClass = {};
+function computeMaxChunkSize(students, constraints) {
+    const { useGender, chunkSize } = getChunkConfig(constraints);
+    if (chunkSize <= 1) return 1;
+
+    const sizesByKey = {};
     for (const student of students) {
-        const oldClass = normalizeOldClass(student);
-        sizesByOldClass[oldClass] = (sizesByOldClass[oldClass] || 0) + 1;
+        const key = getChunkKey(student, useGender);
+        sizesByKey[key] = (sizesByKey[key] || 0) + 1;
     }
 
-    let maxSize = minSameOldClass;
-    for (const oldClass in sizesByOldClass) {
-        const groupSize = sizesByOldClass[oldClass];
-        if (groupSize < minSameOldClass) continue;
-        const fullChunks = Math.floor(groupSize / minSameOldClass);
-        const remainder = groupSize % minSameOldClass;
+    let maxSize = chunkSize;
+    for (const key in sizesByKey) {
+        const groupSize = sizesByKey[key];
+        if (groupSize < chunkSize) continue;
+        const fullChunks = Math.floor(groupSize / chunkSize);
+        const remainder = groupSize % chunkSize;
         // Beim Verteilen des Rests via i % fullChunks kann ein einzelner Chunk
         // bis zu ceil(remainder / fullChunks) zusätzliche Schüler erhalten.
         const extras = fullChunks > 0 ? Math.ceil(remainder / fullChunks) : 0;
-        const chunkMax = minSameOldClass + extras;
+        const chunkMax = chunkSize + extras;
         if (chunkMax > maxSize) maxSize = chunkMax;
     }
 
@@ -880,31 +1022,33 @@ function computeMaxChunkSize(students, minSameOldClass) {
 }
 
 function buildPlacementUnits(students, constraints, seed) {
-    if (constraints.minSameOldClass <= 1) {
+    const { useGender, chunkSize } = getChunkConfig(constraints);
+
+    if (chunkSize <= 1) {
         return getConstructionOrder(students, seed).map(student => [student]);
     }
 
-    const byOldClass = {};
+    // Schüler nach Block-Schlüssel sammeln: alte Klasse (ggf. + Geschlecht).
+    const byKey = {};
     for (const student of students) {
-        const oldClass = normalizeOldClass(student);
-        if (!byOldClass[oldClass]) byOldClass[oldClass] = [];
-        byOldClass[oldClass].push(student);
+        const key = getChunkKey(student, useGender);
+        if (!byKey[key]) byKey[key] = [];
+        byKey[key].push(student);
     }
 
-    const chunksByOldClass = {};
+    const chunksByKey = {};
 
-    for (const oldClass in byOldClass) {
-        const group = [...byOldClass[oldClass]].sort((a, b) => {
+    for (const key in byKey) {
+        const group = [...byKey[key]].sort((a, b) => {
             const noiseA = deterministicNoise(a['Schüler'] || '', seed);
             const noiseB = deterministicNoise(b['Schüler'] || '', seed);
             return noiseA - noiseB;
         });
 
-        if (group.length < constraints.minSameOldClass) {
+        if (group.length < chunkSize) {
             return null;
         }
 
-        const chunkSize = constraints.minSameOldClass;
         const fullChunks = Math.floor(group.length / chunkSize);
         const remainder = group.length % chunkSize;
         const chunks = [];
@@ -918,15 +1062,15 @@ function buildPlacementUnits(students, constraints, seed) {
             chunks[i % chunks.length].push(group[fullChunks * chunkSize + i]);
         }
 
-        chunksByOldClass[oldClass] = chunks;
+        chunksByKey[key] = chunks;
     }
 
-    // Reihenfolge der alten Klassen pro Versuch variieren, damit nicht immer
-    // dieselben Klassen zuerst platziert werden. Größte Gruppen zuerst (sie sind
-    // der limitierende Faktor); bei gleicher Größe seedabhängig per Noise.
-    const orderedOldClasses = Object.keys(chunksByOldClass).sort((a, b) => {
-        const sizeA = byOldClass[a].length;
-        const sizeB = byOldClass[b].length;
+    // Reihenfolge der Blöcke pro Versuch variieren, damit nicht immer dieselben
+    // Gruppen zuerst platziert werden. Größte Gruppen zuerst (sie sind der
+    // limitierende Faktor); bei gleicher Größe seedabhängig per Noise.
+    const orderedKeys = Object.keys(chunksByKey).sort((a, b) => {
+        const sizeA = byKey[a].length;
+        const sizeB = byKey[b].length;
         if (sizeA !== sizeB) return sizeB - sizeA;
         return deterministicNoise(a, seed) - deterministicNoise(b, seed);
     });
@@ -936,8 +1080,8 @@ function buildPlacementUnits(students, constraints, seed) {
     while (added) {
         added = false;
 
-        for (const oldClass of orderedOldClasses) {
-            const chunk = chunksByOldClass[oldClass].shift();
+        for (const key of orderedKeys) {
+            const chunk = chunksByKey[key].shift();
             if (chunk) {
                 units.push(chunk);
                 added = true;
@@ -955,6 +1099,9 @@ function calculateHardConstraintPenalty(classNames, constraints) {
         const studentsInClass = currentClasses[className];
         const genderCounts = {};
         const oldClassCounts = {};
+        const oldClassGenderCounts = {};
+        let femaleCount = 0;
+        let maleCount = 0;
         let activeCount = 0;
         let grade1Count = 0;
         let grade3Count = 0;
@@ -962,13 +1109,18 @@ function calculateHardConstraintPenalty(classNames, constraints) {
 
         studentsInClass.forEach(student => {
             const gender = normalizeGender(student);
+            const genderClass = getGenderClass(student);
             const oldClass = normalizeOldClass(student);
             const activity = normalizeActivity(student);
             const grade = normalizeGrade(student);
             genderCounts[gender] = (genderCounts[gender] || 0) + 1;
             oldClassCounts[oldClass] = (oldClassCounts[oldClass] || 0) + 1;
+            const ogKey = oldClass + '||' + genderClass;
+            oldClassGenderCounts[ogKey] = (oldClassGenderCounts[ogKey] || 0) + 1;
             distinctOldClasses.add(oldClass);
 
+            if (genderClass === 'w') femaleCount++;
+            if (genderClass === 'm') maleCount++;
             if (activity === 'a') activeCount++;
             if (grade === '1') grade1Count++;
             if (grade === '3') grade3Count++;
@@ -978,6 +1130,21 @@ function calculateHardConstraintPenalty(classNames, constraints) {
             Object.values(genderCounts).forEach(count => {
                 if (count > constraints.maxSameGender) {
                     penalty += (count - constraints.maxSameGender) * 100;
+                }
+            });
+        }
+
+        if (constraints.maxFemale > 0 && femaleCount > constraints.maxFemale) {
+            penalty += (femaleCount - constraints.maxFemale) * 100;
+        }
+        if (constraints.maxMale > 0 && maleCount > constraints.maxMale) {
+            penalty += (maleCount - constraints.maxMale) * 100;
+        }
+
+        if (constraints.minSameGenderOldClass > 1) {
+            Object.values(oldClassGenderCounts).forEach(count => {
+                if (count > 0 && count < constraints.minSameGenderOldClass) {
+                    penalty += (constraints.minSameGenderOldClass - count) * 70;
                 }
             });
         }
@@ -1381,11 +1548,14 @@ function calculateWishScore(student, classmates) {
 
     const classmateNames = classmates.map(c => c['Schüler']);
 
-    // Return score of highest fulfilled wish priority only
+    // Konkave Punktwerte: Der Sprung vom 3.- zum 2.-Wunsch (1 -> 3 = +2) bringt mehr
+    // als der Sprung vom 2.- zum 1.-Wunsch (3 -> 4 = +1). Damit belohnt der Optimizer
+    // eher, jemanden von seinem schlechtesten erfüllten Wunsch wegzuholen, als einen
+    // ohnehin guten Wunsch noch zu perfektionieren.
     if (classmateNames.includes(wishes['Wunsch 1 - Höchste Priorität'])) {
-        return 3;
+        return 4;
     } else if (classmateNames.includes(wishes['Wunsch 2 - Zweithöchste Priorität'])) {
-        return 2;
+        return 3;
     } else if (classmateNames.includes(wishes['Wunsch 3 - Dritthöchste Priorität'])) {
         return 1;
     }
@@ -1419,8 +1589,9 @@ function calculateTotalScore() {
     const classNames = Object.keys(currentClasses).filter(name => name !== 'Ignorierte Schüler');
 
     // Wishes score + Penalty für Schüler ganz ohne erfüllten Wunsch
-    // Differenz zwischen "ein Wunsch erfüllt" und "keiner erfüllt" soll wesentlich
-    // größer wiegen als die Stufen 1/2/3 untereinander.
+    // Rohwerte 4/3/1 (×10 = 40/30/10) sind konkav: Aufstieg vom 3.- zum 2.-Wunsch (+20)
+    // wiegt mehr als vom 2.- zum 1.-Wunsch (+10). Die Differenz zwischen "ein Wunsch
+    // erfüllt" und "keiner erfüllt" (Penalty 100) wiegt deutlich schwerer als die Stufen.
     const PENALTY_NO_WISH_FULFILLED = 100;
     let unfulfilledPenalty = 0;
     for (const className in currentClasses) {
@@ -1488,17 +1659,22 @@ function calculateClassMaxPenalty(studentsInClass, constraints) {
 
     const genderCounts = {};
     const oldClassCounts = {};
+    let femaleCount = 0;
+    let maleCount = 0;
     let activeCount = 0;
     let grade1Count = 0;
     let grade3Count = 0;
 
     for (const student of studentsInClass) {
         const gender = normalizeGender(student);
+        const genderClass = getGenderClass(student);
         const oldClass = normalizeOldClass(student);
         const activity = normalizeActivity(student);
         const grade = normalizeGrade(student);
         genderCounts[gender] = (genderCounts[gender] || 0) + 1;
         oldClassCounts[oldClass] = (oldClassCounts[oldClass] || 0) + 1;
+        if (genderClass === 'w') femaleCount++;
+        if (genderClass === 'm') maleCount++;
         if (activity === 'a') activeCount++;
         if (grade === '1') grade1Count++;
         if (grade === '3') grade3Count++;
@@ -1510,6 +1686,12 @@ function calculateClassMaxPenalty(studentsInClass, constraints) {
                 penalty += (genderCounts[g] - constraints.maxSameGender) * PENALTY_PER_EXCESS;
             }
         }
+    }
+    if (constraints.maxFemale > 0 && femaleCount > constraints.maxFemale) {
+        penalty += (femaleCount - constraints.maxFemale) * PENALTY_PER_EXCESS;
+    }
+    if (constraints.maxMale > 0 && maleCount > constraints.maxMale) {
+        penalty += (maleCount - constraints.maxMale) * PENALTY_PER_EXCESS;
     }
     if (constraints.maxSameOldClass > 0) {
         for (const c in oldClassCounts) {
@@ -1590,10 +1772,13 @@ function calculateMinConstraintPenalty(classNames, constraints) {
     for (const className of classNames) {
         const studentsInClass = currentClasses[className];
         const oldClassCounts = {};
+        const oldClassGenderCounts = {};
         const distinctOldClasses = new Set();
         for (const student of studentsInClass) {
             const oldClass = normalizeOldClass(student);
             oldClassCounts[oldClass] = (oldClassCounts[oldClass] || 0) + 1;
+            const ogKey = oldClass + '||' + getGenderClass(student);
+            oldClassGenderCounts[ogKey] = (oldClassGenderCounts[ogKey] || 0) + 1;
             distinctOldClasses.add(oldClass);
         }
 
@@ -1602,6 +1787,15 @@ function calculateMinConstraintPenalty(classNames, constraints) {
                 const count = oldClassCounts[oldClass];
                 if (count > 0 && count < constraints.minSameOldClass) {
                     penalty += (constraints.minSameOldClass - count) * PENALTY_PER_MISSING_STUDENT;
+                }
+            }
+        }
+
+        if (constraints.minSameGenderOldClass > 1) {
+            for (const key in oldClassGenderCounts) {
+                const count = oldClassGenderCounts[key];
+                if (count > 0 && count < constraints.minSameGenderOldClass) {
+                    penalty += (constraints.minSameGenderOldClass - count) * PENALTY_PER_MISSING_STUDENT;
                 }
             }
         }
@@ -1736,6 +1930,77 @@ function displayClasses() {
     markUnfulfilledWishes();
     updateStats();
     document.getElementById('statsSection').style.display = 'flex';
+    reapplySelections();
+}
+
+// Ziel des aktuell best-erfüllten Wunsches eines Schülers innerhalb seiner Klasse.
+// Entfernt man genau diesen Mitschüler, sinkt die erfüllte Wunsch-Priorität des
+// Schülers (oder fällt ganz weg). Liefert null, wenn kein Wunsch erfüllt ist.
+function getBestFulfilledWishTarget(studentName, classmateNameSet) {
+    const wishes = wishesData.find(w => w['Schüler'] === studentName);
+    if (!wishes) return null;
+    const ordered = [
+        wishes['Wunsch 1 - Höchste Priorität'],
+        wishes['Wunsch 2 - Zweithöchste Priorität'],
+        wishes['Wunsch 3 - Dritthöchste Priorität']
+    ];
+    for (const target of ordered) {
+        if (target && classmateNameSet.has(target)) return target;
+    }
+    return null;
+}
+
+// Gruppiert die Schüler einer Klasse in zusammenhängende Wunsch-Cluster.
+// Kante A–B, falls B Ziel von A's best-erfülltem Wunsch ist (in beide Richtungen
+// geprüft). Eine Gruppe ist eine Zusammenhangskomponente: Jeder darin kann nicht
+// entfernt werden, ohne dass ein anderer der Gruppe eine schlechtere/keine Wunsch-
+// erfüllung bekommt. Wer mit niemandem verbunden ist, bildet eine 1er-Gruppe.
+function computeWishGroups(students) {
+    const names = students.map(s => s['Schüler']);
+    const nameSet = new Set(names);
+    const indexByName = new Map(names.map((n, i) => [n, i]));
+
+    const parent = names.map((_, i) => i);
+    const find = (x) => {
+        while (parent[x] !== x) {
+            parent[x] = parent[parent[x]];
+            x = parent[x];
+        }
+        return x;
+    };
+    const union = (a, b) => {
+        const ra = find(a);
+        const rb = find(b);
+        if (ra !== rb) parent[ra] = rb;
+    };
+
+    for (const student of students) {
+        const target = getBestFulfilledWishTarget(student['Schüler'], nameSet);
+        if (target && indexByName.has(target)) {
+            union(indexByName.get(student['Schüler']), indexByName.get(target));
+        }
+    }
+
+    const groupsMap = new Map();
+    for (const student of students) {
+        const root = find(indexByName.get(student['Schüler']));
+        if (!groupsMap.has(root)) groupsMap.set(root, []);
+        groupsMap.get(root).push(student);
+    }
+
+    const groups = [...groupsMap.values()];
+    // Innerhalb jeder Gruppe alphabetisch.
+    for (const group of groups) {
+        group.sort((a, b) => (a['Schüler'] || '').localeCompare(b['Schüler'] || '', 'de'));
+    }
+    // Gruppenreihenfolge: größere Gruppen zuerst, dann alphabetisch nach erstem Mitglied
+    // (deterministisch, damit die Anzeige stabil bleibt).
+    groups.sort((a, b) => {
+        if (b.length !== a.length) return b.length - a.length;
+        return (a[0]['Schüler'] || '').localeCompare(b[0]['Schüler'] || '', 'de');
+    });
+
+    return groups;
 }
 
 function createClassBox(className, students) {
@@ -1761,18 +2026,44 @@ function createClassBox(className, students) {
     
     const studentsList = document.createElement('div');
     studentsList.className = 'students-list';
-    
-    students.forEach(student => {
-        const studentDiv = createStudentElement(student);
-        studentsList.appendChild(studentDiv);
+
+    const groups = computeWishGroups(students);
+    groups.forEach(group => {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'student-group';
+        const memberNames = group.map(s => s['Schüler']);
+        groupDiv.dataset.groupMembers = JSON.stringify(memberNames);
+
+        if (group.length === 1) {
+            groupDiv.classList.add('single-member');
+        } else {
+            // Griff zum Verschieben der ganzen Gruppe (zusätzlich zum Einzel-Drag).
+            const groupHeader = document.createElement('div');
+            groupHeader.className = 'group-header';
+            groupHeader.draggable = true;
+            groupHeader.dataset.groupMembers = groupDiv.dataset.groupMembers;
+            groupHeader.title = 'Klicken: Gruppe auswählen · Ziehen: ganze Gruppe verschieben';
+            groupHeader.innerHTML =
+                `<span class="group-grip">⠿</span><span class="group-label">Gruppe · ${group.length}</span>`;
+            groupHeader.addEventListener('dragstart', handleGroupDragStart);
+            groupHeader.addEventListener('dragend', handleGroupDragEnd);
+            groupHeader.addEventListener('click', () => selectGroup(memberNames));
+            groupDiv.appendChild(groupHeader);
+        }
+
+        group.forEach(student => {
+            groupDiv.appendChild(createStudentElement(student));
+        });
+
+        studentsList.appendChild(groupDiv);
     });
-    
+
     box.appendChild(studentsList);
-    
+
     box.addEventListener('dragover', handleDragOver);
     box.addEventListener('drop', handleDrop);
     box.addEventListener('dragleave', handleDragLeave);
-    
+
     return box;
 }
 
@@ -1784,26 +2075,42 @@ function createClassStats(students, constraintFlags = getClassConstraintFlags(st
     const typeCounts = { s: 0, a: 0 };
     const gradeCounts = {};
     const oldClassCounts = {};
-    
+
     students.forEach(s => {
-        const gender = s['Geschlecht (m/w/d)'];
+        const gender = getGenderClass(s);
         if (gender in genderCounts) genderCounts[gender]++;
-        
+
         const type = getStudentActivityType(s);
         if (type in typeCounts) typeCounts[type]++;
-        
+
         const grade = normalizeGrade(s) || 'Unbekannt';
         gradeCounts[grade] = (gradeCounts[grade] || 0) + 1;
-        
+
         const oldClass = s['Alte Klasse'];
         oldClassCounts[oldClass] = (oldClassCounts[oldClass] || 0) + 1;
     });
-    
+
+    // Alte Klassen alphabetisch nach Klassenname sortieren
+    const oldClassEntries = Object.entries(oldClassCounts)
+        .sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'de'));
+
+    // Konkrete Schüler ermitteln, die die Min-Regel "gleiches Geschlecht je alte Klasse"
+    // verletzen (sie sind die einzige/n ihres Geschlechts aus ihrer alten Klasse).
+    let genderOldClassRow = '';
+    if (constraintFlags.genderOldClass) {
+        const violatorNames = getGenderOldClassViolators(students).map(s => s['Schüler']);
+        const namesText = violatorNames.length
+            ? violatorNames.join(', ')
+            : 'Mindestanzahl unterschritten';
+        genderOldClassRow = `<div class="stat-row constraint-violation"><span class="stat-label">Geschlecht je alte Klasse:</span><span>${escapeHtml(namesText)}</span></div>`;
+    }
+
     stats.innerHTML = `
         <div class="stat-row ${constraintFlags.gender ? 'constraint-violation' : ''}">
             <span class="stat-label">Geschlecht:</span>
             <span>m: ${genderCounts.m}, w: ${genderCounts.w}, d: ${genderCounts.d}</span>
         </div>
+        ${genderOldClassRow}
         <div class="stat-row ${constraintFlags.activity ? 'constraint-violation' : ''}">
             <span class="stat-label">Typ:</span>
             <span>still: ${typeCounts.s}, aktiv: ${typeCounts.a}</span>
@@ -1814,20 +2121,55 @@ function createClassStats(students, constraintFlags = getClassConstraintFlags(st
         </div>
         <div class="stat-row ${constraintFlags.oldClass ? 'constraint-violation' : ''}">
             <span class="stat-label">Alte Klassen:</span>
-            <span>${Object.entries(oldClassCounts).map(([k, v]) => `${k}: ${v}`).join(', ')}</span>
+            <span>${oldClassEntries.map(([k, v]) => `${escapeHtml(String(k))}: ${v}`).join(', ')}</span>
         </div>
         ${constraintFlags.classSize ? '<div class="stat-row constraint-violation"><span class="stat-label">Klassengröße:</span><span>Min/Max verletzt</span></div>' : ''}
         ${constraintFlags.oldClassDiversity ? '<div class="stat-row constraint-violation"><span class="stat-label">Vielfalt alte Klassen:</span><span>Mindestanzahl unterschritten</span></div>' : ''}
         ${constraintFlags.exclusion ? '<div class="stat-row constraint-violation"><span class="stat-label">Ausschlüsse:</span><span>Konflikt in dieser Klasse</span></div>' : ''}
     `;
-    
+
     return stats;
+}
+
+// Liefert die Schüler einer Klasse, die die Regel "Min. gleiches Geschlecht je alte
+// Klasse" verletzen: ihre (alte Klasse, Geschlecht)-Gruppe ist in dieser Klasse
+// vorhanden, aber kleiner als die geforderte Mindestzahl.
+function getGenderOldClassViolators(studentsInClass) {
+    const constraints = getConstraintConfig();
+    if (constraints.minSameGenderOldClass <= 1) return [];
+
+    const groups = {};
+    for (const student of studentsInClass) {
+        const key = normalizeOldClass(student) + '||' + getGenderClass(student);
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(student);
+    }
+
+    const violators = [];
+    for (const key in groups) {
+        const group = groups[key];
+        if (group.length > 0 && group.length < constraints.minSameGenderOldClass) {
+            violators.push(...group);
+        }
+    }
+    violators.sort((a, b) => (a['Schüler'] || '').localeCompare(b['Schüler'] || '', 'de'));
+    return violators;
+}
+
+function escapeHtml(text) {
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function getClassConstraintFlags(studentsInClass, className = '') {
     if (className === 'Ignorierte Schüler') {
         return {
             gender: false,
+            genderOldClass: false,
             activity: false,
             grades: false,
             classSize: false,
@@ -1841,6 +2183,7 @@ function getClassConstraintFlags(studentsInClass, className = '') {
     const constraints = getConstraintConfig();
     const flags = {
         gender: false,
+        genderOldClass: false,
         activity: false,
         grades: false,
         classSize: false,
@@ -1852,6 +2195,9 @@ function getClassConstraintFlags(studentsInClass, className = '') {
 
     const genderCounts = {};
     const oldClassCounts = {};
+    const oldClassGenderCounts = {};
+    let femaleCount = 0;
+    let maleCount = 0;
     let activeCount = 0;
     let grade1Count = 0;
     let grade3Count = 0;
@@ -1859,14 +2205,19 @@ function getClassConstraintFlags(studentsInClass, className = '') {
 
     for (const student of studentsInClass) {
         const gender = normalizeGender(student);
+        const genderClass = getGenderClass(student);
         const oldClass = normalizeOldClass(student);
         const activity = normalizeActivity(student);
         const grade = normalizeGrade(student);
 
         genderCounts[gender] = (genderCounts[gender] || 0) + 1;
         oldClassCounts[oldClass] = (oldClassCounts[oldClass] || 0) + 1;
+        const ogKey = oldClass + '||' + genderClass;
+        oldClassGenderCounts[ogKey] = (oldClassGenderCounts[ogKey] || 0) + 1;
         distinctOldClasses.add(oldClass);
 
+        if (genderClass === 'w') femaleCount++;
+        if (genderClass === 'm') maleCount++;
         if (activity === 'a') activeCount++;
         if (grade === '1') grade1Count++;
         if (grade === '3') grade3Count++;
@@ -1876,6 +2227,20 @@ function getClassConstraintFlags(studentsInClass, className = '') {
         for (const gender in genderCounts) {
             if (genderCounts[gender] > constraints.maxSameGender) {
                 flags.gender = true;
+                break;
+            }
+        }
+    }
+
+    if ((constraints.maxFemale > 0 && femaleCount > constraints.maxFemale) ||
+        (constraints.maxMale > 0 && maleCount > constraints.maxMale)) {
+        flags.gender = true;
+    }
+
+    if (constraints.minSameGenderOldClass > 1) {
+        for (const key in oldClassGenderCounts) {
+            if (oldClassGenderCounts[key] > 0 && oldClassGenderCounts[key] < constraints.minSameGenderOldClass) {
+                flags.genderOldClass = true;
                 break;
             }
         }
@@ -1909,7 +2274,7 @@ function getClassConstraintFlags(studentsInClass, className = '') {
     }
 
     flags.exclusion = classHasExclusionConflict(studentsInClass);
-    flags.hasViolation = flags.gender || flags.activity || flags.grades || flags.classSize || flags.oldClass || flags.oldClassDiversity || flags.exclusion;
+    flags.hasViolation = flags.gender || flags.genderOldClass || flags.activity || flags.grades || flags.classSize || flags.oldClass || flags.oldClassDiversity || flags.exclusion;
 
     return flags;
 }
@@ -1979,6 +2344,13 @@ function createStudentElement(student) {
     div.dataset.studentId = student['Schüler'];
     div.title = getStudentTooltipText(student);
 
+    // Geschlecht hervorheben: linke Border (m blau, w rosa)
+    if (document.getElementById('showGenderHighlight').checked) {
+        const genderClass = getGenderClass(student);
+        if (genderClass === 'm') div.classList.add('gender-highlight', 'gender-m');
+        else if (genderClass === 'w') div.classList.add('gender-highlight', 'gender-w');
+    }
+
     if (document.getElementById('showMutualPairs').checked && isSeparatedMutualWishOneStudent(student['Schüler'])) {
         div.classList.add('mutual-pair-separated');
     }
@@ -1986,7 +2358,7 @@ function createStudentElement(student) {
     if (manualExclusionHighlightStudentIds.has(student['Schüler'])) {
         div.classList.add('manual-exclusion-highlight');
     }
-    
+
     // Check if we need to show fulfilled priority
     if (document.getElementById('showFulfilledPriority').checked) {
         const priorityStatus = getFulfilledPriority(student);
@@ -1998,7 +2370,29 @@ function createStudentElement(student) {
             div.appendChild(prioritySpan);
         }
     }
-    
+
+    // Typ anzeigen: oranges "a" (aktiv) / lilanes "s" (still) auf quadratischem Hintergrund
+    if (document.getElementById('showType').checked) {
+        const type = normalizeActivity(student);
+        if (type === 'a' || type === 's') {
+            const typeSpan = document.createElement('span');
+            typeSpan.className = `student-type-badge type-${type}`;
+            typeSpan.textContent = type;
+            div.appendChild(typeSpan);
+        }
+    }
+
+    // Noten anzeigen: Notennummer vor gelbem Stern
+    if (document.getElementById('showGrades').checked) {
+        const grade = normalizeGrade(student);
+        if (grade) {
+            const gradeSpan = document.createElement('span');
+            gradeSpan.className = 'student-grade-badge';
+            gradeSpan.innerHTML = `<span class="grade-star">★</span><span class="grade-num">${grade}</span>`;
+            div.appendChild(gradeSpan);
+        }
+    }
+
     // Create text span for student name
     const nameSpan = document.createElement('span');
     nameSpan.textContent = student['Schüler'];
@@ -2180,15 +2574,21 @@ function calculateScoreDetails() {
 function selectStudent(student) {
     const isSameSelectedStudent = selectedStudent && selectedStudent['Schüler'] === student['Schüler'];
 
-    clearSelectionHighlights();
+    clearAllSelectionVisuals();
+    selectedGroupKey = null;
 
     if (isSameSelectedStudent) {
         selectedStudent = null;
         return;
     }
 
+    selectedStudent = student;
+    applyStudentSelectionVisuals(student);
+}
+
+function applyStudentSelectionVisuals(student) {
     const selectedStudentClass = findStudentClassName(student['Schüler']);
-    
+
     const selectedEl = document.querySelector(`[data-student-id="${student['Schüler']}"]`);
     if (selectedEl) {
         selectedEl.classList.add('selected');
@@ -2248,19 +2648,166 @@ function selectStudent(student) {
             if (el) el.classList.add('excluded');
         }
     });
-    
-    selectedStudent = student;
+}
+
+// ---- Gruppen-Auswahl -------------------------------------------------------
+
+function getGroupKey(memberNames) {
+    return [...memberNames].sort((a, b) => a.localeCompare(b, 'de')).join('||');
+}
+
+function clearAllSelectionVisuals() {
+    clearSelectionHighlights();
+    document.querySelectorAll('.student-group.group-selected').forEach(el => el.classList.remove('group-selected'));
+    document.querySelectorAll('.student.group-member-selected').forEach(el => el.classList.remove('group-member-selected'));
+    document.querySelectorAll('.group-summary').forEach(el => el.remove());
+}
+
+function selectGroup(memberNames) {
+    const key = getGroupKey(memberNames);
+    const isSame = selectedGroupKey === key;
+
+    clearAllSelectionVisuals();
+    selectedStudent = null;
+
+    if (isSame) {
+        selectedGroupKey = null;
+        return;
+    }
+
+    selectedGroupKey = key;
+    applyGroupSelectionVisuals(memberNames);
+}
+
+function findGroupElementByKey(key) {
+    return [...document.querySelectorAll('.student-group')].find(el => {
+        const members = JSON.parse(el.dataset.groupMembers || '[]');
+        return getGroupKey(members) === key;
+    }) || null;
+}
+
+function buildGroupSummaryElement(memberObjs) {
+    const genderCounts = { m: 0, w: 0, d: 0 };
+    const typeCounts = { s: 0, a: 0 };
+    const gradeCounts = {};
+    const oldClassCounts = {};
+
+    memberObjs.forEach(s => {
+        const g = getGenderClass(s);
+        if (g in genderCounts) genderCounts[g]++;
+        const t = normalizeActivity(s);
+        if (t in typeCounts) typeCounts[t]++;
+        const grade = normalizeGrade(s) || 'Unbekannt';
+        gradeCounts[grade] = (gradeCounts[grade] || 0) + 1;
+        const oc = s['Alte Klasse'] || 'Unbekannt';
+        oldClassCounts[oc] = (oldClassCounts[oc] || 0) + 1;
+    });
+
+    const oldClassEntries = Object.entries(oldClassCounts)
+        .sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'de'));
+
+    const summary = document.createElement('div');
+    summary.className = 'group-summary';
+    summary.innerHTML = `
+        <div class="group-summary-title">Auswahl (${memberObjs.length} Schüler)</div>
+        <div class="stat-row"><span class="stat-label">Geschlecht:</span><span>m: ${genderCounts.m}, w: ${genderCounts.w}, d: ${genderCounts.d}</span></div>
+        <div class="stat-row"><span class="stat-label">Typ:</span><span>still: ${typeCounts.s}, aktiv: ${typeCounts.a}</span></div>
+        <div class="stat-row"><span class="stat-label">Noten:</span><span>${Object.entries(gradeCounts).map(([k, v]) => `${escapeHtml(String(k))}: ${v}`).join(', ')}</span></div>
+        <div class="stat-row"><span class="stat-label">Alte Klassen:</span><span>${oldClassEntries.map(([k, v]) => `${escapeHtml(String(k))}: ${v}`).join(', ')}</span></div>
+    `;
+    return summary;
+}
+
+function applyGroupSelectionVisuals(memberNames) {
+    const memberSet = new Set(memberNames);
+    const memberObjs = memberNames
+        .map(n => studentData.find(s => s['Schüler'] === n))
+        .filter(Boolean);
+
+    // Map studentId -> Element (robust gegenüber Sonderzeichen in Namen)
+    const elById = {};
+    document.querySelectorAll('.student').forEach(el => { elById[el.dataset.studentId] = el; });
+
+    // Gruppe markieren + Sammel-Stats einblenden
+    const groupEl = findGroupElementByKey(getGroupKey(memberNames));
+    if (groupEl) {
+        groupEl.classList.add('group-selected');
+        const summary = buildGroupSummaryElement(memberObjs);
+        const header = groupEl.querySelector('.group-header');
+        if (header) header.after(summary);
+        else groupEl.prepend(summary);
+    }
+
+    memberNames.forEach(name => {
+        const el = elById[name];
+        if (el) el.classList.add('group-member-selected');
+    });
+
+    // Alle Schüler hervorheben, die sich mit mindestens einem Gruppenmitglied ausschließen
+    studentData.forEach(other => {
+        if (memberSet.has(other['Schüler'])) return;
+        const excluded = memberObjs.some(m => isExcluded(m, other) || isExcluded(other, m));
+        if (excluded) {
+            const el = elById[other['Schüler']];
+            if (el) el.classList.add('excluded');
+        }
+    });
+}
+
+// Stellt eine aktive Auswahl (Einzel-Schüler oder Gruppe) nach einem Neu-Rendern wieder her.
+function reapplySelections() {
+    if (selectedGroupKey) {
+        const groupEl = findGroupElementByKey(selectedGroupKey);
+        if (groupEl) {
+            const members = JSON.parse(groupEl.dataset.groupMembers || '[]');
+            applyGroupSelectionVisuals(members);
+        } else {
+            // Gruppe existiert in dieser Form nicht mehr -> Auswahl aufheben
+            selectedGroupKey = null;
+        }
+        return;
+    }
+
+    if (selectedStudent) {
+        const el = document.querySelector(`[data-student-id="${selectedStudent['Schüler']}"]`);
+        if (el) applyStudentSelectionVisuals(selectedStudent);
+        else selectedStudent = null;
+    }
 }
 
 // Drag and drop handlers
 function handleDragStart(e) {
     draggedStudent = studentData.find(s => s['Schüler'] === e.target.dataset.studentId);
     draggedFromClass = e.target.closest('.class-box').dataset.className;
+    // Einzel-Drag schließt einen evtl. laufenden Gruppen-Drag-Zustand aus.
+    draggedGroup = null;
+    draggedGroupFromClass = null;
     e.target.classList.add('dragging');
 }
 
 function handleDragEnd(e) {
     e.target.classList.remove('dragging');
+}
+
+function handleGroupDragStart(e) {
+    const memberNames = JSON.parse(e.currentTarget.dataset.groupMembers || '[]');
+    draggedGroup = memberNames
+        .map(name => studentData.find(s => s['Schüler'] === name))
+        .filter(Boolean);
+    draggedGroupFromClass = e.currentTarget.closest('.class-box').dataset.className;
+    // Gruppen-Drag schließt den Einzel-Drag-Zustand aus.
+    draggedStudent = null;
+    draggedFromClass = null;
+    const groupEl = e.currentTarget.closest('.student-group');
+    if (groupEl) groupEl.classList.add('dragging-group');
+    e.dataTransfer.effectAllowed = 'move';
+    // Firefox startet einen Drag nur, wenn dataTransfer Daten enthält.
+    e.dataTransfer.setData('text/plain', 'group');
+}
+
+function handleGroupDragEnd(e) {
+    const groupEl = e.currentTarget.closest('.student-group');
+    if (groupEl) groupEl.classList.remove('dragging-group');
 }
 
 function handleDragOver(e) {
@@ -2275,55 +2822,145 @@ function handleDragLeave(e) {
 function handleDrop(e) {
     e.preventDefault();
     e.currentTarget.classList.remove('drag-over');
-    
+
     const targetClass = e.currentTarget.dataset.className;
-    
-    if (targetClass === draggedFromClass) return;
 
-    clearManualExclusionPairsForStudent(draggedStudent['Schüler']);
-    
-    const movedStudentIds = new Set([draggedStudent['Schüler']]);
+    if (draggedGroup && draggedGroup.length > 0) {
+        const group = draggedGroup;
+        const fromClass = draggedGroupFromClass;
+        draggedGroup = null;
+        draggedGroupFromClass = null;
+        moveStudentsToClass(group, fromClass, targetClass);
+    } else if (draggedStudent) {
+        const student = draggedStudent;
+        const fromClass = draggedFromClass;
+        draggedStudent = null;
+        draggedFromClass = null;
+        moveStudentsToClass([student], fromClass, targetClass);
+    }
+}
 
-    currentClasses[draggedFromClass] = currentClasses[draggedFromClass].filter(
-        s => !movedStudentIds.has(s['Schüler'])
+// Verschiebt einen oder mehrere Schüler (Einzel- oder Gruppen-Drag) in eine andere Klasse.
+function moveStudentsToClass(studentsToMove, fromClass, toClass) {
+    if (!fromClass || !toClass || fromClass === toClass) return;
+    if (!currentClasses[fromClass] || !currentClasses[toClass]) return;
+
+    const movedIds = new Set(studentsToMove.map(s => s['Schüler']));
+
+    for (const student of studentsToMove) {
+        clearManualExclusionPairsForStudent(student['Schüler']);
+    }
+
+    currentClasses[fromClass] = currentClasses[fromClass].filter(
+        s => !movedIds.has(s['Schüler'])
     );
-    
-    currentClasses[targetClass].push(draggedStudent);
+    for (const student of studentsToMove) {
+        currentClasses[toClass].push(student);
+    }
 
-    addManualExclusionPairsForStudentInClass(draggedStudent, targetClass);
-    
+    for (const student of studentsToMove) {
+        addManualExclusionPairsForStudentInClass(student, toClass);
+    }
+
     displayClasses();
 
-    const sourceFlags = getClassConstraintFlags(currentClasses[draggedFromClass], draggedFromClass);
-    const targetFlags = getClassConstraintFlags(currentClasses[targetClass], targetClass);
+    const sourceFlags = getClassConstraintFlags(currentClasses[fromClass], fromClass);
+    const targetFlags = getClassConstraintFlags(currentClasses[toClass], toClass);
     const hasWarnings = sourceFlags.hasViolation || targetFlags.hasViolation;
-    
-    if (selectedStudent && selectedStudent['Schüler'] === draggedStudent['Schüler']) {
-        setTimeout(() => selectStudent(draggedStudent), 100);
+
+    const label = studentsToMove.length === 1
+        ? studentsToMove[0]['Schüler']
+        : `Gruppe (${studentsToMove.length} Schüler)`;
+
+    if (selectedStudent && movedIds.has(selectedStudent['Schüler'])) {
+        const reselect = selectedStudent;
+        setTimeout(() => selectStudent(reselect), 100);
     }
 
     if (hasWarnings) {
-        showError(`Hinweis: ${draggedStudent['Schüler']} wurde verschoben. In mindestens einer betroffenen Klasse sind Grenzen verletzt (rot markiert).`);
+        showError(`Hinweis: ${label} wurde verschoben. In mindestens einer betroffenen Klasse sind Grenzen verletzt (rot markiert).`);
     } else {
-        showSuccess(`${draggedStudent['Schüler']} wurde in ${targetClass} verschoben!`);
+        showSuccess(`${label} wurde in ${toClass} verschoben!`);
     }
 }
 
 // Import/Export functions
+// Exportiert die Einteilung als Excel-Datei – ein Tabellenblatt pro Klasse mit den
+// Spalten Nachname, Vorname und Alte Klasse, sortiert nach Nachname.
+function exportExcel() {
+    if (Object.keys(currentClasses).length === 0) {
+        showError('Keine Klasseneinteilung zum Exportieren vorhanden!');
+        return;
+    }
+    if (typeof XLSX === 'undefined') {
+        showError('Excel-Bibliothek nicht geladen. Bitte Seite neu laden.');
+        return;
+    }
+
+    const wb = XLSX.utils.book_new();
+    const usedNames = new Set();
+
+    // Sheetnamen dürfen max. 31 Zeichen lang sein, keine Sonderzeichen \ / ? * [ ] :
+    // enthalten und müssen eindeutig sein.
+    const sanitizeSheetName = (name) => {
+        const base = String(name).replace(/[\\\/?*\[\]:]/g, ' ').trim().slice(0, 31) || 'Klasse';
+        let candidate = base;
+        let i = 2;
+        while (usedNames.has(candidate.toLowerCase())) {
+            const suffix = ' (' + i + ')';
+            candidate = base.slice(0, 31 - suffix.length) + suffix;
+            i++;
+        }
+        usedNames.add(candidate.toLowerCase());
+        return candidate;
+    };
+
+    const toRow = (s) => {
+        let nachname = (s['Nachname'] || '').toString().trim();
+        const vorname = (s['Vorname'] || '').toString().trim();
+        // Fallback, falls Nachname/Vorname-Spalten fehlen: vollständigen Namen verwenden.
+        if (!nachname && !vorname) nachname = (s['Schüler'] || '').toString().trim();
+        const alteKlasse = (s['Alte Klasse'] || '').toString().trim();
+        return [nachname, vorname, alteKlasse];
+    };
+
+    for (const className in currentClasses) {
+        const sorted = [...currentClasses[className]].sort((a, b) => {
+            const na = (a['Nachname'] || a['Schüler'] || '').toString();
+            const nb = (b['Nachname'] || b['Schüler'] || '').toString();
+            const cmp = na.localeCompare(nb, 'de');
+            if (cmp !== 0) return cmp;
+            return (a['Vorname'] || '').toString().localeCompare((b['Vorname'] || '').toString(), 'de');
+        });
+
+        const aoa = [['Nachname', 'Vorname', 'Alte Klasse'], ...sorted.map(toRow)];
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = [{ wch: 22 }, { wch: 22 }, { wch: 14 }];
+        XLSX.utils.book_append_sheet(wb, ws, sanitizeSheetName(className));
+    }
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `Klasseneinteilung_${dateStr}.xlsx`);
+    showSuccess('Excel-Datei erfolgreich erstellt!');
+}
+
 function exportClasses() {
     if (Object.keys(currentClasses).length === 0) {
         showError('Keine Klasseneinteilung zum Exportieren vorhanden!');
         return;
     }
-    
+
     const exportData = {
-        version: '1.4',
+        version: '1.5',
         exportDate: new Date().toISOString(),
         totalScore: calculateTotalScore(),
         classCount: Object.keys(currentClasses).filter(c => c !== 'Ignorierte Schüler').length,
         includeIgnored: document.getElementById('includeIgnored').checked,
         showMutualPairs: document.getElementById('showMutualPairs').checked,
         showFulfilledPriority: document.getElementById('showFulfilledPriority').checked,
+        showGenderHighlight: document.getElementById('showGenderHighlight').checked,
+        showType: document.getElementById('showType').checked,
+        showGrades: document.getElementById('showGrades').checked,
         distributionRules: {
             maxSameGender: parseInt(document.getElementById('maxSameGender').value) || 0,
             maxSameOldClass: parseInt(document.getElementById('maxSameOldClass').value) || 0,
@@ -2334,6 +2971,9 @@ function exportClasses() {
             maxGrade1: parseInt(document.getElementById('maxGrade1').value) || 0,
             maxGrade3: parseInt(document.getElementById('maxGrade3').value) || 0,
             minDistinctOldClasses: parseInt(document.getElementById('minDistinctOldClasses').value) || 0,
+            maxFemale: parseInt(document.getElementById('maxFemale').value) || 0,
+            maxMale: parseInt(document.getElementById('maxMale').value) || 0,
+            minSameGenderOldClass: parseInt(document.getElementById('minSameGenderOldClass').value) || 0,
             mutualWishOneRequired: document.getElementById('mutualWishOneRequired').checked
         },
         classes: {},
@@ -2394,7 +3034,16 @@ function importClasses(event) {
             if (importData.showFulfilledPriority !== undefined) {
                 document.getElementById('showFulfilledPriority').checked = importData.showFulfilledPriority;
             }
-            
+            if (importData.showGenderHighlight !== undefined) {
+                document.getElementById('showGenderHighlight').checked = importData.showGenderHighlight;
+            }
+            if (importData.showType !== undefined) {
+                document.getElementById('showType').checked = importData.showType;
+            }
+            if (importData.showGrades !== undefined) {
+                document.getElementById('showGrades').checked = importData.showGrades;
+            }
+
             // Import distribution rules
             if (importData.distributionRules) {
                 if (importData.distributionRules.maxSameGender !== undefined) {
@@ -2423,6 +3072,15 @@ function importClasses(event) {
                 }
                 if (importData.distributionRules.minDistinctOldClasses !== undefined) {
                     document.getElementById('minDistinctOldClasses').value = importData.distributionRules.minDistinctOldClasses;
+                }
+                if (importData.distributionRules.maxFemale !== undefined) {
+                    document.getElementById('maxFemale').value = importData.distributionRules.maxFemale;
+                }
+                if (importData.distributionRules.maxMale !== undefined) {
+                    document.getElementById('maxMale').value = importData.distributionRules.maxMale;
+                }
+                if (importData.distributionRules.minSameGenderOldClass !== undefined) {
+                    document.getElementById('minSameGenderOldClass').value = importData.distributionRules.minSameGenderOldClass;
                 }
                 if (importData.distributionRules.mutualWishOneRequired !== undefined) {
                     document.getElementById('mutualWishOneRequired').checked = importData.distributionRules.mutualWishOneRequired;
@@ -2475,6 +3133,10 @@ function resetAll() {
     document.getElementById('statsSection').style.display = 'none';
     document.getElementById('showMutualPairs').checked = false;
     document.getElementById('showFulfilledPriority').checked = false;
+    document.getElementById('showGenderHighlight').checked = false;
+    document.getElementById('showType').checked = false;
+    document.getElementById('showGrades').checked = false;
+    selectedGroupKey = null;
     document.getElementById('classCount').value = 4;
     document.getElementById('includeIgnored').checked = false;
     document.getElementById('maxSameGender').value = 0;
@@ -2486,7 +3148,10 @@ function resetAll() {
     document.getElementById('maxGrade1').value = 0;
     document.getElementById('maxGrade3').value = 0;
     document.getElementById('minDistinctOldClasses').value = 0;
+    document.getElementById('maxFemale').value = 0;
+    document.getElementById('maxMale').value = 0;
+    document.getElementById('minSameGenderOldClass').value = 2;
     document.getElementById('mutualWishOneRequired').checked = false;
-    
+
     showSuccess('Alle Daten zurückgesetzt!');
 }
