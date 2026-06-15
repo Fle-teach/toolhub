@@ -376,8 +376,9 @@ const state = {
     subjects: [],     // distinct Optionen
     classes: [],      // distinct Klassen, sortiert
     config: {
-        criteria: { gender: 'soft', size: 'soft', minN: 'soft', classEven: 'soft' },
+        criteria: { gender: 'soft', size: 'soft', minN: 'soft', maxN: 'soft', classEven: 'soft' },
         minN: 2,
+        maxN: 4,
         sizeTol: 1,
         perSubject: {}  // option -> { nCourses, bands: { klasse: [bool,...] } }
     },
@@ -403,9 +404,9 @@ function remStu(c, s) { c.size--; c[s.g]--; let e = c.cls.get(s.k); e[s.g]--; }
 
 // Kosten einer Verteilung. Liefert {hard, soft, total} + Detailverletzungen.
 function costOf(courses, ctx) {
-    const { crit, minN, ratio, sizeTol, classCourseList } = ctx;
+    const { crit, minN, maxN, ratio, sizeTol, classCourseList } = ctx;
     let hard = 0, soft = 0;
-    const detail = { size: 0, gender: 0, minN: 0, classEven: 0 };
+    const detail = { size: 0, gender: 0, minN: 0, maxN: 0, classEven: 0 };
 
     // Gleiche Kursgrößen
     if (crit.size !== 'off') {
@@ -444,6 +445,19 @@ function costOf(courses, ctx) {
         if (crit.minN === 'hard') { hard += pen; detail.minN += pen; }
         else soft += pen * 4.0;
     }
+    // Höchstens N je Klasse & Geschlecht (Obergrenze pro Kurs)
+    if (crit.maxN !== 'off') {
+        let pen = 0;
+        for (const c of courses) {
+            for (const [, e] of c.cls) {
+                for (const g of ['m', 'w']) {
+                    if (e[g] > maxN) pen += (e[g] - maxN);
+                }
+            }
+        }
+        if (crit.maxN === 'hard') { hard += pen; detail.maxN += pen; }
+        else soft += pen * 4.0;
+    }
     // Klassen gleichmäßig über ihre erlaubten Kurse
     if (crit.classEven !== 'off') {
         let pen = 0, viol = 0;
@@ -465,22 +479,14 @@ function allowedCoursesFor(klasse, nCourses, allowedByClass) {
     return (a && a.length) ? a : Array.from({ length: nCourses }, (_, i) => i);
 }
 
-// students: [{id,k,g}], allowedByClass: Map klasse->[courseIdx]
-function assignSubject(students, nCourses, allowedByClass, crit, minN, sizeTol, seed) {
-    const rnd = mulberry32(seed);
-    const classes = [...new Set(students.map(s => s.k))];
-    const classCourseList = classes.map(k => ({ k, allowed: allowedCoursesFor(k, nCourses, allowedByClass) }));
-    const ratio = students.length ? students.filter(s => s.g === 'm').length / students.length : 0.5;
-    const ctx = { crit, minN, ratio, sizeTol, classCourseList };
-
+// Greedy-Start: zufällige Reihenfolge, jeder Schüler in den aktuell günstigsten erlaubten Kurs
+function greedyStart(students, nCourses, allowedFor, ctx, rnd) {
     const courses = makeCourses(nCourses);
     const assign = new Map();
-
-    // Greedy-Startlösung: in zufälliger Reihenfolge jeweils in den günstigsten erlaubten Kurs
-    const order = [...students];
-    for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1));[order[i], order[j]] = [order[j], order[i]]; }
+    const order = students.slice();
+    for (let i = order.length - 1; i > 0; i--) { const j = (rnd() * (i + 1)) | 0;[order[i], order[j]] = [order[j], order[i]]; }
     for (const s of order) {
-        const allowed = allowedCoursesFor(s.k, nCourses, allowedByClass);
+        const allowed = allowedFor(s);
         let bestC = allowed[0], bestCost = Infinity;
         for (const ci of allowed) {
             addStu(courses[ci], s);
@@ -490,39 +496,102 @@ function assignSubject(students, nCourses, allowedByClass, crit, minN, sizeTol, 
         }
         addStu(courses[bestC], s); assign.set(s.id, bestC);
     }
+    return { courses, assign };
+}
 
-    // Lokale Optimierung (Simulated Annealing)
-    if (nCourses > 1) {
-        let curCost = costOf(courses, ctx).total;
-        let best = { assign: new Map(assign), cost: curCost };
-        const iters = Math.min(60000, Math.max(6000, students.length * 800));
-        let T = Math.max(2, curCost / Math.max(1, students.length));
-        const cooling = Math.pow(0.0005, 1 / iters);
-        for (let i = 0; i < iters; i++) {
-            const s = students[Math.floor(rnd() * students.length)];
-            const allowed = allowedCoursesFor(s.k, nCourses, allowedByClass);
-            if (allowed.length < 2) { T *= cooling; continue; }
-            const from = assign.get(s.id);
-            const to = allowed[Math.floor(rnd() * allowed.length)];
-            if (to === from) { T *= cooling; continue; }
-            remStu(courses[from], s); addStu(courses[to], s);
-            const newCost = costOf(courses, ctx).total;
-            const dE = newCost - curCost;
-            if (dE <= 0 || rnd() < Math.exp(-dE / Math.max(1e-9, T))) {
-                assign.set(s.id, to); curCost = newCost;
-                if (curCost < best.cost) best = { assign: new Map(assign), cost: curCost };
-            } else {
-                remStu(courses[to], s); addStu(courses[from], s);
+// Simulated Annealing mit ZWEI Zugtypen:
+//  - Verschieben: ein Schüler wechselt den Kurs (ändert Kursgrößen)
+//  - Tauschen:    zwei Schüler aus verschiedenen Kursen tauschen (Kursgrößen bleiben gleich)
+// Swaps sind der Schlüssel gegen Sackgassen: z.B. Geschlecht ausgleichen, OHNE die Größe zu
+// verschlechtern – mit reinen Verschiebungen blockieren sich solche Verbesserungen oft gegenseitig.
+function anneal(students, courses, assign, ctx, allowedFor, rnd) {
+    const n = students.length;
+    let curCost = costOf(courses, ctx).total;
+    let best = { assign: new Map(assign), cost: curCost };
+    const iters = Math.min(40000, Math.max(4000, n * 500));
+    let T = Math.max(1, curCost / Math.max(1, n)) + 8;
+    const cooling = Math.pow(0.02 / T, 1 / iters);
+    for (let i = 0; i < iters; i++) {
+        let revert = null;
+        if (rnd() < 0.5) {
+            // Verschieben
+            const s = students[(rnd() * n) | 0];
+            const allowed = allowedFor(s);
+            if (allowed.length > 1) {
+                const from = assign.get(s.id);
+                const to = allowed[(rnd() * allowed.length) | 0];
+                if (to !== from) {
+                    remStu(courses[from], s); addStu(courses[to], s); assign.set(s.id, to);
+                    revert = () => { remStu(courses[to], s); addStu(courses[from], s); assign.set(s.id, from); };
+                }
             }
-            T *= cooling;
+        } else {
+            // Tauschen (jeder muss im Kurs des anderen erlaubt sein)
+            const a = students[(rnd() * n) | 0];
+            const b = students[(rnd() * n) | 0];
+            const ca = assign.get(a.id), cb = assign.get(b.id);
+            if (ca !== cb && allowedFor(a).includes(cb) && allowedFor(b).includes(ca)) {
+                remStu(courses[ca], a); remStu(courses[cb], b);
+                addStu(courses[cb], a); addStu(courses[ca], b);
+                assign.set(a.id, cb); assign.set(b.id, ca);
+                revert = () => {
+                    remStu(courses[cb], a); remStu(courses[ca], b);
+                    addStu(courses[ca], a); addStu(courses[cb], b);
+                    assign.set(a.id, ca); assign.set(b.id, cb);
+                };
+            }
         }
-        // beste Lösung wiederherstellen
-        assign.clear(); for (const [k, v] of best.assign) assign.set(k, v);
+        if (!revert) { T *= cooling; continue; }
+        const newCost = costOf(courses, ctx).total;
+        const dE = newCost - curCost;
+        if (dE <= 0 || rnd() < Math.exp(-dE / Math.max(1e-9, T))) {
+            curCost = newCost;
+            if (curCost < best.cost) best = { assign: new Map(assign), cost: curCost };
+        } else {
+            revert();
+        }
+        T *= cooling;
+    }
+    // beste gefundene Lösung in courses/assign zurückschreiben
+    assign.clear(); for (const [k, v] of best.assign) assign.set(k, v);
+    for (const c of courses) { c.size = 0; c.m = 0; c.w = 0; c.cls.clear(); }
+    for (const s of students) addStu(courses[assign.get(s.id)], s);
+    return best.cost;
+}
+
+// students: [{id,k,g}], allowedByClass: Map klasse->[courseIdx]
+function assignSubject(students, nCourses, allowedByClass, crit, minN, maxN, sizeTol, seed) {
+    const rnd = mulberry32(seed);
+    const classes = [...new Set(students.map(s => s.k))];
+    // erlaubte Kurse je Klasse einmal auflösen (Bänder) und wiederverwenden
+    const resolvedAllowed = new Map(classes.map(k => [k, allowedCoursesFor(k, nCourses, allowedByClass)]));
+    const classCourseList = classes.map(k => ({ k, allowed: resolvedAllowed.get(k) }));
+    const ratio = students.length ? students.filter(s => s.g === 'm').length / students.length : 0.5;
+    const ctx = { crit, minN, maxN, ratio, sizeTol, classCourseList };
+    const allowedFor = s => resolvedAllowed.get(s.k);
+
+    if (nCourses <= 1) {
+        const assign = new Map(students.map(s => [s.id, 0]));
+        const finalCourses = makeCourses(nCourses);
+        for (const s of students) addStu(finalCourses[0], s);
+        return { assign, courses: finalCourses, ctx, ratio, classCourseList };
+    }
+
+    // Mehrere Neustarts (jeweils anderer Greedy-Start + Annealing); beste Lösung gewinnt.
+    // Das verhindert, dass ein einzelner unglücklicher Start in einem lokalen Optimum festsitzt.
+    const restarts = students.length > 120 ? 5 : 10;
+    let best = null;
+    for (let rs = 0; rs < restarts; rs++) {
+        const { courses, assign } = greedyStart(students, nCourses, allowedFor, ctx, rnd);
+        anneal(students, courses, assign, ctx, allowedFor, rnd);
+        const cost = costOf(courses, ctx).total;
+        if (best === null || cost < best.cost) best = { assign: new Map(assign), cost };
+        if (best.cost === 0) break; // perfekte Lösung – früh abbrechen
     }
 
     const finalCourses = makeCourses(nCourses);
-    for (const s of students) addStu(finalCourses[assign.get(s.id)], s);
-    return { assign, courses: finalCourses, ctx, ratio, classCourseList };
+    for (const s of students) addStu(finalCourses[best.assign.get(s.id)], s);
+    return { assign: best.assign, courses: finalCourses, ctx, ratio, classCourseList };
 }
 
 /* =========================================================================
@@ -551,6 +620,15 @@ function setStep(active) {
 function studentsOf(option) { return state.students.filter(s => s.option === option); }
 function asAlgoStudents(option) {
     return studentsOf(option).map(s => ({ id: s.id, k: s.klasse, g: s.geschlecht }));
+}
+
+// Default-Parallelkurse: orientiert an der Klassenzahl, anteilig zur Schülerzahl des Fachs.
+// Bsp.: 5 Klassen, 2/5 wählen Kunst, 3/5 Musik -> Kunst 2 Parallelkurse, Musik 3.
+function defaultCourseCount(option) {
+    const total = state.students.length || 1;
+    const numClasses = state.classes.length || 1;
+    const inSubject = studentsOf(option).length;
+    return Math.max(1, Math.round(numClasses * inSubject / total));
 }
 
 /* =========================================================================
@@ -688,7 +766,8 @@ $('btnToConfig').addEventListener('click', () => { buildConfigStep(); setStep(2)
 const CRITERIA = [
     { key: 'gender', label: 'Geschlechter-Gleichgewicht', sub: '♂/♀-Anteil je Kurs ≈ Anteil im Fach' },
     { key: 'size', label: 'Gleiche Kursgrößen', sub: 'Kurse möglichst gleich groß' },
-    { key: 'minN', label: 'Mind. N je Klasse & Geschlecht', sub: 'kein Kind allein als einzige(r) seiner Klasse+Geschlecht im Kurs' },
+    { key: 'minN', label: 'Mindestens N je Klasse & Geschlecht', sub: 'kein Kind allein als einzige(r) seiner Klasse+Geschlecht im Kurs' },
+    { key: 'maxN', label: 'Höchstens N je Klasse & Geschlecht', sub: 'begrenzt, wie viele einer Klasse+Geschlecht in einem Kurs landen' },
     { key: 'classEven', label: 'Klassen gleichmäßig verteilen', sub: 'jede Klasse möglichst gleichmäßig über ihre Kurse' },
 ];
 
@@ -718,6 +797,14 @@ function buildConfigStep() {
             const lab = document.createElement('span'); lab.className = 'crit-sub'; lab.textContent = 'N =';
             right.appendChild(lab); right.appendChild(inp);
         }
+        if (c.key === 'maxN') {
+            const inp = document.createElement('input');
+            inp.type = 'number'; inp.min = '1'; inp.max = '20'; inp.value = state.config.maxN; inp.style.width = '60px';
+            inp.title = 'N (Höchstanzahl)';
+            inp.addEventListener('change', () => { state.config.maxN = Math.max(1, parseInt(inp.value) || 4); });
+            const lab = document.createElement('span'); lab.className = 'crit-sub'; lab.textContent = 'N =';
+            right.appendChild(lab); right.appendChild(inp);
+        }
         if (c.key === 'size') {
             const inp = document.createElement('input');
             inp.type = 'number'; inp.min = '0'; inp.max = '10'; inp.value = state.config.sizeTol; inp.style.width = '60px';
@@ -738,8 +825,7 @@ function buildConfigStep() {
         const males = studs.filter(s => s.geschlecht === 'm').length;
         const females = studs.filter(s => s.geschlecht === 'w').length;
         if (!state.config.perSubject[option]) {
-            const def = Math.max(1, Math.ceil(studs.length / 16));
-            state.config.perSubject[option] = { nCourses: def, bands: {} };
+            state.config.perSubject[option] = { nCourses: defaultCourseCount(option), bands: {} };
         }
         const cfg = state.config.perSubject[option];
 
@@ -820,22 +906,22 @@ function bandsToAllowed(cfg, classesHere) {
 }
 
 function computeAll(reseed = false) {
-    const crit = state.config.criteria, minN = state.config.minN, sizeTol = state.config.sizeTol;
+    const crit = state.config.criteria, minN = state.config.minN, maxN = state.config.maxN, sizeTol = state.config.sizeTol;
     state.subjects.forEach(option => {
         let cfg = state.config.perSubject[option];
         if (!cfg) { // Fallback, falls ohne Konfig-Schritt aufgerufen
-            cfg = state.config.perSubject[option] = { nCourses: Math.max(1, Math.ceil(studentsOf(option).length / 16)), bands: {} };
+            cfg = state.config.perSubject[option] = { nCourses: defaultCourseCount(option), bands: {} };
         }
         const algoStuds = asAlgoStudents(option);
         const classesHere = [...new Set(algoStuds.map(s => s.k))];
         const allowedByClass = bandsToAllowed(cfg, classesHere);
         const seed = (reseed ? Math.floor(Math.random() * 1e9) : 12345)
             + option.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-        const res = assignSubject(algoStuds, cfg.nCourses, allowedByClass, crit, minN, sizeTol, seed);
+        const res = assignSubject(algoStuds, cfg.nCourses, allowedByClass, crit, minN, maxN, sizeTol, seed);
         state.results[option] = {
             nCourses: cfg.nCourses,
             assign: res.assign,
-            params: { crit, minN, sizeTol, ratio: res.ratio, classCourseList: res.classCourseList, allowedByClass }
+            params: { crit, minN, maxN, sizeTol, ratio: res.ratio, classCourseList: res.classCourseList, allowedByClass }
         };
     });
     renderResults();
@@ -925,6 +1011,7 @@ function refreshSubjectBoard(option) {
     if (r.params.crit.size === 'hard' && cost.detail.size > 0) msgs.push('Kursgrößen überschreiten die Toleranz');
     if (r.params.crit.gender === 'hard' && cost.detail.gender > 0) msgs.push(`${cost.detail.gender} Kurs(e) mit unausgeglichenem Geschlecht`);
     if (r.params.crit.minN === 'hard' && cost.detail.minN > 0) msgs.push(`Mindest-N je Klasse/Geschlecht ${cost.detail.minN}× verletzt`);
+    if (r.params.crit.maxN === 'hard' && cost.detail.maxN > 0) msgs.push(`Höchst-N je Klasse/Geschlecht ${cost.detail.maxN}× verletzt`);
     if (r.params.crit.classEven === 'hard' && cost.detail.classEven > 0) msgs.push('Klassenverteilung ungleichmäßig');
     warnDiv.innerHTML = msgs.length ? `<div class="warn">⚠️ ${msgs.join(' · ')}</div>` : '';
 
@@ -938,6 +1025,9 @@ function refreshSubjectBoard(option) {
         let colViol = false;
         if (r.params.crit.minN === 'hard') {
             for (const [, e] of c.cls) for (const g of ['m', 'w']) if (e[g] > 0 && e[g] < r.params.minN) colViol = true;
+        }
+        if (r.params.crit.maxN === 'hard') {
+            for (const [, e] of c.cls) for (const g of ['m', 'w']) if (e[g] > r.params.maxN) colViol = true;
         }
         if (r.params.crit.gender === 'hard' && c.size >= 3 && Math.abs((c.m / c.size) - ratio) > 0.2) colViol = true;
         col.classList.toggle('violation', colViol);
@@ -1027,18 +1117,31 @@ function exportXlsx() {
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(stat), 'Statistik');
 
-    // Je Fach ein Blatt
+    // Je Kurs ein eigenes Tabellenblatt
+    const usedNames = new Set(['Gesamt', 'Statistik']);
     state.subjects.forEach(option => {
         const r = state.results[option];
-        const rows = [['Kurs', 'Vorname', 'Nachname', 'Klasse', 'Geschlecht']];
-        studentsOf(option).slice()
-            .sort((a, b) => (r.assign.get(a.id) - r.assign.get(b.id)) || a.klasse.localeCompare(b.klasse, 'de') || a.nachname.localeCompare(b.nachname, 'de'))
-            .forEach(s => rows.push(['Kurs ' + roman(r.assign.get(s.id)), s.vorname, s.nachname, s.klasse, s.geschlecht === 'm' ? 'm' : 'w']));
-        const safe = option.replace(/[\\\/\?\*\[\]:]/g, ' ').slice(0, 28) || 'Fach';
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), safe);
+        for (let ci = 0; ci < r.nCourses; ci++) {
+            const rows = [['Vorname', 'Nachname', 'Klasse', 'Geschlecht']];
+            studentsOf(option)
+                .filter(s => r.assign.get(s.id) === ci)
+                .sort((a, b) => a.klasse.localeCompare(b.klasse, 'de') || a.nachname.localeCompare(b.nachname, 'de'))
+                .forEach(s => rows.push([s.vorname, s.nachname, s.klasse, s.geschlecht === 'm' ? 'm' : 'w']));
+            const name = uniqueSheetName(`${option} Kurs ${roman(ci)}`, usedNames);
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), name);
+        }
     });
 
     XLSX.writeFile(wb, 'Kurseinteilung_WPB.xlsx');
+}
+
+// Excel-Blattnamen: max. 31 Zeichen, keine \ / ? * [ ] : ; Eindeutigkeit sicherstellen
+function uniqueSheetName(base, used) {
+    let name = base.replace(/[\\\/\?\*\[\]:]/g, ' ').slice(0, 31).trim() || 'Kurs';
+    if (!used.has(name)) { used.add(name); return name; }
+    let i = 2, cand;
+    do { const suf = ' ' + i; cand = name.slice(0, 31 - suf.length).trim() + suf; i++; } while (used.has(cand));
+    used.add(cand); return cand;
 }
 </script>
 </body>
