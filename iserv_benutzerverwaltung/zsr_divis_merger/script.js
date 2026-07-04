@@ -12,6 +12,53 @@ const CONFIG = {
     REQUIRED_ELECTIVE_COLUMNS: ['Nachname', 'Vorname', 'Namenszusatz', 'Rufname', 'Geburtsdatum', 'Klassenname']
 }
 
+// ===== GEBURTSDATUM-NORMALISIERUNG =====
+
+// Wandelt beliebige Geburtsdatum-Zellwerte in einheitliches TT.MM.JJJJ um.
+// Excel speichert Datumszellen intern als Serienzahl (z. B. 42420 = 20.02.2016);
+// je nach Zellformatierung liefert die Datei daher Zahlen, Date-Objekte oder
+// unterschiedlich formatierte Strings. Ohne Normalisierung schlägt das Matching
+// zwischen ZSR- und DiViS-Daten über das Geburtsdatum fehl.
+function normalizeBirthdate(value) {
+    if (value === undefined || value === null || value === "") return "";
+
+    // Date-Objekt (falls XLSX Zellen bereits als Datum liefert)
+    if (value instanceof Date && !isNaN(value)) {
+        return formatDateDDMMYYYY(value.getDate(), value.getMonth() + 1, value.getFullYear());
+    }
+
+    // Excel-Serienzahl: Zahl oder rein numerischer String (z. B. 42420)
+    const str = String(value).trim();
+    const numericValue = typeof value === 'number' ? value :
+        (/^\d{4,6}$/.test(str) ? parseInt(str, 10) : NaN);
+    if (!isNaN(numericValue) && numericValue > 10000 && numericValue < 80000) {
+        // Excel-Epoche 30.12.1899; Offset 25569 Tage bis zum 01.01.1970 (Unix-Epoche)
+        const date = new Date(Math.round((numericValue - 25569) * 86400000));
+        return formatDateDDMMYYYY(date.getUTCDate(), date.getUTCMonth() + 1, date.getUTCFullYear());
+    }
+
+    // TT.MM.JJJJ, T.M.JJJJ, TT/MM/JJJJ, TT-MM-JJJJ (auch zweistelliges Jahr)
+    let match = str.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+    if (match) {
+        let year = parseInt(match[3], 10);
+        if (match[3].length === 2) year += year < 50 ? 2000 : 1900;
+        return formatDateDDMMYYYY(parseInt(match[1], 10), parseInt(match[2], 10), year);
+    }
+
+    // ISO-Format JJJJ-MM-TT (z. B. 2016-02-20)
+    match = str.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
+    if (match) {
+        return formatDateDDMMYYYY(parseInt(match[3], 10), parseInt(match[2], 10), parseInt(match[1], 10));
+    }
+
+    // Unbekanntes Format: unverändert zurückgeben
+    return str;
+}
+
+function formatDateDDMMYYYY(day, month, year) {
+    return String(day).padStart(2, '0') + '.' + String(month).padStart(2, '0') + '.' + year;
+}
+
 // ===== KURSDATEN-VERARBEITUNG =====
 
 function processCourseData(courseData) {
@@ -390,7 +437,9 @@ async function readZSRFile(file) {
                     const zsrRow = {};
                     headers.forEach((header, index) => {
                         if (header) {
-                            zsrRow[header.trim() + "-ZSR"] = row[index] ? row[index].toString().trim() : "";
+                            zsrRow[header.trim() + "-ZSR"] = header.includes('Geburtsdatum')
+                                ? normalizeBirthdate(row[index])
+                                : (row[index] ? row[index].toString().trim() : "");
                         }
                     });
                     
@@ -443,7 +492,9 @@ async function readDivisFile(file) {
                     const divisRow = {};
                     headers.forEach((header, index) => {
                         if (header) {
-                            divisRow[header.trim() + "-DiViS"] = row[index] ? row[index].toString().trim() : "";
+                            divisRow[header.trim() + "-DiViS"] = header.includes('Geburtsdatum')
+                                ? normalizeBirthdate(row[index])
+                                : (row[index] ? row[index].toString().trim() : "");
                         }
                     });
                     
@@ -611,7 +662,9 @@ async function readElectiveFile(file) {
                         
                         headers.forEach((header, index) => {
                             if (header) {
-                                participant[header] = row[index] ? row[index].toString().trim() : "";
+                                participant[header] = header.includes('Geburtsdatum')
+                                    ? normalizeBirthdate(row[index])
+                                    : (row[index] ? row[index].toString().trim() : "");
                             }
                         });
                         
