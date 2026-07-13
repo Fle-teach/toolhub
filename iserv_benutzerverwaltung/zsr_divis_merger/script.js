@@ -169,7 +169,8 @@ function processElectiveData(electiveData, mergedStudentData) {
             if (!studentElectives.has(zsrId)) {
                 studentElectives.set(zsrId, []);
             }
-            studentElectives.get(zsrId).push(participant.courseName);
+            // Gleicher Gruppenname wie bei den Lehrern ("Kurs " + normalisierter Name)
+            studentElectives.get(zsrId).push("Kurs " + participant.courseName);
             matchCount++;
         } else {
             mismatches.push({
@@ -283,81 +284,70 @@ function calculateInitPW(zsrId) {
     return initPW + initPWvorn + initPWhinten;
 }
 
-function formatCourseName(originalName) {
-    // Teile den String in Wörter auf
-    const parts = originalName.trim().split(/\s+/);
-    
-    let classLevel = '';
-    let courseSubject = [];
-    let subNumber = '';
-    let teacherName = '';
-    
-    // Durchsuche alle Teile nach Mustern
-    for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-        
-        // Prüfe auf Klassenstufe mit optionaler Unternummer (z.B. "8.1", "11-12.2", "9.4")
-        const classWithSubMatch = part.match(/^(\d+(?:-\d+)?)\.(\d+)$/);
-        if (classWithSubMatch && !classLevel) {
-            classLevel = classWithSubMatch[1];
-            subNumber = classWithSubMatch[2];
-            continue;
-        }
-        
-        // Prüfe auf reine Klassenstufe (z.B. "8", "9", "11-12")
-        const classMatch = part.match(/^(\d+(?:-\d+)?)$/);
-        if (classMatch && !classLevel) {
-            classLevel = classMatch[1];
-            continue;
-        }
-        
-        // Prüfe auf Fach mit Unternummer (z.B. "BK" in "BK 8.1 Jän")
-        if (i < parts.length - 1) {
-            const nextPart = parts[i + 1];
-            const nextClassWithSubMatch = nextPart.match(/^(\d+(?:-\d+)?)\.(\d+)$/);
-            if (nextClassWithSubMatch && !classLevel) {
-                courseSubject.push(part);
-                classLevel = nextClassWithSubMatch[1];
-                subNumber = nextClassWithSubMatch[2];
-                i++; // Überspringe das nächste Teil, da wir es bereits verarbeitet haben
-                continue;
+// Normalisiert einen Kursnamen auf das einheitliche Muster:
+//   <Klasse/Jahrgang> <Fachkürzel/Zusatz> <Lehrerkürzel (alphabetisch)>
+// Beispiele: "11-12 frz 1" + [Ben]        -> "11-12 frz Ben"
+//            "Rel 8.1"     + [Woh]        -> "08 Rel Woh"
+//            "5a Geo"      + [Zer], [Möh] -> "05A Geo Möh Zer"
+// Regeln:
+// - Klasse/Jahrgang steht vorn; einstellige Zahlen erhalten eine führende Null.
+// - Buchstabenanteile der Klasse werden großgeschrieben ("5a" -> "05A").
+// - Zahlen, die keine Klasse/Jahrgang repräsentieren (Kursnummern wie "1" oder ".1"), entfallen.
+// - Lehrerkürzel werden alphabetisch sortiert angehängt.
+function normalizeCourseName(courseTitle, teacherKuerzelList, participants) {
+    const parts = (courseTitle || '').toString().trim().split(/\s+/).filter(p => p !== '');
+    const kuerzelLower = new Set((teacherKuerzelList || []).map(k => k.toLowerCase()));
+
+    // Klassenstufen der Teilnehmer: Plausibilitätsprüfung für reine Zahlen und Fallback,
+    // falls der Titel keine Klasse/Jahrgang enthält
+    const stufen = new Set();
+    (participants || []).forEach(p => {
+        const match = (p["Klassenstufe"] || '').toString().match(/(\d{1,2})/);
+        if (match) stufen.add(parseInt(match[1], 10));
+    });
+
+    const padClass = num => String(num).padStart(2, '0');
+
+    let classToken = '';
+    const subjectParts = [];
+
+    parts.forEach(part => {
+        // Lehrerkürzel im Titel überspringen (z. B. wenn der Blattname als Quelle dient)
+        if (kuerzelLower.has(part.toLowerCase())) return;
+
+        // Klasse/Jahrgang: Zahl oder Zahlbereich, optional Buchstaben und/oder Kursnummer,
+        // z. B. "5a", "8", "11-12", "8.1", "11-12.2"
+        const classMatch = part.match(/^(\d{1,2})(?:-(\d{1,2}))?([A-Za-zÄÖÜäöü]{0,2})(?:\.\d+)?$/);
+        if (classMatch && !classToken) {
+            const isPlainNumber = !classMatch[2] && !classMatch[3] && !part.includes('.');
+            // Reine Zahlen nur als Klasse werten, wenn sie zur Klassenstufe der Teilnehmer
+            // passen – sonst ist es eine Kursnummer, die gestrichen wird
+            if (!isPlainNumber || stufen.size === 0 || stufen.has(parseInt(classMatch[1], 10))) {
+                classToken = padClass(classMatch[1]) +
+                    (classMatch[2] ? '-' + padClass(classMatch[2]) : '') +
+                    (classMatch[3] || '').toUpperCase();
+                return;
             }
         }
-        
-        // Das letzte Wort ist normalerweise der Lehrername
-        if (i === parts.length - 1) {
-            teacherName = part;
-            continue;
-        }
-        
-        // Alle anderen Teile gehören zum Fach/Kurs
-        courseSubject.push(part);
+
+        // Übrige reine Zahlen (Kursnummern) streichen
+        if (/^\d+(\.\d+)?$/.test(part)) return;
+
+        subjectParts.push(part);
+    });
+
+    // Fallback: Klasse/Jahrgang aus den Klassenstufen der Teilnehmer ableiten
+    if (!classToken && stufen.size > 0) {
+        const sorted = [...stufen].sort((a, b) => a - b);
+        classToken = sorted.length === 1
+            ? padClass(sorted[0])
+            : padClass(sorted[0]) + '-' + padClass(sorted[sorted.length - 1]);
     }
-    
-    // Baue das Ergebnis zusammen
-    let result = [];
-    
-    // Klassenstufe zuerst (falls vorhanden)
-    if (classLevel) {
-        result.push(classLevel);
-    }
-    
-    // Dann das Fach
-    if (courseSubject.length > 0) {
-        result = result.concat(courseSubject);
-    }
-    
-    // Dann die Unternummer (falls vorhanden)
-    if (subNumber) {
-        result.push(subNumber);
-    }
-    
-    // Schließlich der Lehrername
-    if (teacherName) {
-        result.push(teacherName);
-    }
-    
-    return result.join(' ');
+
+    const sortedKuerzel = [...(teacherKuerzelList || [])].sort((a, b) => a.localeCompare(b, 'de'));
+
+    const result = [classToken, ...subjectParts, ...sortedKuerzel].filter(p => p).join(' ');
+    return result || (courseTitle || '').toString().trim();
 }
 
 function removeLineBreaks(value) {
@@ -665,8 +655,8 @@ async function readElectiveFile(file) {
                         const row = rawData[i];
                         if (row && row[0]) {
                             const cellContent = row[0].toString().trim();
-                            // Wenn es wie ein Fach aussieht (kurz, ohne eckige Klammern)
-                            if (cellContent.length < 20 && !cellContent.includes('[') && !fach) {
+                            // Wenn es wie der Kurstitel aussieht (ohne eckige Klammern), z. B. "11-12 muPr Band"
+                            if (cellContent.length < 40 && !cellContent.includes('[') && !fach) {
                                 fach = cellContent;
                             }
                             // Wenn es wie ein Lehrer aussieht (mit eckigen Klammern oder "Herr"/"Frau")
@@ -688,8 +678,6 @@ async function readElectiveFile(file) {
                         return;
                     }
                     
-                    // Kursname formatieren: Zahlen an den Anfang verschieben
-                    const formattedCourseName = formatCourseName(sheetName);
                     // --- Lehrer-Extraktion aus den Zeilen oberhalb des Headers ---
                     // Jeder Lehrer steht in einer eigenen Zelle in den Zeilen oberhalb des Header.
                     // Beispiel: "[Adva] Herr Advani, Anil"
@@ -705,6 +693,36 @@ async function readElectiveFile(file) {
                         }
                     }
 
+                    // Teilnehmer verarbeiten (ab der Zeile nach dem Header)
+                    const participants = rawData.slice(headerRowIndex + 1).map(row => {
+                        if (!row || row.length === 0 || !row[0]) return null; // Leere Zeilen überspringen
+
+                        const participant = {
+                            originalCourseName: sheetName, // Originaler Name für Debug-Zwecke
+                            fach: fach,
+                            lehrer: lehrer
+                        };
+
+                        headers.forEach((header, index) => {
+                            if (header) {
+                                participant[header] = header.includes('Geburtsdatum')
+                                    ? normalizeBirthdate(row[index])
+                                    : (row[index] ? row[index].toString().trim() : "");
+                            }
+                        });
+
+                        return participant;
+                    }).filter(p => p !== null && p["Geburtsdatum"]); // Nur Teilnehmer mit Geburtsdatum
+
+                    // Kursname normalisieren: Quelle ist der Kurstitel aus der ersten Zeile
+                    // (Fallback: Blattname) plus die Lehrerkürzel aus den [Kürzel]-Zeilen
+                    const formattedCourseName = normalizeCourseName(
+                        fach || sheetName,
+                        teachersInSheet.map(t => t.kuerzel),
+                        participants
+                    );
+                    participants.forEach(p => { p.courseName = formattedCourseName; });
+
                     // Append unique teachers to global teacherList and add group (course)
                     teachersInSheet.forEach(t => {
                         const existing = teacherList.find(e => e.importId === t.importId && e.firstName === t.firstName && e.lastName === t.lastName);
@@ -715,28 +733,6 @@ async function readElectiveFile(file) {
                             if (!existing.groups.includes(courseGroup)) existing.groups.push(courseGroup);
                         }
                     });
-                    
-                    // Teilnehmer verarbeiten (ab der Zeile nach dem Header)
-                    const participants = rawData.slice(headerRowIndex + 1).map(row => {
-                        if (!row || row.length === 0 || !row[0]) return null; // Leere Zeilen überspringen
-                        
-                        const participant = {
-                            courseName: formattedCourseName, // Formatierter Kursname
-                            originalCourseName: sheetName, // Originaler Name für Debug-Zwecke
-                            fach: fach,
-                            lehrer: lehrer
-                        };
-                        
-                        headers.forEach((header, index) => {
-                            if (header) {
-                                participant[header] = header.includes('Geburtsdatum')
-                                    ? normalizeBirthdate(row[index])
-                                    : (row[index] ? row[index].toString().trim() : "");
-                            }
-                        });
-                        
-                        return participant;
-                    }).filter(p => p !== null && p["Geburtsdatum"]); // Nur Teilnehmer mit Geburtsdatum
 
                     // --- NEU: Lehrer-Gruppen für unterrichtete Klassen ---
                     // Alle unterschiedlichen Klassen der Teilnehmer ermitteln
@@ -1633,10 +1629,14 @@ document.getElementById('processButton').addEventListener('click', async functio
             const originalCourseCount = [...new Set(electiveData.map(p => p.originalCourseName))].length;
             showAlert(`Wahlpflichtkurs-Datei erfolgreich eingelesen: ${electiveData.length} Teilnehmer in ${courseCount} Kursen gefunden. Kursnamen wurden formatiert.`, 'success');
             
-            // Debug: Zeige Beispiele der Namensformatierung
-            const courseNameExamples = [...new Set(electiveData.map(p => p.originalCourseName))]
+            // Debug: Zeige Beispiele der Namensnormalisierung
+            const exampleMap = new Map();
+            electiveData.forEach(p => {
+                if (!exampleMap.has(p.originalCourseName)) exampleMap.set(p.originalCourseName, p.courseName);
+            });
+            const courseNameExamples = [...exampleMap.entries()]
                 .slice(0, 3)
-                .map(original => `"${original}" → "${formatCourseName(original)}"`)
+                .map(([original, formatted]) => `"${original}" → "${formatted}"`)
                 .join(', ');
             if (courseNameExamples) {
                 console.log('Kursname-Formatierung:', courseNameExamples);
