@@ -668,19 +668,67 @@ async function readDivisFile(file) {
 }
 
 
+// Löst Namenskollisionen zwischen Kursen auf: Entstehen durch die Normalisierung
+// (z. B. Wegfall der Kursnummer) identische Namen für unterschiedliche Kurse,
+// werden fortlaufende Nummern angehängt:
+//   "Rel 8.2 Bra" und "Rel 8.4 Bra" -> "08 Rel Bra 1" und "08 Rel Bra 2"
+// Setzt course.finalName und aktualisiert die courseName-Einträge der Teilnehmer.
+// Gibt eine Map der umbenannten Namen zurück: Name -> Anzahl der Kurse.
+function resolveCourseNameCollisions(courses) {
+    const nameCounts = new Map();
+    courses.forEach(course => {
+        nameCounts.set(course.courseName, (nameCounts.get(course.courseName) || 0) + 1);
+    });
+
+    const nameCounters = new Map();
+    courses.forEach(course => {
+        if (nameCounts.get(course.courseName) > 1) {
+            const n = (nameCounters.get(course.courseName) || 0) + 1;
+            nameCounters.set(course.courseName, n);
+            course.finalName = `${course.courseName} ${n}`;
+        } else {
+            course.finalName = course.courseName;
+        }
+        course.participants.forEach(p => { p.courseName = course.finalName; });
+    });
+
+    const renamed = new Map();
+    nameCounters.forEach((count, name) => renamed.set(name, count));
+    return renamed;
+}
+
 // Neue Funktion liest mehrere Dateien nacheinander
 async function readElectiveFiles(fileList) {
     if (!fileList || fileList.length === 0) return [];
 
-    let allElectives = [];
-
+    // Alle Kurse (ein Kurs = ein Tabellenblatt) aus allen Dateien einsammeln
+    let allCourses = [];
     for (let i = 0; i < fileList.length; i++) {
-        const file = fileList[i];
-        const singleElectives = await readElectiveFile(file); // bestehende Logik
-        allElectives = allElectives.concat(singleElectives);
+        const courses = await readElectiveFile(fileList[i]);
+        allCourses = allCourses.concat(courses);
     }
 
-    return allElectives;
+    // Namenskollisionen über alle Dateien hinweg auflösen
+    const renamed = resolveCourseNameCollisions(allCourses);
+    if (renamed.size > 0) {
+        const details = [...renamed.entries()].map(([name, count]) => `"${name}" (${count} Kurse)`).join(', ');
+        showAlert(`Gleichnamige Kurse durch fortlaufende Nummern unterschieden: ${details}.`, 'info');
+    }
+
+    // Kurs-Gruppen der Lehrer erst jetzt vergeben, damit sie die endgültigen
+    // (ggf. nummerierten) Kursnamen erhalten
+    allCourses.forEach(course => {
+        const courseGroup = "Kurs " + course.finalName;
+        course.teachers.forEach(t => {
+            const existing = teacherList.find(e => e.importId === t.importId && e.firstName === t.firstName && e.lastName === t.lastName);
+            if (existing && !existing.groups.includes(courseGroup)) {
+                existing.groups.push(courseGroup);
+            }
+        });
+    });
+
+    // Flache Teilnehmerliste zurückgeben (bisheriges Format)
+    return allCourses.flatMap(course => course.participants);
 }
 
 async function readElectiveFile(file) {
@@ -799,14 +847,12 @@ async function readElectiveFile(file) {
                     );
                     participants.forEach(p => { p.courseName = formattedCourseName; });
 
-                    // Append unique teachers to global teacherList and add group (course)
+                    // Lehrer registrieren; die Kurs-Gruppen werden erst nach der
+                    // Kollisionsprüfung in readElectiveFiles vergeben (endgültige Namen)
                     teachersInSheet.forEach(t => {
                         const existing = teacherList.find(e => e.importId === t.importId && e.firstName === t.firstName && e.lastName === t.lastName);
-                        const courseGroup = "Kurs " + formattedCourseName;
                         if (!existing) {
-                            teacherList.push({ ...t, groups: [courseGroup] });
-                        } else {
-                            if (!existing.groups.includes(courseGroup)) existing.groups.push(courseGroup);
+                            teacherList.push({ ...t, groups: [] });
                         }
                     });
 
@@ -840,9 +886,16 @@ async function readElectiveFile(file) {
                         }
                     });
                     
-                    electiveCourses.push(...participants);
+                    // Kurs-Objekt sammeln; die Kollisionsprüfung über alle Dateien
+                    // und die flache Teilnehmerliste erstellt readElectiveFiles
+                    electiveCourses.push({
+                        courseName: formattedCourseName,
+                        originalCourseName: sheetName,
+                        teachers: teachersInSheet,
+                        participants: participants
+                    });
                 });
-                
+
                 resolve(electiveCourses);
                 
             } catch (error) {
