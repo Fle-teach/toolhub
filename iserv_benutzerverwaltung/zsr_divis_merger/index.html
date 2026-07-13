@@ -18,9 +18,9 @@
         </div>
 
         <div class="file-section">
-            <h3>2. ZSR-Datei auswählen (S_L_Aufgenommen.xlsx)</h3>
-            <input type="file" id="zsrFile" accept=".xlsx" class="file-input" />
-            <p><strong>Erforderliche Spalten:</strong> ZSR-ID, Nachname, Bestandteil Familienname, Vorname, Geburtsdatum</p>
+            <h3>2. ZSR-Datei(en) auswählen (z. B. S_L_Aufgenommen.xlsx)</h3>
+            <input type="file" id="zsrFile" accept=".xlsx" class="file-input" multiple />
+            <p><strong>Erforderliche Spalten:</strong> ZSR-ID (auch "ZSRID"), Nachname, Vorname, Geburtsdatum &ndash; weitere Spalten (z.&nbsp;B. Bestandteil Familienname) werden übernommen, wenn vorhanden. Es können mehrere ZSR-Dateien mit unterschiedlichem Aufbau ausgewählt werden; bei doppelten ZSR-IDs zählt das erste Vorkommen.</p>
         </div>
 
         <!-- Kurszuordnungen-Datei Upload entfernt -->

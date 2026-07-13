@@ -1,7 +1,6 @@
 // ===== KONFIGURATION =====
 const CONFIG = {
-    ZSR_HEADER_ROW: 2,
-    ZSR_DATA_START_ROW: 3,
+    // ZSR-Header-Zeile wird dynamisch erkannt (siehe findZSRHeaderRow)
     DIVIS_HEADER_ROW: 0,
     DIVIS_DATA_START_ROW: 1,
     BATCH_SIZE: 50, // Verarbeitung in 50er-Batches für bessere Performance
@@ -45,8 +44,8 @@ function normalizeBirthdate(value) {
         return formatDateDDMMYYYY(parseInt(match[1], 10), parseInt(match[2], 10), year);
     }
 
-    // ISO-Format JJJJ-MM-TT (z. B. 2016-02-20)
-    match = str.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
+    // ISO-Format JJJJ-MM-TT, optional mit Zeitanteil (z. B. "2016-02-20" oder "2016-02-20 00:00:00")
+    match = str.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})([T\s].*)?$/);
     if (match) {
         return formatDateDDMMYYYY(parseInt(match[3], 10), parseInt(match[2], 10), parseInt(match[1], 10));
     }
@@ -402,6 +401,62 @@ function updateStats(zsrCount, divisCount, mergedCount) {
 
 // ===== DATEI-VERARBEITUNG =====
 
+// Vereinheitlicht Spaltennamen unterschiedlicher ZSR-Exporte,
+// z. B. schreibt "S_L_falsche_Schulnummer" die ID-Spalte als "ZSRID" statt "ZSR-ID".
+function canonicalZSRHeader(header) {
+    const trimmed = header.toString().trim();
+    if (trimmed.replace(/[\s_-]/g, '').toUpperCase() === 'ZSRID') return 'ZSR-ID';
+    return trimmed;
+}
+
+// Findet die Header-Zeile einer ZSR-Datei dynamisch, da die Zeilennummer
+// je nach Export-Variante abweichen kann: Gesucht wird eine Zeile, die eine
+// ZSR-ID-Spalte (auch "ZSRID"), "Nachname" und "Geburtsdatum" enthält.
+function findZSRHeaderRow(rawData) {
+    const maxScan = Math.min(rawData.length, 20);
+    for (let i = 0; i < maxScan; i++) {
+        const row = rawData[i];
+        if (!row) continue;
+        const cells = row.map(c => (c === undefined || c === null) ? '' : c.toString().trim());
+        const hasZsrId = cells.some(c => c.replace(/[\s_-]/g, '').toUpperCase() === 'ZSRID');
+        const hasNachname = cells.some(c => c.includes('Nachname'));
+        const hasGeburtsdatum = cells.some(c => c.includes('Geburtsdatum'));
+        if (hasZsrId && hasNachname && hasGeburtsdatum) return i;
+    }
+    return -1;
+}
+
+// Liest mehrere ZSR-Dateien (ggf. mit unterschiedlichem Aufbau) und führt sie
+// zusammen. Bei doppelten ZSR-IDs zählt das erste Vorkommen.
+async function readZSRFiles(fileList) {
+    const files = Array.from(fileList);
+    const allRows = [];
+    const seenIds = new Set();
+    let duplicateCount = 0;
+
+    for (const file of files) {
+        const rows = await readZSRFile(file);
+        rows.forEach(row => {
+            const id = row["ZSR-ID-ZSR"];
+            if (seenIds.has(id)) {
+                duplicateCount++;
+                return;
+            }
+            seenIds.add(id);
+            allRows.push(row);
+        });
+        if (files.length > 1) {
+            showAlert(`ZSR-Datei "${file.name}": ${rows.length} Datensätze eingelesen.`, 'info');
+        }
+    }
+
+    if (duplicateCount > 0) {
+        showAlert(`${duplicateCount} doppelte ZSR-Datensätze (gleiche ZSR-ID in mehreren Dateien) wurden übersprungen – es zählt jeweils das erste Vorkommen.`, 'info');
+    }
+
+    return allRows;
+}
+
 async function readZSRFile(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -409,54 +464,66 @@ async function readZSRFile(file) {
             try {
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
-                
+
                 if (!workbook.SheetNames.length) {
-                    throw new Error('Keine Arbeitsblätter in der ZSR-Datei gefunden');
+                    throw new Error('Keine Arbeitsblätter gefunden');
                 }
-                
+
                 const sheet = workbook.Sheets[workbook.SheetNames[0]];
                 const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-                
-                if (rawData.length < CONFIG.ZSR_DATA_START_ROW + 1) {
-                    throw new Error('ZSR-Datei enthält nicht genügend Daten');
+
+                const headerRowIndex = findZSRHeaderRow(rawData);
+                if (headerRowIndex === -1) {
+                    throw new Error('Keine Header-Zeile mit den Spalten ZSR-ID, Nachname und Geburtsdatum gefunden');
                 }
-                
-                const headers = rawData[CONFIG.ZSR_HEADER_ROW];
-                const dataRows = rawData.slice(CONFIG.ZSR_DATA_START_ROW);
-                
+
+                const headers = rawData[headerRowIndex].map(h =>
+                    (h === undefined || h === null) ? '' : canonicalZSRHeader(h)
+                );
+                const dataRows = rawData.slice(headerRowIndex + 1);
+
+                if (dataRows.length === 0) {
+                    throw new Error('Keine Datenzeilen unterhalb der Header-Zeile gefunden');
+                }
+
                 // Validierung der erforderlichen Spalten
-                const missingColumns = CONFIG.REQUIRED_ZSR_COLUMNS.filter(col => 
+                const missingColumns = CONFIG.REQUIRED_ZSR_COLUMNS.filter(col =>
                     !headers.some(header => header && header.includes(col))
                 );
-                
+
                 if (missingColumns.length > 0) {
-                    throw new Error(`ZSR-Datei: Fehlende Spalten: ${missingColumns.join(', ')}`);
+                    throw new Error(`Fehlende Spalten: ${missingColumns.join(', ')}`);
                 }
-                
+
                 const processedData = dataRows.map(row => {
                     const zsrRow = {};
                     headers.forEach((header, index) => {
                         if (header) {
-                            zsrRow[header.trim() + "-ZSR"] = header.includes('Geburtsdatum')
+                            zsrRow[header + "-ZSR"] = header.includes('Geburtsdatum')
                                 ? normalizeBirthdate(row[index])
                                 : (row[index] ? row[index].toString().trim() : "");
                         }
                     });
-                    
+
                     zsrRow["InitPW"] = calculateInitPW(zsrRow["ZSR-ID-ZSR"]);
-                    zsrRow["Zusammengesetzter-Nachname-ZSR"] = 
-                        (zsrRow["Bestandteil Familienname-ZSR"] + " " + zsrRow["Nachname-ZSR"]).trim();
-                    
+                    // "Bestandteil Familienname" existiert nicht in allen Export-Varianten
+                    zsrRow["Zusammengesetzter-Nachname-ZSR"] =
+                        ((zsrRow["Bestandteil Familienname-ZSR"] || "") + " " + (zsrRow["Nachname-ZSR"] || "")).trim();
+
                     return zsrRow;
-                }).filter(row => row["ZSR-ID-ZSR"]); // Nur Zeilen mit ZSR-ID
-                
+                }).filter(row =>
+                    // Nur Zeilen mit ZSR-ID; wiederholte Header-Zeilen (mehrseitige Print-Exporte) überspringen
+                    row["ZSR-ID-ZSR"] &&
+                    row["ZSR-ID-ZSR"].replace(/[\s_-]/g, '').toUpperCase() !== 'ZSRID'
+                );
+
                 resolve(processedData);
-                
+
             } catch (error) {
-                reject(new Error(`Fehler beim Lesen der ZSR-Datei: ${error.message}`));
+                reject(new Error(`Fehler beim Lesen der ZSR-Datei "${file.name}": ${error.message}`));
             }
         };
-        reader.onerror = () => reject(new Error('Fehler beim Lesen der ZSR-Datei'));
+        reader.onerror = () => reject(new Error(`Fehler beim Lesen der ZSR-Datei "${file.name}"`));
         reader.readAsArrayBuffer(file);
     });
 }
@@ -1519,12 +1586,12 @@ function checkFilesReady() {
 }
 
 document.getElementById('processButton').addEventListener('click', async function() {
-    const zsrFile = document.getElementById('zsrFile').files[0];
+    const zsrFiles = document.getElementById('zsrFile').files;
     const divisFile = document.getElementById('divisFile').files[0];
     const electiveFile = document.getElementById('electiveFile').files[0];
     const classTeacherFile = document.getElementById('classTeacherFile').files[0];
-    
-    if (!zsrFile || !divisFile) {
+
+    if (!zsrFiles.length || !divisFile) {
         showAlert('Bitte ZSR- und DiViS-Dateien auswählen.', 'error');
         return;
     }
@@ -1542,9 +1609,9 @@ document.getElementById('processButton').addEventListener('click', async functio
     // Reset teacher list for each run
     teacherList = [];
         
-        // ZSR-Datei einlesen
-        updateProgress(5, 'Lese ZSR-Datei...');
-        zsrData = await readZSRFile(zsrFile);
+        // ZSR-Datei(en) einlesen
+        updateProgress(5, zsrFiles.length > 1 ? `Lese ${zsrFiles.length} ZSR-Dateien...` : 'Lese ZSR-Datei...');
+        zsrData = await readZSRFiles(zsrFiles);
         
         // DiViS-Datei einlesen
         updateProgress(10, 'Lese DiViS-Datei...');
@@ -1620,7 +1687,7 @@ document.getElementById('processButton').addEventListener('click', async functio
         }
         
     // Zusammenfassung der geladenen Dateien
-    const loadedFiles = ['ZSR-Datei', 'DiViS-Datei'];
+    const loadedFiles = [zsrFiles.length > 1 ? `${zsrFiles.length} ZSR-Dateien` : 'ZSR-Datei', 'DiViS-Datei'];
     if (electiveFile) loadedFiles.push('Wahlpflichtkurse');
         
         showAlert(`Dateien geladen: ${loadedFiles.join(', ')}`, 'info');
