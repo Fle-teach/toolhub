@@ -289,14 +289,12 @@ function calculateInitPW(zsrId) {
 
 // Zuordnungstabelle aus Fachkürzel.csv: Schreibvariante (lowercase) -> normalisiertes Kürzel
 let fachKuerzelMap = null;
-let fachKuerzelMaxWords = 1;
 let fachKuerzelLoadError = false;
 
 // Erwartetes Format: "Fach;Normalisiertes Kürzel;Zu Ersetzen[;weitere Varianten...]"
 // Es wird gegen alle Spalten (Fachname, Kürzel, Varianten) case-insensitiv gematcht.
 function parseFachKuerzelCSV(text) {
     const map = new Map();
-    let maxWords = 1;
     const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/); // BOM entfernen
     lines.slice(1).forEach(line => {
         if (!line.trim()) return;
@@ -306,54 +304,31 @@ function parseFachKuerzelCSV(text) {
         if (!normalized) return;
         [fach, normalized, ...fields.slice(2)].forEach(key => {
             if (!key) return;
-            const lookupKey = key.toLowerCase().replace(/\s+/g, ' ');
-            map.set(lookupKey, normalized);
-            maxWords = Math.max(maxWords, lookupKey.split(' ').length);
+            map.set(key.toLowerCase().replace(/\s+/g, ' '), normalized);
         });
     });
-    return { map, maxWords };
+    return map;
 }
 
-// Normalisiert die Fach-Tokens einer Kursbezeichnung anhand der Fachkürzel-Tabelle:
-// - Bekannte Kürzel/Schreibvarianten (case-insensitiv, auch mehrwortig wie "E cam")
-//   werden durch das normalisierte Kürzel ersetzt.
-// - Zusammenhängende unbekannte Tokens werden mit Unterstrich verbunden
-//   ("muPr Band" -> "muPr_Band").
+// Normalisiert den Fach-Anteil einer Kursbezeichnung anhand der Fachkürzel-Tabelle.
+// Entscheidend: Die gesamte Fach-Phrase wird als Ganzes geprüft, nicht ihre
+// Einzelwörter – sonst würden Bestandteile eines unbekannten mehrteiligen Kürzels
+// einzeln ersetzt (z. B. "muPr Orchester" fälschlich zu "muPr Orch").
+// - Ist die komplette Phrase bekannt (case-insensitiv, auch mehrwortig wie
+//   "E cam" oder "Big Band"), wird sie durch das normalisierte Kürzel ersetzt.
+// - Sonst gilt die Phrase als EIN unbekanntes Kürzel: mehrteilige werden mit
+//   Unterstrich verbunden ("muPr Band" -> "muPr_Band", "muPr Orchester" ->
+//   "muPr_Orchester"), einteilige bleiben unverändert.
 function normalizeFachKuerzel(subjectParts) {
-    if (!fachKuerzelMap || fachKuerzelMap.size === 0) {
-        return subjectParts.length > 1 ? [subjectParts.join('_')] : subjectParts;
+    if (subjectParts.length === 0) return subjectParts;
+
+    if (fachKuerzelMap && fachKuerzelMap.size > 0) {
+        const lookupKey = subjectParts.join(' ').toLowerCase().replace(/\s+/g, ' ');
+        const normalized = fachKuerzelMap.get(lookupKey);
+        if (normalized) return [normalized];
     }
 
-    const result = [];
-    let unknownRun = [];
-    const flushUnknown = () => {
-        if (unknownRun.length > 0) {
-            result.push(unknownRun.join('_'));
-            unknownRun = [];
-        }
-    };
-
-    let i = 0;
-    while (i < subjectParts.length) {
-        let matched = false;
-        // Längste Übereinstimmung zuerst versuchen (mehrwortige Varianten wie "E cam")
-        for (let len = Math.min(fachKuerzelMaxWords, subjectParts.length - i); len >= 1; len--) {
-            const phrase = subjectParts.slice(i, i + len).join(' ').toLowerCase();
-            if (fachKuerzelMap.has(phrase)) {
-                flushUnknown();
-                result.push(fachKuerzelMap.get(phrase));
-                i += len;
-                matched = true;
-                break;
-            }
-        }
-        if (!matched) {
-            unknownRun.push(subjectParts[i]);
-            i++;
-        }
-    }
-    flushUnknown();
-    return result;
+    return subjectParts.length > 1 ? [subjectParts.join('_')] : subjectParts;
 }
 
 // Normalisiert einen Kursnamen auf das einheitliche Muster:
@@ -1993,9 +1968,7 @@ const fachKuerzelLoadPromise = fetch('Fachkürzel.csv')
         return response.text();
     })
     .then(text => {
-        const parsed = parseFachKuerzelCSV(text);
-        fachKuerzelMap = parsed.map;
-        fachKuerzelMaxWords = parsed.maxWords;
+        fachKuerzelMap = parseFachKuerzelCSV(text);
         console.log(`Fachkürzel.csv geladen: ${fachKuerzelMap.size} Zuordnungen`);
     })
     .catch(error => {
