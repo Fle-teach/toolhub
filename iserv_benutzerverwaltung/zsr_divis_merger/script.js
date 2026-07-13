@@ -284,15 +284,89 @@ function calculateInitPW(zsrId) {
     return initPW + initPWvorn + initPWhinten;
 }
 
+// ===== FACHKÜRZEL-NORMALISIERUNG =====
+
+// Zuordnungstabelle aus Fachkürzel.csv: Schreibvariante (lowercase) -> normalisiertes Kürzel
+let fachKuerzelMap = null;
+let fachKuerzelMaxWords = 1;
+let fachKuerzelLoadError = false;
+
+// Erwartetes Format: "Fach;Normalisiertes Kürzel;Zu Ersetzen[;weitere Varianten...]"
+// Es wird gegen alle Spalten (Fachname, Kürzel, Varianten) case-insensitiv gematcht.
+function parseFachKuerzelCSV(text) {
+    const map = new Map();
+    let maxWords = 1;
+    const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/); // BOM entfernen
+    lines.slice(1).forEach(line => {
+        if (!line.trim()) return;
+        const fields = line.split(';').map(f => f.trim());
+        const fach = fields[0];
+        const normalized = fields[1];
+        if (!normalized) return;
+        [fach, normalized, ...fields.slice(2)].forEach(key => {
+            if (!key) return;
+            const lookupKey = key.toLowerCase().replace(/\s+/g, ' ');
+            map.set(lookupKey, normalized);
+            maxWords = Math.max(maxWords, lookupKey.split(' ').length);
+        });
+    });
+    return { map, maxWords };
+}
+
+// Normalisiert die Fach-Tokens einer Kursbezeichnung anhand der Fachkürzel-Tabelle:
+// - Bekannte Kürzel/Schreibvarianten (case-insensitiv, auch mehrwortig wie "E cam")
+//   werden durch das normalisierte Kürzel ersetzt.
+// - Zusammenhängende unbekannte Tokens werden mit Unterstrich verbunden
+//   ("muPr Band" -> "muPr_Band").
+function normalizeFachKuerzel(subjectParts) {
+    if (!fachKuerzelMap || fachKuerzelMap.size === 0) {
+        return subjectParts.length > 1 ? [subjectParts.join('_')] : subjectParts;
+    }
+
+    const result = [];
+    let unknownRun = [];
+    const flushUnknown = () => {
+        if (unknownRun.length > 0) {
+            result.push(unknownRun.join('_'));
+            unknownRun = [];
+        }
+    };
+
+    let i = 0;
+    while (i < subjectParts.length) {
+        let matched = false;
+        // Längste Übereinstimmung zuerst versuchen (mehrwortige Varianten wie "E cam")
+        for (let len = Math.min(fachKuerzelMaxWords, subjectParts.length - i); len >= 1; len--) {
+            const phrase = subjectParts.slice(i, i + len).join(' ').toLowerCase();
+            if (fachKuerzelMap.has(phrase)) {
+                flushUnknown();
+                result.push(fachKuerzelMap.get(phrase));
+                i += len;
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            unknownRun.push(subjectParts[i]);
+            i++;
+        }
+    }
+    flushUnknown();
+    return result;
+}
+
 // Normalisiert einen Kursnamen auf das einheitliche Muster:
 //   <Klasse/Jahrgang> <Fachkürzel/Zusatz> <Lehrerkürzel (alphabetisch)>
-// Beispiele: "11-12 frz 1" + [Ben]        -> "11-12 frz Ben"
-//            "Rel 8.1"     + [Woh]        -> "08 Rel Woh"
-//            "5a Geo"      + [Zer], [Möh] -> "05A Geo Möh Zer"
+// Beispiele: "11-12 frz 1"    + [Ben]        -> "11-12 Frz Ben"
+//            "Rel 8.1"        + [Woh]        -> "08 Rel Woh"
+//            "5a D"           + [Sn]         -> "05A Deu Sn"
+//            "5a Geo"         + [Zer], [Möh] -> "05A Geo Möh Zer"
+//            "11-12 muPr Band" + [Adva]      -> "11-12 muPr_Band Adva"
 // Regeln:
 // - Klasse/Jahrgang steht vorn; einstellige Zahlen erhalten eine führende Null.
 // - Buchstabenanteile der Klasse werden großgeschrieben ("5a" -> "05A").
 // - Zahlen, die keine Klasse/Jahrgang repräsentieren (Kursnummern wie "1" oder ".1"), entfallen.
+// - Fachkürzel werden anhand von Fachkürzel.csv vereinheitlicht (siehe normalizeFachKuerzel).
 // - Lehrerkürzel werden alphabetisch sortiert angehängt.
 function normalizeCourseName(courseTitle, teacherKuerzelList, participants) {
     const parts = (courseTitle || '').toString().trim().split(/\s+/).filter(p => p !== '');
@@ -346,7 +420,9 @@ function normalizeCourseName(courseTitle, teacherKuerzelList, participants) {
 
     const sortedKuerzel = [...(teacherKuerzelList || [])].sort((a, b) => a.localeCompare(b, 'de'));
 
-    const result = [classToken, ...subjectParts, ...sortedKuerzel].filter(p => p).join(' ');
+    const normalizedSubjects = normalizeFachKuerzel(subjectParts);
+
+    const result = [classToken, ...normalizedSubjects, ...sortedKuerzel].filter(p => p).join(' ');
     return result || (courseTitle || '').toString().trim();
 }
 
@@ -1619,6 +1695,12 @@ document.getElementById('processButton').addEventListener('click', async functio
         // Wahlpflichtkurs-Datei einlesen (optional)
         if (electiveFile) {
             updateProgress(17, 'Lese Wahlpflichtkurs-Datei...');
+
+            // Fachkürzel-Zuordnung wird für die Kursnamen-Normalisierung benötigt
+            await fachKuerzelLoadPromise;
+            if (fachKuerzelLoadError) {
+                showAlert('Fachkürzel.csv konnte nicht geladen werden – Fachkürzel in Kursnamen werden nicht normalisiert.', 'warning');
+            }
             
             const electiveFile = document.getElementById('electiveFile').files;
             if (electiveFile && electiveFile.length > 0) {
@@ -1792,6 +1874,26 @@ window.addEventListener('beforeunload', function() {
 });
 
 // === INITIALIZATION ===
+
+// Fachkürzel-Zuordnung beim Start laden (für die Normalisierung der Kursnamen).
+// Schlägt das Laden fehl (z. B. Aufruf über file:// oder Datei fehlt), wird beim
+// Verarbeiten von Kurse-Dateien eine Warnung angezeigt und ohne Zuordnung gearbeitet.
+const fachKuerzelLoadPromise = fetch('Fachkürzel.csv')
+    .then(response => {
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.text();
+    })
+    .then(text => {
+        const parsed = parseFachKuerzelCSV(text);
+        fachKuerzelMap = parsed.map;
+        fachKuerzelMaxWords = parsed.maxWords;
+        console.log(`Fachkürzel.csv geladen: ${fachKuerzelMap.size} Zuordnungen`);
+    })
+    .catch(error => {
+        fachKuerzelLoadError = true;
+        console.warn('Fachkürzel.csv konnte nicht geladen werden:', error.message);
+    });
+
 document.addEventListener('DOMContentLoaded', function() {
     checkFilesReady();
 });
