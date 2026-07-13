@@ -214,6 +214,7 @@ let courseData = [];
 let electiveData = [];
 let classTeacherData = [];
 let teacherList = [];
+let courseList = []; // Übersicht aller angelegten Kurse (für den Kursliste-Export)
 let mergedData = [];
 let filteredElternImportOutput = [];
 
@@ -726,6 +727,14 @@ async function readElectiveFiles(fileList) {
             }
         });
     });
+
+    // Kursliste für den Export befüllen (ein Eintrag pro angelegtem Kurs)
+    courseList = allCourses.map(course => ({
+        "Kursname": "Kurs " + course.finalName,
+        "Ursprünglicher Name (Tabellenblatt)": course.originalCourseName,
+        "Lehrkräfte": course.teachers.map(t => t.kuerzel).sort((a, b) => a.localeCompare(b, 'de')).join(', '),
+        "Anzahl Teilnehmer": course.participants.length
+    }));
 
     // Flache Teilnehmerliste zurückgeben (bisheriges Format)
     return allCourses.flatMap(course => course.participants);
@@ -1493,6 +1502,37 @@ function generateElternExport() {
     }
 }
 
+// ===== KURSLISTE-EXPORT =====
+
+function generateKurslisteExport() {
+    if (courseList.length > 0) {
+        // Header-Zeile
+        const headers = Object.keys(courseList[0]);
+        const headerLine = headers.join(";");
+
+        // Datenzeilen mit korrektem CSV-Escaping
+        const dataLines = courseList.map(record =>
+            headers.map(header => escapeCSVValue(record[header])).join(";")
+        );
+
+        const csvContent = "data:text/csv;charset=utf-8," +
+            [headerLine].concat(dataLines).join("\n");
+
+        const today = new Date().toISOString().split('T')[0];
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Kursliste ${today}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showAlert(`Kursliste (${courseList.length} Kurse) erfolgreich heruntergeladen!`, 'success');
+    } else {
+        showAlert('Keine Kurse zum Herunterladen verfügbar.', 'error');
+    }
+}
+
 // ===== LEHRER-EXPORT =====
 
 // Test-Funktion für Lehrer-Parsing
@@ -1731,8 +1771,9 @@ document.getElementById('processButton').addEventListener('click', async functio
         
         showLoading('Verarbeitung gestartet...');
 
-    // Reset teacher list for each run
+    // Reset teacher list and course list for each run
     teacherList = [];
+    courseList = [];
         
         // ZSR-Datei(en) einlesen
         updateProgress(5, zsrFiles.length > 1 ? `Lese ${zsrFiles.length} ZSR-Dateien...` : 'Lese ZSR-Datei...');
@@ -1844,6 +1885,12 @@ document.getElementById('processButton').addEventListener('click', async functio
             lehrerBtn.style.display = 'inline-block';
             lehrerBtn.disabled = teacherList.length === 0;
         }
+        // Kursliste-Export Button
+        const kurslisteBtn = document.getElementById('downloadKurslisteButton');
+        if (kurslisteBtn) {
+            kurslisteBtn.style.display = 'inline-block';
+            kurslisteBtn.disabled = courseList.length === 0;
+        }
         
         // Schülerimport automatisch downloaden
         generateSchuelerExport(mergedData);
@@ -1870,6 +1917,14 @@ const downloadLehrerButton = document.getElementById('downloadLehrerButton');
 if (downloadLehrerButton) {
     downloadLehrerButton.addEventListener('click', function() {
         generateLehrerExport();
+    });
+}
+
+// Kursliste-Button
+const downloadKurslisteButton = document.getElementById('downloadKurslisteButton');
+if (downloadKurslisteButton) {
+    downloadKurslisteButton.addEventListener('click', function() {
+        generateKurslisteExport();
     });
 }
 
@@ -1924,6 +1979,7 @@ window.addEventListener('beforeunload', function() {
     electiveData = null;
     mergedData = null;
     filteredElternImportOutput = null;
+    courseList = null;
 });
 
 // === INITIALIZATION ===
