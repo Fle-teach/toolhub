@@ -1416,7 +1416,8 @@ function generateSchuelerExport(mergedData) {
         "ZSR-ID-ZSR": record["ZSR-ID-ZSR"],
         "Klasse/Information": record["Klasse/Information"],
         "Zusammengesetzter-Nachname-DiViS": record["Zusammengesetzter-Nachname-DiViS"],
-        "Rufname-DiViS": record["Rufname-DiViS"],
+        // Leerer Rufname: Vorname als Ersatz verwenden
+        "Rufname-DiViS": record["Rufname-DiViS"] || record["Vorname-DiViS"] || "",
         "InitPW": record["InitPW"],
         "Geburtsdatum": record["Geburtsdatum-DiViS"],
         "Gruppen": record["Gruppen"] || ""
