@@ -1,10 +1,13 @@
-// Normalisierung der Kursbezeichnungen (Schülergruppen) in der Untis-Exportdatei GPU002.TXT
-// Schema: <Klasse|Jahrgang|Jahrgangsspanne> <Fachkürzel> <Lehrerkürzel...> <ggf. laufende Nummer>
+// Aufbereitung der Untis-Exportdateien GPU001.TXT (Stundenplan) und GPU002.TXT (Unterricht)
+// für den Import in IServ. GPU001 bleibt unverändert; in GPU002 werden die Kursbezeichnungen
+// (Schülergruppen) normalisiert:
+//   <Klasse|Jahrgang|Jahrgangsspanne> <Fachkürzel> <Lehrerkürzel...> <ggf. Zeitangabe>
 //
 // Garantien:
 //  - Zeilen mit gleicher alter Kursbezeichnung erhalten dieselbe neue Bezeichnung.
 //  - Zeilen mit unterschiedlicher alter Kursbezeichnung erhalten unterschiedliche neue
-//    Bezeichnungen (bei Bedarf durch laufende Nummern).
+//    Bezeichnungen. Kollisionen werden durch die Unterrichtszeiten aus GPU001 unterschieden
+//    (z. B. "11-12 Lat Se (Di 1.+2.)"); reicht das nicht, zusätzlich durch laufende Nummern.
 //  - Alle übrigen Felder der Datei bleiben unverändert.
 //
 // Optionen:
@@ -15,12 +18,21 @@
 //  - fachNormalisieren: Fachkürzel in der Kursbezeichnung werden anhand von
 //    Fachkürzel.csv (aus dem zsr_divis_merger) vereinheitlicht.
 
+const FELD_UNR = 0;
 const FELD_KLASSE = 4;
 const FELD_LEHRER = 5;
 const FELD_FACH = 6;
 const FELD_SCHUELERGRUPPE = 41;
 
+// GPU001: eine Zeile pro Unterrichtsnummer, Kopplungszeile (Lehrer/Fach) und Einzelstunde.
+const GPU001_UNR = 0;
+const GPU001_LEHRER = 2;
+const GPU001_FACH = 3;
+const GPU001_TAG = 5;
+const GPU001_STUNDE = 6;
+
 const OBERSTUFEN_KLASSEN = new Set(['11', '12']);
+const WOCHENTAGE = [null, 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
 // Zerlegt eine CSV-Zeile in ihre Roh-Felder (inkl. Anführungszeichen),
 // damit die Zeile später unverändert wieder zusammengesetzt werden kann.
@@ -93,6 +105,51 @@ function normalisiereFach(fach, fachMap) {
 }
 
 // ---------------------------------------------------------------------------
+// Stundenplan (GPU001)
+// ---------------------------------------------------------------------------
+
+// Liest GPU001 und liefert eine Map "U-Nr|Lehrer|Fach" -> Menge der Einzelstunden
+// ("Tag,Stunde"). Über diesen Schlüssel finden die Kopplungszeilen aus GPU002 ihre Zeiten.
+function parseGPU001(text) {
+    const map = new Map();
+    for (const line of text.split(/\r?\n/)) {
+        if (line.trim() === '') continue;
+        const raw = splitRaw(line);
+        if (raw.length <= GPU001_STUNDE) continue;
+        const key = unquote(raw[GPU001_UNR]) + '|' + unquote(raw[GPU001_LEHRER]) + '|' + unquote(raw[GPU001_FACH]);
+        if (!map.has(key)) map.set(key, new Set());
+        map.get(key).add(unquote(raw[GPU001_TAG]) + ',' + unquote(raw[GPU001_STUNDE]));
+    }
+    return map;
+}
+
+// Baut die Zeitangabe eines Kurses aus seinen Einzelstunden, z. B. "Di 1.+2." oder
+// "Di 1.+2., Do 5." — leere Zeichenkette, wenn keine Stunden gefunden wurden.
+function zeitAngabe(zeilenGruppe, gpu001Map) {
+    const stunden = new Set();
+    for (const z of zeilenGruppe) {
+        const zeiten = gpu001Map.get(z.unr + '|' + z.lehrer + '|' + z.fach);
+        if (zeiten) for (const s of zeiten) stunden.add(s);
+    }
+    if (stunden.size === 0) return '';
+
+    const proTag = new Map();
+    for (const s of stunden) {
+        const [tag, stunde] = s.split(',').map(Number);
+        if (!proTag.has(tag)) proTag.set(tag, []);
+        proTag.get(tag).push(stunde);
+    }
+    return [...proTag.keys()]
+        .sort((a, b) => a - b)
+        .map((tag) => {
+            const name = WOCHENTAGE[tag] ?? 'Tag' + tag;
+            const std = proTag.get(tag).sort((a, b) => a - b).map((s) => s + '.').join('+');
+            return name + ' ' + std;
+        })
+        .join(', ');
+}
+
+// ---------------------------------------------------------------------------
 // Kursbezeichnungen
 // ---------------------------------------------------------------------------
 
@@ -131,7 +188,7 @@ function klassenTeil(klassen) {
     return min === max ? padJahrgang(min) : padJahrgang(min) + '-' + padJahrgang(max);
 }
 
-// Baut aus allen Zeilen eines Kurses den Basis-Namen (ohne laufende Nummer).
+// Baut aus allen Zeilen eines Kurses den Basis-Namen (ohne Unterscheidungszusatz).
 function basisName(zeilen, fachMap) {
     const klassen = zeilen.map((z) => z.klasse);
     let faecher = [...new Set(zeilen.map((z) => z.fach).filter((f) => f !== ''))];
@@ -159,7 +216,12 @@ function istEinKlassenKurs(zeilen) {
 
 // Kernfunktion: berechnet Umbenennung/Filterung und gibt Datei-Inhalt + Mapping zurück.
 function normalisiereGPU002(text, optionen = {}) {
-    const { nurKlassenuebergreifend = false, fachNormalisieren = false, fachMap = null } = optionen;
+    const {
+        nurKlassenuebergreifend = false,
+        fachNormalisieren = false,
+        fachMap = null,
+        gpu001Map = null,
+    } = optionen;
     const zeilenumbruch = text.includes('\r\n') ? '\r\n' : '\n';
     const zeilen = text.split(/\r?\n/);
 
@@ -170,6 +232,7 @@ function normalisiereGPU002(text, optionen = {}) {
         if (raw.length <= FELD_SCHUELERGRUPPE) return null;
         return {
             raw,
+            unr: unquote(raw[FELD_UNR]),
             klasse: unquote(raw[FELD_KLASSE]),
             lehrer: unquote(raw[FELD_LEHRER]),
             fach: unquote(raw[FELD_FACH]),
@@ -185,11 +248,11 @@ function normalisiereGPU002(text, optionen = {}) {
     }
 
     // 2. Ein-Klassen-Kurse bestimmen und Basis-Namen der verbleibenden Kurse berechnen.
-    const mapping = new Map(); // alte Bezeichnung -> { neu, nummeriert, entfernt }
+    const mapping = new Map(); // alte Bezeichnung -> { neu, unterschieden, entfernt }
     const basisZuAlt = new Map(); // Basis-Name -> alte Bezeichnungen
     for (const [alt, zeilenGruppe] of gruppen) {
         if (nurKlassenuebergreifend && istEinKlassenKurs(zeilenGruppe)) {
-            mapping.set(alt, { neu: null, nummeriert: false, entfernt: true });
+            mapping.set(alt, { neu: null, unterschieden: false, entfernt: true });
             continue;
         }
         const basis = basisName(zeilenGruppe, fachNormalisieren ? fachMap : null);
@@ -197,21 +260,41 @@ function normalisiereGPU002(text, optionen = {}) {
         basisZuAlt.get(basis).push(alt);
     }
 
-    // 3. Endgültige Namen vergeben: bei Kollision erhalten alle Kurse eine laufende Nummer.
-    // Kollisionspartner werden alphanumerisch nach alter Bezeichnung sortiert, damit eine
-    // bereits vorhandene Nummerierung (z. B. "... 1" / "... 2") erhalten bleibt.
+    // 3. Endgültige Namen vergeben. Kollidieren mehrere Kurse auf demselben Basis-Namen,
+    //    werden sie durch ihre Unterrichtszeiten aus GPU001 unterschieden, z. B.
+    //    "11-12 Lat Se (Di 1.+2.)". Haben Kurse identische Zeiten oder fehlt GPU001,
+    //    erhalten sie zusätzlich laufende Nummern. Kollisionspartner werden alphanumerisch
+    //    nach alter Bezeichnung sortiert, damit die Vergabe stabil bleibt.
     const vergeben = new Set();
     for (const [basis, alte] of basisZuAlt) {
         alte.sort((a, b) => a.localeCompare(b, 'de', { numeric: true }));
+
+        // Kandidaten mit Zeitangabe bilden (nur bei Kollision nötig).
+        const kandidaten = alte.map((alt) => {
+            if (alte.length === 1 || !gpu001Map) return basis;
+            const zeit = zeitAngabe(gruppen.get(alt), gpu001Map);
+            return zeit === '' ? basis : basis + ' (' + zeit + ')';
+        });
+
+        // Kandidaten, die mehrfach vorkommen, zusätzlich durchnummerieren.
+        const haeufigkeit = new Map();
+        for (const k of kandidaten) haeufigkeit.set(k, (haeufigkeit.get(k) ?? 0) + 1);
+        const zaehler = new Map();
         alte.forEach((alt, index) => {
-            let neu = alte.length > 1 ? basis + ' ' + (index + 1) : basis;
-            let nummer = index + 1;
+            const kandidat = kandidaten[index];
+            let neu = kandidat;
+            if (haeufigkeit.get(kandidat) > 1) {
+                const n = (zaehler.get(kandidat) ?? 0) + 1;
+                zaehler.set(kandidat, n);
+                neu = kandidat + ' ' + n;
+            }
+            let nummer = 1;
             while (vergeben.has(neu)) {
                 nummer++;
-                neu = basis + ' ' + nummer;
+                neu = kandidat + ' ' + nummer;
             }
             vergeben.add(neu);
-            mapping.set(alt, { neu, nummeriert: alte.length > 1, entfernt: false });
+            mapping.set(alt, { neu, unterschieden: alte.length > 1, entfernt: false });
         });
     }
 
@@ -245,18 +328,107 @@ function normalisiereGPU002(text, optionen = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// ZIP-Archiv (Store-Verfahren ohne Kompression, ausreichend für den IServ-Import)
+// ---------------------------------------------------------------------------
+
+const CRC32_TABELLE = (() => {
+    const tabelle = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+        let c = i;
+        for (let j = 0; j < 8; j++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+        tabelle[i] = c >>> 0;
+    }
+    return tabelle;
+})();
+
+function crc32(daten) {
+    let crc = 0xffffffff;
+    for (let i = 0; i < daten.length; i++) {
+        crc = CRC32_TABELLE[(crc ^ daten[i]) & 0xff] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+}
+
+// Erzeugt ein ZIP-Archiv aus Dateien { name (ASCII), daten (Uint8Array) }.
+function erzeugeZip(dateien, datum = new Date()) {
+    const dosZeit = (datum.getHours() << 11) | (datum.getMinutes() << 5) | Math.floor(datum.getSeconds() / 2);
+    const dosDatum = ((datum.getFullYear() - 1980) << 9) | ((datum.getMonth() + 1) << 5) | datum.getDate();
+
+    const teile = [];
+    const zentral = [];
+    let offset = 0;
+
+    for (const { name, daten } of dateien) {
+        const nameBytes = new TextEncoder().encode(name);
+        const crc = crc32(daten);
+
+        const lokal = new DataView(new ArrayBuffer(30));
+        lokal.setUint32(0, 0x04034b50, true); // Signatur Local File Header
+        lokal.setUint16(4, 20, true); // benötigte Version
+        lokal.setUint16(8, 0, true); // Methode: Store
+        lokal.setUint16(10, dosZeit, true);
+        lokal.setUint16(12, dosDatum, true);
+        lokal.setUint32(14, crc, true);
+        lokal.setUint32(18, daten.length, true); // komprimiert (= unkomprimiert bei Store)
+        lokal.setUint32(22, daten.length, true);
+        lokal.setUint16(26, nameBytes.length, true);
+        teile.push(new Uint8Array(lokal.buffer), nameBytes, daten);
+
+        const eintrag = new DataView(new ArrayBuffer(46));
+        eintrag.setUint32(0, 0x02014b50, true); // Signatur Central Directory
+        eintrag.setUint16(4, 20, true);
+        eintrag.setUint16(6, 20, true);
+        eintrag.setUint16(10, 0, true); // Methode: Store
+        eintrag.setUint16(12, dosZeit, true);
+        eintrag.setUint16(14, dosDatum, true);
+        eintrag.setUint32(16, crc, true);
+        eintrag.setUint32(20, daten.length, true);
+        eintrag.setUint32(24, daten.length, true);
+        eintrag.setUint16(28, nameBytes.length, true);
+        eintrag.setUint32(42, offset, true);
+        zentral.push(new Uint8Array(eintrag.buffer), nameBytes);
+
+        offset += 30 + nameBytes.length + daten.length;
+    }
+
+    let zentralGroesse = 0;
+    for (const t of zentral) zentralGroesse += t.length;
+
+    const ende = new DataView(new ArrayBuffer(22));
+    ende.setUint32(0, 0x06054b50, true); // Signatur End of Central Directory
+    ende.setUint16(8, dateien.length, true);
+    ende.setUint16(10, dateien.length, true);
+    ende.setUint32(12, zentralGroesse, true);
+    ende.setUint32(16, offset, true);
+
+    const alleTeile = [...teile, ...zentral, new Uint8Array(ende.buffer)];
+    let gesamt = 0;
+    for (const t of alleTeile) gesamt += t.length;
+    const zip = new Uint8Array(gesamt);
+    let pos = 0;
+    for (const t of alleTeile) {
+        zip.set(t, pos);
+        pos += t.length;
+    }
+    return zip;
+}
+
+// ---------------------------------------------------------------------------
 // Browser-UI (wird unter Node.js für Tests übersprungen)
 // ---------------------------------------------------------------------------
 if (typeof document !== 'undefined') {
     const FACHKUERZEL_URL = '../../iserv_benutzerverwaltung/zsr_divis_merger/Fachk%C3%BCrzel.csv';
 
-    let dateiText = null;
+    let gpu002Text = null;
+    let gpu001Text = null;
+    let gpu001Bytes = null; // Original für das ZIP-Archiv
     let ergebnis = null;
     let erkannteKodierung = null;
     let fachMap = null;
 
     const fileInput = document.getElementById('fileInput');
     const uploadArea = document.getElementById('uploadArea');
+    const fileStatus = document.getElementById('fileStatus');
     const downloadBtn = document.getElementById('downloadBtn');
     const errorDiv = document.getElementById('error');
     const warnDiv = document.getElementById('warnung');
@@ -303,48 +475,81 @@ if (typeof document !== 'undefined') {
     uploadArea.addEventListener('drop', (e) => {
         e.preventDefault();
         uploadArea.classList.remove('dragover');
-        if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+        handleFiles(e.dataTransfer.files);
     });
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) handleFile(e.target.files[0]);
-    });
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
     optKlassenuebergreifend.addEventListener('change', aktualisiere);
     optFachNormalisieren.addEventListener('change', aktualisiere);
 
-    function handleFile(file) {
-        errorDiv.textContent = '';
-        resultsDiv.style.display = 'none';
-        dateiText = null;
-        ergebnis = null;
+    // Untis exportiert je nach System UTF-8 oder Windows-1252.
+    function dekodiere(buffer) {
+        try {
+            return { text: new TextDecoder('utf-8', { fatal: true }).decode(buffer), kodierung: 'UTF-8' };
+        } catch {
+            return { text: new TextDecoder('windows-1252').decode(buffer), kodierung: 'Windows-1252' };
+        }
+    }
 
-        const reader = new FileReader();
-        reader.onload = () => {
-            // Untis exportiert je nach System UTF-8 oder Windows-1252.
-            const buffer = reader.result;
-            try {
-                dateiText = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
-                erkannteKodierung = 'UTF-8';
-            } catch {
-                dateiText = new TextDecoder('windows-1252').decode(buffer);
-                erkannteKodierung = 'Windows-1252';
-            }
-            aktualisiere();
-        };
-        reader.readAsArrayBuffer(file);
+    // Unterscheidet GPU001 (9 Felder) und GPU002 (47 Felder) anhand der Spaltenzahl;
+    // der Dateiname dient nur als Rückfallebene.
+    function erkenneDatei(name, text) {
+        const ersteZeile = text.split(/\r?\n/).find((l) => l.trim() !== '');
+        if (ersteZeile) {
+            const felder = splitRaw(ersteZeile).length;
+            if (felder > FELD_SCHUELERGRUPPE) return 'GPU002';
+            if (felder >= 7) return 'GPU001';
+        }
+        if (/001/.test(name)) return 'GPU001';
+        if (/002/.test(name)) return 'GPU002';
+        return null;
+    }
+
+    function handleFiles(files) {
+        errorDiv.textContent = '';
+        for (const file of files) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const { text, kodierung } = dekodiere(reader.result);
+                const typ = erkenneDatei(file.name, text);
+                if (typ === 'GPU002') {
+                    gpu002Text = text;
+                    erkannteKodierung = kodierung;
+                } else if (typ === 'GPU001') {
+                    gpu001Text = text;
+                    gpu001Bytes = new Uint8Array(reader.result);
+                } else {
+                    errorDiv.textContent = `"${file.name}" wurde nicht als GPU001 oder GPU002 erkannt.`;
+                }
+                aktualisiere();
+            };
+            reader.readAsArrayBuffer(file);
+        }
     }
 
     function aktualisiere() {
-        if (dateiText === null) return;
+        fileStatus.innerHTML =
+            `GPU001.TXT: <strong>${gpu001Text ? '✓ geladen' : 'fehlt'}</strong> &middot; ` +
+            `GPU002.TXT: <strong>${gpu002Text ? '✓ geladen' : 'fehlt'}</strong>`;
+        downloadBtn.disabled = !(gpu001Text && gpu002Text);
+
+        if (gpu002Text === null) return;
         errorDiv.textContent = '';
         warnDiv.textContent = '';
         try {
+            const hinweise = [];
             if (optFachNormalisieren.checked && !fachMap) {
-                warnDiv.textContent = 'Fachkürzel.csv ist nicht geladen — die Fachkürzel bleiben unverändert.';
+                hinweise.push('Fachkürzel.csv ist nicht geladen — die Fachkürzel bleiben unverändert.');
             }
-            ergebnis = normalisiereGPU002(dateiText, {
+            if (gpu001Text === null) {
+                hinweise.push('GPU001.TXT fehlt — Kurse mit gleichem Namen werden vorerst nummeriert statt ' +
+                    'über ihre Unterrichtszeiten unterschieden, und der ZIP-Download ist noch nicht möglich.');
+            }
+            warnDiv.textContent = hinweise.join(' ');
+            ergebnis = normalisiereGPU002(gpu002Text, {
                 nurKlassenuebergreifend: optKlassenuebergreifend.checked,
                 fachNormalisieren: optFachNormalisieren.checked,
                 fachMap,
+                gpu001Map: gpu001Text !== null ? parseGPU001(gpu001Text) : null,
             });
             zeigeErgebnis();
         } catch (err) {
@@ -357,25 +562,27 @@ if (typeof document !== 'undefined') {
         const behalten = eintraege.filter(([, e]) => !e.entfernt);
         const entfernt = eintraege.filter(([, e]) => e.entfernt);
         const geaendert = behalten.filter(([alt, e]) => alt !== e.neu);
-        const nummeriert = behalten.filter(([, e]) => e.nummeriert);
+        const unterschieden = behalten.filter(([, e]) => e.unterschieden);
+        const normal = behalten.filter(([, e]) => !e.unterschieden);
 
         statsDiv.innerHTML =
             `<p>Datenzeilen: <strong>${ergebnis.anzahlZeilen}</strong> ` +
             `(davon ${ergebnis.anzahlOhneGruppe} ohne Kursbezeichnung, bleiben unverändert)</p>` +
             `<p>Kurse: <strong>${eintraege.length}</strong> &middot; ` +
             `behalten: <strong>${behalten.length}</strong> (umbenannt: ${geaendert.length}, ` +
-            `mit laufender Nummer: ${nummeriert.length}) &middot; ` +
+            `mit Unterscheidungszusatz: ${unterschieden.length}) &middot; ` +
             `entfernt: <strong>${entfernt.length}</strong> (${ergebnis.entfernteZeilen} Zeilen)</p>` +
-            `<p>Erkannte Kodierung: ${erkannteKodierung} (Download erfolgt als UTF-8)</p>`;
+            `<p>Erkannte Kodierung: ${erkannteKodierung} (GPU002 im ZIP als UTF-8, GPU001 unverändert)</p>`;
 
-        behalten.sort((a, b) => a[1].neu.localeCompare(b[1].neu, 'de'));
+        unterschieden.sort((a, b) => a[1].neu.localeCompare(b[1].neu, 'de'));
+        normal.sort((a, b) => a[1].neu.localeCompare(b[1].neu, 'de'));
         entfernt.sort((a, b) => a[0].localeCompare(b[0], 'de'));
 
         mappingBody.innerHTML = '';
-        for (const [alt, e] of [...behalten, ...entfernt]) {
+        for (const [alt, e] of [...unterschieden, ...normal, ...entfernt]) {
             const tr = document.createElement('tr');
             if (e.entfernt) tr.className = 'entfernt';
-            else if (e.nummeriert) tr.className = 'nummeriert';
+            else if (e.unterschieden) tr.className = 'unterschieden';
             const tdAlt = document.createElement('td');
             tdAlt.textContent = alt;
             const tdNeu = document.createElement('td');
@@ -388,11 +595,15 @@ if (typeof document !== 'undefined') {
     }
 
     downloadBtn.addEventListener('click', () => {
-        if (!ergebnis) return;
-        const blob = new Blob([ergebnis.inhalt], { type: 'text/csv;charset=utf-8;' });
+        if (!ergebnis || !gpu001Bytes) return;
+        const zip = erzeugeZip([
+            { name: 'GPU001.TXT', daten: gpu001Bytes },
+            { name: 'GPU002.TXT', daten: new TextEncoder().encode(ergebnis.inhalt) },
+        ]);
+        const blob = new Blob([zip], { type: 'application/zip' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = 'GPU002.TXT';
+        link.download = 'untis_iserv_import.zip';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -405,5 +616,6 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         normalisiereGPU002, klassenTeil, basisName, splitRaw, unquote,
         parseFachKuerzelCSV, normalisiereFach, istEinKlassenKurs,
+        parseGPU001, zeitAngabe, erzeugeZip, crc32,
     };
 }

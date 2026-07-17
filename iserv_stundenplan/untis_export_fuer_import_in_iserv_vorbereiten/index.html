@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPU002: Kursbezeichnungen normalisieren</title>
+    <title>Untis-Export für IServ-Import vorbereiten</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -50,6 +50,10 @@
         .btn:hover {
             background-color: #0056b3;
         }
+        .btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
         .stats {
             margin-top: 20px;
             padding: 15px;
@@ -86,7 +90,7 @@
             padding: 4px 8px;
             border-top: 1px solid #eee;
         }
-        .mapping tr.nummeriert td {
+        .mapping tr.unterschieden td {
             background-color: #fff3cd;
         }
         .mapping tr.entfernt td {
@@ -144,18 +148,23 @@
 </head>
 <body>
     <div class="container">
-        <h1>GPU002: Kursbezeichnungen normalisieren</h1>
-        <p>Wähle die aus Untis exportierte Datei <strong>GPU002.TXT</strong> aus.
-        Die Kursbezeichnungen (Schülergruppen) werden auf das Schema
-        <code>&lt;Klasse&gt; &lt;Fach&gt; &lt;Lehrkraft&gt; &lt;ggf. Nr.&gt;</code> normalisiert.
+        <h1>Untis-Export für IServ-Import vorbereiten</h1>
+        <p>Wähle die aus Untis exportierten Dateien <strong>GPU001.TXT</strong> (Stundenplan)
+        und <strong>GPU002.TXT</strong> (Unterricht) aus.
+        Die Kursbezeichnungen (Schülergruppen) in GPU002 werden auf das Schema
+        <code>&lt;Klasse&gt; &lt;Fach&gt; &lt;Lehrkraft&gt;</code> normalisiert.
         Bei klassenübergreifenden Kursen wird der Jahrgang (z.&nbsp;B. <code>08</code>)
         oder eine Jahrgangsspanne (z.&nbsp;B. <code>08-10</code>) verwendet.
-        Alle übrigen Daten bleiben unverändert.</p>
+        Kurse, die sonst denselben Namen hätten, werden über ihre Unterrichtszeiten
+        unterschieden (z.&nbsp;B. <code>11-12 Lat Se (Di 1.+2.)</code>).
+        Alle übrigen Daten bleiben unverändert. Zum Schluss werden beide Dateien als
+        ZIP-Archiv für den IServ-Import heruntergeladen.</p>
 
         <div class="upload-area" id="uploadArea">
-            <p>📁 GPU002.TXT hier ablegen oder</p>
-            <label for="fileInput" class="btn">Datei auswählen</label>
-            <input type="file" id="fileInput" accept=".txt,.csv,.TXT,.CSV">
+            <p>📁 GPU001.TXT und GPU002.TXT hier ablegen oder</p>
+            <label for="fileInput" class="btn">Dateien auswählen</label>
+            <input type="file" id="fileInput" accept=".txt,.csv,.TXT,.CSV" multiple>
+            <p id="fileStatus"></p>
         </div>
 
         <div class="optionen">
@@ -183,7 +192,7 @@
         <div id="results" style="display: none;">
             <div class="stats" id="stats"></div>
 
-            <button id="downloadBtn" class="btn">Normalisierte GPU002.TXT herunterladen</button>
+            <button id="downloadBtn" class="btn">ZIP-Archiv für IServ herunterladen (GPU001 + GPU002)</button>
 
             <div class="mapping">
                 <table>
@@ -193,8 +202,8 @@
                     <tbody id="mappingBody"></tbody>
                 </table>
             </div>
-            <p class="legende"><span class="marker">Gelb markiert:</span>
-            Kurse, die zur Unterscheidung eine laufende Nummer erhalten haben.
+            <p class="legende"><span class="marker">Gelb markiert (oben):</span>
+            Kurse, die zur Unterscheidung eine Zeitangabe (bzw. laufende Nummer) erhalten haben.
             &nbsp;<span class="marker-entfernt">Rot markiert:</span>
             Kurse, deren Zeilen entfernt wurden (nur eine Klasse).</p>
         </div>
