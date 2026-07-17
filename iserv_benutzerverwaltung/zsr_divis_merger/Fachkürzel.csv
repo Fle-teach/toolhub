@@ -1,29 +1,34 @@
 ﻿Fach;Normalisiertes Kürzel;Zu Ersetzen
-Big Band;BigBand;Bigband
+Big Band;BigBand;Bigband;BB
 Bildende Kunst;BK;
 Biologie;Bio;
 Orchester;Orch;
+A-Orchester;A-Orch;
+B-Orchester;B-Orch;B-Orche
+AG Streicher;AG-Strei;
 Chemie;Che;Ch
-Chor Unterstufe;Chor;
-Deutsch als Zweitsprache;DZw;
+Chor Unterstufe;Chor;Chor U-stu
+Deutsch als Zweitsprache;DZw;DAZ
 Deutsch;Deu;D
-Camb. Certificate;Cambridge;E cam; EC
+Deutsch Förderung;DFö;D Fö
+Camb. Certificate;Cambridge;E cam; EC;E Camb;E Camb 2
 Englisch;Eng;E
-Französisch;Frz;
+Französisch;Frz;F
 Geographie;Geo;
 Geschichte;Ges;Ge
-Geschichte bilingual;GesBili;
+Geschichte bilingual;GesBili;Ges bili
 Glück;Glü;
 Informatik;Inf;Info
 Journalistisches Schreiben;JourS;
 Klassenrat;Kl-R;
 Kreatives Schreiben;KreaS;
 Kunst-Design-Digital;KuDeDi;
-Latein;Lat;
-Leseförderung;LFö;
+Latein;Lat;L
+Leseförderung;LFö;Lese Fö
 Mathematik;Mat;Ma
 Medien Gestalten;MeG;
-Mathe Förderung;MFö;
+MedDik;MedDik;
+Mathe Förderung;MFö;M Fö
 Musikpraktischer Kurs;MuP;
 Musik;Mus;Mu
 NaWi;NaWi;
@@ -33,12 +38,13 @@ Philosophie;Phil;
 Physik;Phy;
 Psychologie;Psy;
 Religion;Rel;
-Rechtschreib Förderung;RsFö;
+Rechtschreib Förderung;RsFö;RS Fö
 Seminar;Sem;
+SL;SL;
 Social Sciences;SocSc;
 Spanisch;Spa;
 Sport;Spo;
-Sport Theorie;SpoThe;Spothe
+Sport Theorie;SpoThe;Spothe;SpoTheo
 Theater;The;Thea
 Vorband;VorB;
 Wirtschaft;Wir;Wirt

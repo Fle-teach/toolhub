@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CSV-Filter Tool</title>
+    <title>GPU002: Kursbezeichnungen normalisieren</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
@@ -50,10 +50,6 @@
         .btn:hover {
             background-color: #0056b3;
         }
-        .btn:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
         .stats {
             margin-top: 20px;
             padding: 15px;
@@ -65,220 +61,147 @@
             color: #dc3545;
             margin-top: 10px;
         }
-        .success {
-            color: #28a745;
-            margin-top: 10px;
-        }
-        .preview {
+        .mapping {
             margin-top: 20px;
-            max-height: 300px;
+            max-height: 400px;
             overflow-y: auto;
             border: 1px solid #ddd;
             border-radius: 5px;
-            padding: 10px;
-            background-color: #f9f9f9;
+        }
+        .mapping table {
+            width: 100%;
+            border-collapse: collapse;
             font-family: monospace;
-            font-size: 12px;
+            font-size: 13px;
+        }
+        .mapping th {
+            position: sticky;
+            top: 0;
+            background-color: #007bff;
+            color: white;
+            text-align: left;
+            padding: 8px;
+        }
+        .mapping td {
+            padding: 4px 8px;
+            border-top: 1px solid #eee;
+        }
+        .mapping tr.nummeriert td {
+            background-color: #fff3cd;
+        }
+        .mapping tr.entfernt td {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .mapping tr.entfernt td:first-child {
+            text-decoration: line-through;
+        }
+        .legende {
+            font-size: 13px;
+            color: #666;
+            margin-top: 8px;
+        }
+        .legende .marker {
+            background-color: #fff3cd;
+            padding: 1px 6px;
+        }
+        .legende .marker-entfernt {
+            background-color: #f8d7da;
+            padding: 1px 6px;
+        }
+        .optionen {
+            margin: 15px 0;
+            padding: 12px 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .optionen label {
+            display: block;
+            margin: 6px 0;
+            cursor: pointer;
+        }
+        .warnung {
+            color: #856404;
+            background-color: #fff3cd;
+            border-radius: 5px;
+            padding: 8px 12px;
+            margin-top: 10px;
+        }
+        .warnung:empty {
+            display: none;
+        }
+        #fachCsvFallback {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #fff3cd;
+            border-radius: 5px;
+        }
+        #fachCsvFallback input[type="file"] {
+            display: inline;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>CSV-Filter Tool</h1>
-        <p>Wähle eine CSV-Datei aus. Alle Datensätze, die in der 42. Spalte keinen Wert enthalten oder keinen Zahlenwert beginnen, werden entfernt.</p>
-        
+        <h1>GPU002: Kursbezeichnungen normalisieren</h1>
+        <p>Wähle die aus Untis exportierte Datei <strong>GPU002.TXT</strong> aus.
+        Die Kursbezeichnungen (Schülergruppen) werden auf das Schema
+        <code>&lt;Klasse&gt; &lt;Fach&gt; &lt;Lehrkraft&gt; &lt;ggf. Nr.&gt;</code> normalisiert.
+        Bei klassenübergreifenden Kursen wird der Jahrgang (z.&nbsp;B. <code>08</code>)
+        oder eine Jahrgangsspanne (z.&nbsp;B. <code>08-10</code>) verwendet.
+        Alle übrigen Daten bleiben unverändert.</p>
+
         <div class="upload-area" id="uploadArea">
-            <p>📁 CSV-Datei hier ablegen oder</p>
+            <p>📁 GPU002.TXT hier ablegen oder</p>
             <label for="fileInput" class="btn">Datei auswählen</label>
-            <input type="file" id="fileInput" accept=".csv,.txt">
+            <input type="file" id="fileInput" accept=".txt,.csv,.TXT,.CSV">
         </div>
 
+        <div class="optionen">
+            <label>
+                <input type="checkbox" id="optKlassenuebergreifend" checked>
+                Nur klassenübergreifende Kurse behalten
+                (Kurse mit nur einer Klasse werden gelöscht und in IServ der Klasse zugeordnet;
+                Oberstufenkurse der Jahrgänge 11/12 bleiben erhalten)
+            </label>
+            <label>
+                <input type="checkbox" id="optFachNormalisieren" checked>
+                Fachkürzel normalisieren
+                (gemäß Fachkürzel.csv, z.&nbsp;B. <code>Ma</code> → <code>Mat</code>,
+                <code>D</code> → <code>Deu</code>)
+            </label>
+            <div id="fachCsvFallback">
+                ⚠️ Fachkürzel.csv konnte nicht automatisch geladen werden.
+                Bitte manuell auswählen (toolhub/iserv_benutzerverwaltung/zsr_divis_merger/Fachkürzel.csv):
+                <input type="file" id="fachCsvInput" accept=".csv,.CSV">
+            </div>
+        </div>
+
+        <div id="warnung" class="warnung"></div>
+
         <div id="results" style="display: none;">
-            <div class="stats">
-                <h3>Verarbeitungsergebnisse:</h3>
-                <p id="originalCount"></p>
-                <p id="filteredCount"></p>
-                <p id="removedCount"></p>
-            </div>
+            <div class="stats" id="stats"></div>
 
-            <button id="downloadBtn" class="btn">
-                Gefilterte CSV herunterladen
-            </button>
+            <button id="downloadBtn" class="btn">Normalisierte GPU002.TXT herunterladen</button>
 
-            <div id="preview" class="preview">
-                <h4>Vorschau der ersten 5 Zeilen (gefiltert):</h4>
-                <pre id="previewContent"></pre>
+            <div class="mapping">
+                <table>
+                    <thead>
+                        <tr><th>Bisherige Kursbezeichnung</th><th>Neue Kursbezeichnung</th></tr>
+                    </thead>
+                    <tbody id="mappingBody"></tbody>
+                </table>
             </div>
+            <p class="legende"><span class="marker">Gelb markiert:</span>
+            Kurse, die zur Unterscheidung eine laufende Nummer erhalten haben.
+            &nbsp;<span class="marker-entfernt">Rot markiert:</span>
+            Kurse, deren Zeilen entfernt wurden (nur eine Klasse).</p>
         </div>
 
         <div id="error" class="error"></div>
-        <div id="success" class="success"></div>
     </div>
 
-    <script>
-        let filteredData = '';
-        let originalFilename = '';
-
-        // DOM-Elemente
-        const fileInput = document.getElementById('fileInput');
-        const uploadArea = document.getElementById('uploadArea');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const errorDiv = document.getElementById('error');
-        const successDiv = document.getElementById('success');
-        const previewDiv = document.getElementById('preview');
-        const previewContent = document.getElementById('previewContent');
-        const resultsDiv = document.getElementById('results');
-
-        // Drag & Drop Funktionalität
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
-
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFile(files[0]);
-            }
-        });
-
-        // Datei-Input
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                handleFile(e.target.files[0]);
-            }
-        });
-
-        function handleFile(file) {
-            // Zurücksetzen
-            errorDiv.textContent = '';
-            successDiv.textContent = '';
-            resultsDiv.style.display = 'none';
-            
-            originalFilename = file.name;
-            
-            if (!file.name.toLowerCase().endsWith('.csv') && !file.name.toLowerCase().endsWith('.txt')) {
-                errorDiv.textContent = 'Bitte wählen Sie eine CSV-Datei aus.';
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    processCSV(e.target.result);
-                } catch (error) {
-                    errorDiv.textContent = 'Fehler beim Verarbeiten der Datei: ' + error.message;
-                }
-            };
-            reader.readAsText(file, 'UTF-8');
-        }
-
-        function processCSV(csvText) {
-            // CSV parsen - berücksichtigt Anführungszeichen und Kommas innerhalb von Anführungszeichen
-            const lines = csvText.split(/\r?\n/);
-            const filteredLines = [];
-            let originalCount = 0;
-            let removedCount = 0;
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (line === '') continue;
-
-                originalCount++;
-                
-                // CSV-Zeile parsen
-                const columns = parseCSVLine(line);
-                
-                // Prüfe, ob die 42. Spalte existiert und mit einer Zahl oder einem Unterstrich beginnt
-                // Index 41, da wir bei 0 beginnen
-                if (columns.length >= 42) {
-                    const col42Value = columns[41].trim();
-                    if (col42Value !== '' && /^[\d_]/.test(col42Value)) {
-                        // Behalte die Zeile
-                        filteredLines.push(line);
-                    } else {
-                        removedCount++;
-                    }
-                } else {
-                    // Weniger als 42 Spalten -> entfernen
-                    removedCount++;
-                }
-            }
-
-            filteredData = filteredLines.join('\n');
-            
-            // Ergebnisse anzeigen
-            document.getElementById('originalCount').textContent = `Originale Zeilen: ${originalCount}`;
-            document.getElementById('filteredCount').textContent = `Verbleibende Zeilen: ${filteredLines.length}`;
-            document.getElementById('removedCount').textContent = `Entfernte Zeilen: ${removedCount}`;
-            resultsDiv.style.display = 'block';
-
-            // Vorschau anzeigen
-            if (filteredLines.length > 0) {
-                const previewLines = filteredLines.slice(0, 5);
-                previewContent.textContent = previewLines.join('\n');
-            } else {
-                previewContent.textContent = 'Keine Zeilen übrig nach dem Filtern.';
-            }
-
-            successDiv.textContent = `Verarbeitung abgeschlossen! ${removedCount} von ${originalCount} Zeilen wurden entfernt.`;
-        }
-
-        function parseCSVLine(line) {
-            const result = [];
-            let current = '';
-            let inQuotes = false;
-            
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                const nextChar = line[i + 1];
-                
-                if (char === '"') {
-                    if (inQuotes && nextChar === '"') {
-                        current += '"';
-                        i++; // Überspringe das nächste Anführungszeichen
-                    } else {
-                        inQuotes = !inQuotes;
-                    }
-                } else if (char === ',' && !inQuotes) {
-                    result.push(current);
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
-            
-            result.push(current);
-            return result;
-        }
-
-        // Download-Funktion
-        downloadBtn.addEventListener('click', () => {
-            if (!filteredData) return;
-
-            const blob = new Blob([filteredData], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            
-            // Erstelle neuen Dateinamen
-            const baseName = originalFilename.replace(/\.[^/.]+$/, "");
-            const newFilename = `${baseName}_gefiltert.TXT`;
-            
-            if (link.download !== undefined) {
-                const url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-                link.setAttribute('download', newFilename);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
-        });
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
