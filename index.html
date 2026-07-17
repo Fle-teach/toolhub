@@ -1,199 +1,257 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>toolhub</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
 
-
   <style>
+    :root {
+      --bg: #f2f6fa;
+      --card-bg: #ffffff;
+      --text: #1a2433;
+      --text-muted: #5c6b7f;
+      --link-bg: #f3f6f9;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       font-family: "Open Sans", "Calibri", "Ubuntu", "Arial", "Tahoma", sans-serif;
-      color: #111111;
-      background-color: #eef8fe;
-      margin: 0px;
-      padding: 0px;
+      color: var(--text);
+      background:
+        radial-gradient(1000px 400px at 80% -100px, #dcecfb 0%, transparent 70%),
+        radial-gradient(800px 400px at 10% -150px, #fdeedd 0%, transparent 70%),
+        var(--bg);
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+
+    header {
+      text-align: center;
+      padding: 40px 16px 28px;
     }
 
     h1 {
-      font-weight: 600;
-      text-align: center;
-      margin-top: 10px;
-      margin-bottom: 10px;
       font-family: 'Courier New', Courier, monospace;
+      font-weight: 700;
+      font-size: 3rem;
+      letter-spacing: -1px;
+      margin: 0;
     }
 
-    #h1a {
-      color:rgb(169, 0, 0);
-    }
+    #h1a { color: rgb(169, 0, 0); }
+    #h1b { color: #00437a; }
 
-    #h1b {
-      color: #00437a;
-    }
-
-    #h1c {
-      color: goldenrod;
-    }
-
-    h2 {
+    .subtitle {
+      margin: 6px 0 0;
+      color: var(--text-muted);
+      font-size: 1.05rem;
       font-weight: 400;
-      margin-top: 10px;
-      margin-bottom: 10px;
+    }
+
+    main {
+      max-width: 1700px;
+      margin: 0 auto;
+      padding: 8px 20px 60px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 20px;
+      align-items: start;
+    }
+
+    .card {
+      position: relative;
+      overflow: hidden;
+      background: var(--card-bg);
+      border-radius: 16px;
+      border-top: 4px solid var(--accent);
+      box-shadow: 0 1px 2px rgba(20, 40, 70, 0.06), 0 6px 20px rgba(20, 40, 70, 0.07);
+      padding: 20px 20px 16px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 2px 4px rgba(20, 40, 70, 0.07), 0 14px 32px rgba(20, 40, 70, 0.12);
+    }
+
+    .card-icon {
+      position: absolute;
+      top: -18px;
+      right: -18px;
+      width: 130px;
+      height: 130px;
+      color: var(--accent);
+      opacity: 0.13;
+      pointer-events: none;
+      transform: rotate(-8deg);
+    }
+
+    .card h2 {
+      position: relative;
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin: 0 0 14px;
+      padding-right: 70px; /* Platz, damit der Titel nicht unter das SVG läuft */
+    }
+
+    .tools {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+    }
+
+    .tools a {
+      display: block;
+      background: var(--link-bg);
+      border: 1px solid transparent;
+      border-radius: 10px;
+      padding: 11px 14px;
+      text-decoration: none;
+      color: var(--text);
+      font-size: 0.95rem;
+      line-height: 1.4;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .tools a:hover {
+      background: color-mix(in srgb, var(--accent) 10%, #ffffff);
+      border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+      transform: translateX(3px);
+    }
+
+    footer {
       text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      padding: 0 16px 32px;
     }
-
-    h3 {
-      font-weight: 600;
-      padding-top: 50px;
-    }
-
-    h4 {
-      font-style: italic;
-      padding-top: 50px;
-    }
-
-  .container {
-    display: block;
-    border-radius: 8px;
-    padding: 10px;
-    width: 100%;
-    box-sizing: border-box;
-    border-top: 20px solid #4299e1;
-    border-bottom: 20px solid #4299e1;
-    background-color: #82c1f5;
-  }
-
-  .flex-container {
-    display: flex;
-    flex-wrap: wrap;
-    border-radius: 8px;
-    padding: 10px;
-  }
-
-  .toolbox-grid {
-    gap: 16px;
-  }
-
-  .toolbox-grid .container {
-    flex: 1 1 100%;
-    margin: 0;
-  }
-
-  @media (min-width: 800px) {
-    .toolbox-grid .container {
-      flex-basis: calc((100% - 16px) / 2);
-      max-width: calc((100% - 16px) / 2);
-    }
-  }
-
-  @media (min-width: 1200px) {
-    .toolbox-grid .container {
-      flex-basis: calc((100% - 32px) / 3);
-      max-width: calc((100% - 32px) / 3);
-    }
-  }
-
-  @media (min-width: 1600px) {
-    .toolbox-grid .container {
-      flex-basis: calc((100% - 48px) / 4);
-      max-width: calc((100% - 48px) / 4);
-    }
-  }
-
-  .container .flex-container {
-    display: flex;
-    flex-wrap: wrap;
-    background-color: #00437a;
-    border-radius: 8px;
-    padding: 10px;
-  }
-
-  .flex-container a {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #f1f1f1;
-    border-radius: 8px;
-    margin: 10px;
-    padding: 10px;
-    text-align: center;
-    text-decoration: none;
-    color: #111111;
-    transition: all 0.3s ease;
-    border: 4px solid #4299e1;
-    width: 100%;
-    min-height: 38px; 
-  }
-
-  a:hover {
-    background: #fae8cf;
-    border: 6px solid #4299e1;
-    margin: 6px;
-    padding: 12px;
-  }
   </style>
 </head>
 <body>
 
-<h1><em id="h1a">tool</em><em id="h1b">hub</em></h1>
+<header>
+  <h1><em id="h1a">tool</em><em id="h1b">hub</em></h1>
+  <p class="subtitle">Ein Hub für diverse Tools, die im Kontext Schule benötigt werden</p>
+</header>
 
-<div class="flex-container toolbox-grid">
-<div class="container">
-  <h2>Förderkoordination</h2>
-  <div class="flex-container">
-    <a href="foerderkoordination/sus_mit_foerderbedarf_ermitteln/index.html">SuS mit Förderbedarf ermitteln</a>
-    <a href="">Lernfördervereinbarungen erstellen</a>
-    <a href="foerderkoordination/foerderlisten_kombinieren/index.html">Förderlisten kombinieren</a>
-  </div>
-</div>
+<main>
 
-<div class="container">
-  <h2>IServ-Benutzerverwaltung</h2>
-  <div class="flex-container">
-    <a href="iserv_benutzerverwaltung/zsr_divis_merger/index.html">Schüler-, Eltern-, Lehrer-, und Kursdaten aus DiViS in IServ importieren</a>
-  </div>
-</div>
+  <section class="card" style="--accent: #2f9e6e">
+    <!-- Motiv: Setzling / Wachstum -->
+    <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 22V12"/>
+      <path d="M12 12C12 8.5 9.2 6 5 6c0 4.2 2.8 6.5 7 6.5"/>
+      <path d="M12 12C12 8.5 14.8 6 19 6c0 4.2-2.8 6.5-7 6.5"/>
+      <path d="M7 22h10"/>
+    </svg>
+    <h2>Förderkoordination</h2>
+    <div class="tools">
+      <a href="foerderkoordination/sus_mit_foerderbedarf_ermitteln/index.html">SuS mit Förderbedarf ermitteln</a>
+      <a href="">Lernfördervereinbarungen erstellen</a>
+      <a href="foerderkoordination/foerderlisten_kombinieren/index.html">Förderlisten kombinieren</a>
+    </div>
+  </section>
 
-<div class="container">
-  <h2>IServ-Formulare</h2>
-  <div class="flex-container">
-    <a href="iserv_formulare/fehlende_abgaben_ermitteln/index.html">Fehlende Abgaben ermitteln</a>
-    <a href="iserv_formulare/doppelte_abgaben_entfernen/index.html">Doppelte Abgaben entfernen</a>
-  </div>
-</div>
+  <section class="card" style="--accent: #2b6cb0">
+    <!-- Motiv: Benutzergruppe -->
+    <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="9" cy="8" r="3.5"/>
+      <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
+      <circle cx="17.5" cy="9.5" r="2.5"/>
+      <path d="M16.5 14.2c2.7.4 4.8 2.8 4.8 5.8"/>
+    </svg>
+    <h2>IServ-Benutzerverwaltung</h2>
+    <div class="tools">
+      <a href="iserv_benutzerverwaltung/zsr_divis_merger/index.html">Schüler-, Eltern-, Lehrer-, und Kursdaten aus DiViS in IServ importieren</a>
+    </div>
+  </section>
 
-<div class="container">
-  <h2>IServ-Klassenbuch</h2>
-  <div class="flex-container">
-    <a href="iserv_klassenbuch/fehlzeiten_nach_faechern_auswerten/index.html">Fehlzeiten nach Fächern auswerten</a>
-  </div>
-</div>
+  <section class="card" style="--accent: #805ad5">
+    <!-- Motiv: Formular mit Häkchen -->
+    <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="5" y="3" width="14" height="18" rx="2"/>
+      <path d="M8.5 9.5l1.3 1.3 2.4-2.6"/>
+      <path d="M14.5 10h2"/>
+      <path d="M8.5 15.5l1.3 1.3 2.4-2.6"/>
+      <path d="M14.5 16h2"/>
+    </svg>
+    <h2>IServ-Formulare</h2>
+    <div class="tools">
+      <a href="iserv_formulare/fehlende_abgaben_ermitteln/index.html">Fehlende Abgaben ermitteln</a>
+      <a href="iserv_formulare/doppelte_abgaben_entfernen/index.html">Doppelte Abgaben entfernen</a>
+    </div>
+  </section>
 
-<div class="container">
-  <h2>IServ-Stundenplan</h2>
-  <div class="flex-container">
-    <a href="iserv_stundenplan/untis_export_fuer_import_in_iserv_vorbereiten/index.html">UNTIS-Export für Import in IServ vorverarbeiten</a>
-  </div>
-</div>
+  <section class="card" style="--accent: #dd6b20">
+    <!-- Motiv: aufgeschlagenes Buch -->
+    <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 6c-2-1.5-4.5-2-8-2v14c3.5 0 6 .5 8 2 2-1.5 4.5-2 8-2V4c-3.5 0-6 .5-8 2z"/>
+      <path d="M12 6v14"/>
+      <path d="M7 9c1 0 2 .1 3 .4"/>
+      <path d="M14 9.4c1-.3 2-.4 3-.4"/>
+    </svg>
+    <h2>IServ-Klassenbuch</h2>
+    <div class="tools">
+      <a href="iserv_klassenbuch/fehlzeiten_nach_faechern_auswerten/index.html">Fehlzeiten nach Fächern auswerten</a>
+    </div>
+  </section>
 
-<div class="container">
-  <h2>LEGs</h2>
-  <div class="flex-container">
-    <a href="legs/sus_abgaben_in_kuk_boegen_umwandeln/index.html">Schülerabgaben(CSV) in für KuK ausfüllbare Bögen(DOCX) umwandeln</a>
-  </div>
-</div>
+  <section class="card" style="--accent: #0d9488">
+    <!-- Motiv: Stundenplan-Raster -->
+    <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="16" rx="2"/>
+      <path d="M3 10h18"/>
+      <path d="M9 10v11"/>
+      <path d="M15 10v11"/>
+      <path d="M8 3v4"/>
+      <path d="M16 3v4"/>
+    </svg>
+    <h2>IServ-Stundenplan</h2>
+    <div class="tools">
+      <a href="iserv_stundenplan/untis_export_fuer_import_in_iserv_vorbereiten/index.html">UNTIS-Export für Import in IServ vorverarbeiten</a>
+    </div>
+  </section>
 
-<div class="container">
-  <h2>Klassen- & Kurszusammensetzung</h2>
-  <div class="flex-container">
-    <a href="klassenzusammensetzung/optimierer/index.html">Neue Klassenzusammensetzungen für den Jahrgangswechsel 6/7 erstellen</a>
-    <a href="klassenzusammensetzung/verschiebbare_Paare_ermitteln/index.html">Verschiebbare Paare ermitteln</a>
-    <a href="klassenzusammensetzung/kurseinteilung_WPB/index.html">Kurseinteilung WPB</a>
-  </div>
-  
-</div>
+  <section class="card" style="--accent: #d53f8c">
+    <!-- Motiv: Gesprächsblasen (Lernentwicklungsgespräche) -->
+    <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M14 4H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2v3l4-3h3a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>
+      <path d="M18 9h1a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1v3l-3.5-3"/>
+    </svg>
+    <h2>LEGs</h2>
+    <div class="tools">
+      <a href="legs/sus_abgaben_in_kuk_boegen_umwandeln/index.html">Schülerabgaben(CSV) in für KuK ausfüllbare Bögen(DOCX) umwandeln</a>
+    </div>
+  </section>
 
-</div>
+  <section class="card" style="--accent: #5a67d8">
+    <!-- Motiv: verbundene Knoten (Gruppenzusammensetzung) -->
+    <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="5.5" cy="6" r="2.5"/>
+      <circle cx="18.5" cy="6" r="2.5"/>
+      <circle cx="12" cy="18" r="2.5"/>
+      <path d="M8 6h8"/>
+      <path d="M6.8 8.2l4 7.6"/>
+      <path d="M17.2 8.2l-4 7.6"/>
+    </svg>
+    <h2>Klassen- &amp; Kurszusammensetzung</h2>
+    <div class="tools">
+      <a href="klassenzusammensetzung/optimierer/index.html">Neue Klassenzusammensetzungen für den Jahrgangswechsel 6/7 erstellen</a>
+      <a href="klassenzusammensetzung/verschiebbare_Paare_ermitteln/index.html">Verschiebbare Paare ermitteln</a>
+      <a href="klassenzusammensetzung/kurseinteilung_WPB/index.html">Kurseinteilung WPB</a>
+    </div>
+  </section>
+
+</main>
 
 </body>
 </html>
