@@ -255,7 +255,18 @@ button {
   cursor: not-allowed;
 }
 
-/* ----- Dateiauswahl (verstecktes Input + gestyltes Label) ----- */
+/* ----- Datei-Upload (Klick + Drag-and-drop, Auflistung als Badges) -----
+ *
+ * Markup:
+ *   <input class="file-input" type="file" id="meinInput" accept=".xlsx" multiple>
+ *   <div class="upload-box" id="meinInputZone">
+ *     <div class="upload-text"><strong>Dateien hier ablegen</strong> oder klicken zum Auswählen</div>
+ *     <div class="upload-hint">optionaler Hinweistext</div>
+ *   </div>
+ *   <div class="file-list" id="meinInputList"></div>
+ *
+ * Verdrahtung über toolhubUpload(...) in toolhub.js.
+ */
 
 .file-input {
   position: absolute;
@@ -265,47 +276,92 @@ button {
   overflow: hidden;
 }
 
-.file-box {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 8px;
-  background: var(--link-bg);
+.upload-box {
+  position: relative;
   border: 1px dashed color-mix(in srgb, var(--text-muted) 45%, transparent);
   border-radius: 10px;
+  padding: 28px 20px;
+  text-align: center;
+  background: var(--link-bg);
   cursor: pointer;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.file-box:hover,
-.file-input:focus-visible ~ .file-box {
+.upload-box:hover {
   border-color: color-mix(in srgb, var(--accent) 60%, transparent);
 }
 
-.file-box.dragover {
+.upload-box.dragover {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
-.file-btn {
-  flex: 0 0 auto;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 8px;
-  padding: 8px 14px;
-  color: var(--text);
-  font-size: 0.9rem;
-  font-weight: 600;
-  white-space: nowrap;
+.upload-text {
+  margin-bottom: 6px;
 }
 
-.file-name {
+.upload-text:last-child {
+  margin-bottom: 0;
+}
+
+.upload-text strong {
+  color: var(--accent);
+}
+
+:root[data-theme="light"] .upload-text strong {
+  color: color-mix(in srgb, var(--accent) 85%, #000000);
+}
+
+.upload-hint {
+  font-size: 0.82rem;
   color: var(--text-muted);
-  font-size: 0.9rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.file-list {
+  position: relative;
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-list:empty {
+  margin-top: 0;
+}
+
+.file-badge {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--text);
+  padding: 5px 6px 5px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.file-remove {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  border: none;
+  color: var(--text);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.file-remove:hover {
+  background: color-mix(in srgb, #e05656 25%, transparent);
+  color: #e05656;
 }
 
 /* ----- Tabellen ----- */

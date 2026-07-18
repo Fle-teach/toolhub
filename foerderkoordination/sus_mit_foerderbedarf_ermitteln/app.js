@@ -6,9 +6,6 @@ const DEFAULT_SETTINGS = {
 };
 
 // DOM-Elemente
-const uploadBox = document.getElementById('uploadBox');
-const fileInput = document.getElementById('fileInput');
-const fileList = document.getElementById('fileList');
 const analyzeBtn = document.getElementById('analyzeBtn');
 const messageDiv = document.getElementById('message');
 const resultsSection = document.getElementById('resultsSection');
@@ -23,7 +20,6 @@ const notenHauptfachInput = document.getElementById('notenHauptfach');
 const notenNebenfachInput = document.getElementById('notenNebenfach');
 const hauptfaecherInput = document.getElementById('hauptfaecher');
 
-let selectedFiles = [];
 let resultEntries = []; // {klasse, schueler, fach, lehrkraft, note}
 
 // --- Einstellungen ---
@@ -53,75 +49,30 @@ function readSettings() {
 applyDefaultSettings();
 resetSettingsBtn.addEventListener('click', applyDefaultSettings);
 
-// --- Dateiauswahl (Klick + Drag & Drop) ---
+// --- Dateiauswahl (gemeinsame Upload-Komponente aus toolhub.js) ---
 
-uploadBox.addEventListener('click', () => fileInput.click());
+// Merkt sich, ob im aktuellen Upload ungültige Dateien gemeldet wurden,
+// damit onChange die Fehlermeldung nicht sofort wieder löscht
+let ungueltigGemeldet = false;
 
-uploadBox.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    uploadBox.classList.add('dragover');
-});
-
-uploadBox.addEventListener('dragleave', () => {
-    uploadBox.classList.remove('dragover');
-});
-
-uploadBox.addEventListener('drop', (e) => {
-    e.preventDefault();
-    uploadBox.classList.remove('dragover');
-    addFiles(Array.from(e.dataTransfer.files));
-});
-
-fileInput.addEventListener('change', (e) => {
-    addFiles(Array.from(e.target.files));
-    // Auswahl zurücksetzen, damit dieselbe Datei erneut gewählt werden kann
-    fileInput.value = '';
-});
-
-function addFiles(files) {
-    const invalid = files.filter(f => !f.name.toLowerCase().endsWith('.xlsx'));
-    if (invalid.length > 0) {
-        showMessage(`Bitte nur XLSX-Dateien auswählen. Ungültig: ${invalid.map(f => f.name).join(', ')}`, 'error');
-        return;
-    }
-    if (files.length === 0) return;
-
-    messageDiv.innerHTML = '';
-
-    // Bereits hinzugefügte Dateien (gleicher Name) nicht doppelt aufnehmen
-    files.forEach(file => {
-        if (!selectedFiles.some(f => f.name === file.name)) {
-            selectedFiles.push(file);
+const upload = toolhubUpload({
+    input: 'fileInput',
+    zone: 'uploadBox',
+    list: 'fileList',
+    extensions: ['.xlsx'],
+    onInvalid: (names) => {
+        ungueltigGemeldet = true;
+        showMessage(`Bitte nur XLSX-Dateien auswählen. Ungültig: ${names.map(escapeHtml).join(', ')}`, 'error');
+    },
+    onChange: (files) => {
+        analyzeBtn.disabled = files.length === 0;
+        if (ungueltigGemeldet) {
+            ungueltigGemeldet = false;
+        } else {
+            messageDiv.innerHTML = '';
         }
-    });
-
-    renderFileList();
-}
-
-function removeFile(index) {
-    selectedFiles.splice(index, 1);
-    renderFileList();
-}
-
-function renderFileList() {
-    fileList.innerHTML = '';
-    selectedFiles.forEach((file, index) => {
-        const badge = document.createElement('span');
-        badge.className = 'file-badge';
-        badge.textContent = file.name;
-
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'file-remove';
-        removeBtn.title = 'Datei entfernen';
-        removeBtn.textContent = '×';
-        removeBtn.addEventListener('click', () => removeFile(index));
-
-        badge.appendChild(removeBtn);
-        fileList.appendChild(badge);
-    });
-    analyzeBtn.disabled = selectedFiles.length === 0;
-}
+    }
+});
 
 // --- Auswertung ---
 
@@ -137,7 +88,7 @@ function readFileAsArrayBuffer(file) {
 }
 
 async function analyzeFiles() {
-    if (selectedFiles.length === 0) {
+    if (upload.files.length === 0) {
         showMessage('Bitte mindestens eine XLSX-Datei auswählen.', 'error');
         return;
     }
@@ -154,7 +105,7 @@ async function analyzeFiles() {
     resultEntries = [];
     const errors = [];
 
-    for (const file of selectedFiles) {
+    for (const file of upload.files) {
         try {
             const buffer = await readFileAsArrayBuffer(file);
             const entries = extractFoerderbedarf(buffer, settings);
@@ -346,12 +297,9 @@ exportBtn.addEventListener('click', () => {
 });
 
 resetBtn.addEventListener('click', () => {
-    selectedFiles = [];
     resultEntries = [];
-    fileInput.value = '';
-    fileList.innerHTML = '';
-    messageDiv.innerHTML = '';
     tableContainer.innerHTML = '';
     resultsSection.classList.remove('visible');
-    analyzeBtn.disabled = true;
+    // leert die Auswahl und setzt über onChange auch Button und Meldung zurück
+    upload.clear();
 });

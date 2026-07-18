@@ -11,7 +11,7 @@
   <script src="../../assets/toolhub.js"></script>
 
   <style>
-    /* Kategorie-Akzentfarbe: Förderkoordination (teal) */
+    /* Kategorie-Akzentfarbe: Förderkoordination (Teal) */
     :root {
       --accent: #2dd4bf;
       --accent-text: #06302a;
@@ -162,92 +162,6 @@
     .settings-footer .default-info {
       font-size: 0.82rem;
       color: var(--text-muted);
-    }
-
-    /* ----- Upload ----- */
-
-    .upload-box {
-      position: relative;
-      border: 1px dashed color-mix(in srgb, var(--text-muted) 45%, transparent);
-      border-radius: 10px;
-      padding: 36px 20px;
-      text-align: center;
-      background: var(--link-bg);
-      cursor: pointer;
-      transition: border-color 0.15s ease, background 0.15s ease;
-    }
-
-    .upload-box:hover {
-      border-color: color-mix(in srgb, var(--accent) 60%, transparent);
-    }
-
-    .upload-box.dragover {
-      border-color: var(--accent);
-      background: color-mix(in srgb, var(--accent) 12%, transparent);
-    }
-
-    #fileInput {
-      display: none;
-    }
-
-    .upload-text {
-      margin-bottom: 6px;
-    }
-
-    .upload-text strong {
-      color: var(--accent);
-    }
-
-    :root[data-theme="light"] .upload-text strong {
-      color: color-mix(in srgb, var(--accent) 85%, #000000);
-    }
-
-    .upload-hint {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-    }
-
-    .file-list {
-      position: relative;
-      margin-top: 12px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .file-badge {
-      background: color-mix(in srgb, var(--accent) 14%, transparent);
-      border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-      color: var(--text);
-      padding: 5px 6px 5px 12px;
-      border-radius: 999px;
-      font-size: 0.82rem;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .file-remove {
-      background: color-mix(in srgb, var(--text) 12%, transparent);
-      border: none;
-      color: var(--text);
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      font-size: 0.85rem;
-      line-height: 1;
-      cursor: pointer;
-      padding: 0;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.15s ease, color 0.15s ease;
-    }
-
-    .file-remove:hover {
-      background: color-mix(in srgb, #e05656 25%, transparent);
-      color: #e05656;
     }
 
     .analyze-row {
@@ -489,7 +403,7 @@
         Von DIVIS generierte Noten&uuml;bersichten im XLSX-Format &ndash; mehrere Dateien (eine pro Klasse) m&ouml;glich
       </div>
     </div>
-    <input type="file" id="fileInput" accept=".xlsx" multiple />
+    <input class="file-input" type="file" id="fileInput" accept=".xlsx" multiple />
     <div class="file-list" id="fileList"></div>
     <div class="analyze-row">
       <button class="btn-primary" id="analyzeBtn" type="button" disabled>Auswerten</button>

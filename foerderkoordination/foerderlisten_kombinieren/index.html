@@ -31,12 +31,6 @@
 			align-items: center;
 		}
 
-		/* Dateiauswahl teilt sich die Zeile mit dem Prüfen-Button */
-		.row .file-box {
-			width: auto;
-			flex: 1 1 320px;
-		}
-
 		/* Kleine Hoch/Runter-Buttons in der Prioritätenliste (per JS erzeugt) */
 		.button {
 			background: transparent;
@@ -173,15 +167,15 @@
 				<path d="M7 22h10"/>
 			</svg>
 			<h2>Excel-Dateien ausw&auml;hlen</h2>
-			<div class="row">
-				<input class="file-input" id="fileInput" type="file" accept=".xlsx,.xls,.xlsm" multiple>
-				<label class="file-box" for="fileInput">
-					<span class="file-btn">Dateien ausw&auml;hlen</span>
-					<span class="file-name" id="fileInputName">Keine Dateien ausgew&auml;hlt</span>
-				</label>
+			<div class="upload-box" id="uploadBox">
+				<div class="upload-text"><strong>Excel-Dateien hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
+				<div class="upload-hint">XLSX-, XLS- oder XLSM-Format &ndash; mehrere Dateien m&ouml;glich; gelesen wird jeweils das erste Tabellenblatt</div>
+			</div>
+			<input class="file-input" id="fileInput" type="file" accept=".xlsx,.xls,.xlsm" multiple>
+			<div class="file-list" id="fileList"></div>
+			<div class="row" style="margin-top: 16px;">
 				<button id="analyzeBtn" class="btn-primary" type="button">Dateien pr&uuml;fen</button>
 			</div>
-			<p class="muted">Es werden jeweils die Daten aus dem ersten Tabellenblatt gelesen.</p>
 		</div>
 
 		<div id="statusCard" class="panel hidden"></div>
@@ -258,7 +252,6 @@
 	</main>
 
 	<script>
-		const fileInput = document.getElementById("fileInput");
 		const analyzeBtn = document.getElementById("analyzeBtn");
 		const mergeBtn = document.getElementById("mergeBtn");
 		const downloadBtn = document.getElementById("downloadBtn");
@@ -278,18 +271,18 @@
 		const resultMeta = document.getElementById("resultMeta");
 		const resultHead = document.getElementById("resultHead");
 		const resultBody = document.getElementById("resultBody");
-		const fileInputName = document.getElementById("fileInputName");
 
 		let parsedTables = [];
 		let mergedRows = [];
 		let referenceHeader = [];
 		let selectedSortOrder = [];
 
-		fileInput.addEventListener("change", () => {
-			const count = fileInput.files.length;
-			fileInputName.textContent = count === 0 ? "Keine Dateien ausgewählt"
-				: count === 1 ? fileInput.files[0].name
-				: `${count} Dateien ausgewählt`;
+		// Gemeinsame Upload-Komponente aus toolhub.js
+		const upload = toolhubUpload({
+			input: "fileInput",
+			zone: "uploadBox",
+			list: "fileList",
+			extensions: [".xlsx", ".xls", ".xlsm"]
 		});
 
 		function resetOutput() {
@@ -550,7 +543,7 @@
 		analyzeBtn.addEventListener("click", async () => {
 			resetOutput();
 
-			const files = [...fileInput.files];
+			const files = [...upload.files];
 			if (!files.length) {
 				showStatus("Bitte mindestens eine Excel-Datei auswählen.", true);
 				return;

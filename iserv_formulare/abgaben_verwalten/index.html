@@ -68,51 +68,6 @@
       margin-bottom: 6px;
     }
 
-    .file-list {
-      list-style: none;
-      margin: 8px 0 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .file-list li {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      background: var(--link-bg);
-      border: 1px solid var(--link-border);
-      border-radius: 8px;
-      padding: 7px 12px;
-      font-size: 0.9rem;
-    }
-
-    .file-list li span {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .file-remove {
-      flex: 0 0 auto;
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      font-size: 1.15rem;
-      line-height: 1;
-      cursor: pointer;
-      padding: 2px 7px;
-      border-radius: 6px;
-      transition: color 0.15s ease, background 0.15s ease;
-    }
-
-    .file-remove:hover {
-      color: #e05656;
-      background: color-mix(in srgb, #e05656 15%, transparent);
-    }
-
     .btn-primary {
       margin-top: 6px;
     }
@@ -215,19 +170,18 @@
     <div class="field">
       <label for="teilnehmerCSV">Teilnehmerliste (CSV)</label>
       <input class="file-input" type="file" id="teilnehmerCSV" accept=".csv">
-      <label class="file-box" for="teilnehmerCSV">
-        <span class="file-btn">Datei ausw&auml;hlen</span>
-        <span class="file-name" data-for="teilnehmerCSV">Keine Datei ausgew&auml;hlt</span>
-      </label>
+      <div class="upload-box" id="teilnehmerCSVZone">
+        <div class="upload-text"><strong>CSV-Datei hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
+      </div>
+      <div class="file-list" id="teilnehmerCSVList"></div>
     </div>
     <div class="field">
       <label for="formularCSV">Formulardaten (CSV &ndash; mehrere Dateien m&ouml;glich)</label>
       <input class="file-input" type="file" id="formularCSV" accept=".csv" multiple>
-      <label class="file-box" for="formularCSV">
-        <span class="file-btn">Dateien ausw&auml;hlen</span>
-        <span class="file-name" data-for="formularCSV">Keine Dateien ausgew&auml;hlt</span>
-      </label>
-      <ul class="file-list" id="formularCSVList"></ul>
+      <div class="upload-box" id="formularCSVZone">
+        <div class="upload-text"><strong>CSV-Dateien hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
+      </div>
+      <div class="file-list" id="formularCSVList"></div>
     </div>
     <button class="btn-primary" type="button" onclick="vergleichen()">Vergleichen</button>
     <div class="result" id="ergebnis"></div>
@@ -250,10 +204,10 @@
     <div class="field">
       <label for="csvFile">Formulardaten (CSV)</label>
       <input class="file-input" type="file" id="csvFile" accept=".csv">
-      <label class="file-box" for="csvFile">
-        <span class="file-btn">Datei ausw&auml;hlen</span>
-        <span class="file-name" data-for="csvFile">Keine Datei ausgew&auml;hlt</span>
-      </label>
+      <div class="upload-box" id="csvFileZone">
+        <div class="upload-text"><strong>CSV-Datei hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
+      </div>
+      <div class="file-list" id="csvFileList"></div>
     </div>
     <button class="btn-primary" type="button" onclick="bereinigen()">Bereinigen &amp; Herunterladen</button>
     <div class="result" id="bereinigungsErgebnis"></div>
@@ -274,81 +228,31 @@
     });
   });
 
-  // ----- Dateiauswahl (Klick + Drag-and-Drop) -----
-  // Ausgewählte Dateien werden pro Feld in JS verwaltet, damit bei
-  // Mehrfachfeldern neue Dateien ergänzt statt ersetzt werden.
-  const dateiAuswahl = {};
+  // ----- Dateiauswahl (gemeinsame Upload-Komponente aus toolhub.js) -----
+  const nurCSVHinweis = () => alert('Bitte nur CSV-Dateien auswählen.');
 
-  function renderDateien(id) {
-    const input = document.getElementById(id);
-    const files = dateiAuswahl[id];
-    const nameEl = document.querySelector(`.file-name[data-for="${id}"]`);
-    if (input.multiple) {
-      const listEl = document.getElementById(id + 'List');
-      listEl.innerHTML = '';
-      files.forEach((f, idx) => {
-        const li = document.createElement('li');
-        const span = document.createElement('span');
-        span.textContent = f.name;
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'file-remove';
-        btn.textContent = '×';
-        btn.setAttribute('aria-label', `${f.name} entfernen`);
-        btn.title = 'Datei entfernen';
-        btn.addEventListener('click', () => {
-          files.splice(idx, 1);
-          renderDateien(id);
-        });
-        li.append(span, btn);
-        listEl.appendChild(li);
-      });
-      nameEl.textContent = files.length === 0 ? 'Keine Dateien ausgewählt'
-        : files.length === 1 ? '1 Datei ausgewählt'
-        : `${files.length} Dateien ausgewählt`;
-    } else {
-      nameEl.textContent = files.length === 0 ? 'Keine Datei ausgewählt' : files[0].name;
-    }
-  }
+  const teilnehmerUpload = toolhubUpload({
+    input: 'teilnehmerCSV',
+    zone: 'teilnehmerCSVZone',
+    list: 'teilnehmerCSVList',
+    extensions: ['.csv'],
+    onInvalid: nurCSVHinweis
+  });
 
-  function addDateien(id, fileList) {
-    if (fileList.length === 0) return;
-    const input = document.getElementById(id);
-    const csvs = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.csv'));
-    if (csvs.length === 0) {
-      alert('Bitte nur CSV-Dateien auswählen.');
-      return;
-    }
-    if (input.multiple) {
-      csvs.forEach(f => {
-        const schonVorhanden = dateiAuswahl[id].some(g =>
-          g.name === f.name && g.size === f.size && g.lastModified === f.lastModified);
-        if (!schonVorhanden) dateiAuswahl[id].push(f);
-      });
-    } else {
-      dateiAuswahl[id] = [csvs[0]];
-    }
-    renderDateien(id);
-  }
+  const formularUpload = toolhubUpload({
+    input: 'formularCSV',
+    zone: 'formularCSVZone',
+    list: 'formularCSVList',
+    extensions: ['.csv'],
+    onInvalid: nurCSVHinweis
+  });
 
-  document.querySelectorAll('.file-input').forEach(input => {
-    dateiAuswahl[input.id] = [];
-    input.addEventListener('change', () => {
-      addDateien(input.id, input.files);
-      input.value = '';  // erlaubt erneutes Auswählen derselben Datei
-    });
-
-    const box = document.querySelector(`.file-box[for="${input.id}"]`);
-    ['dragenter', 'dragover'].forEach(ev => box.addEventListener(ev, e => {
-      e.preventDefault();
-      box.classList.add('dragover');
-    }));
-    box.addEventListener('dragleave', () => box.classList.remove('dragover'));
-    box.addEventListener('drop', e => {
-      e.preventDefault();
-      box.classList.remove('dragover');
-      addDateien(input.id, e.dataTransfer.files);
-    });
+  const csvUpload = toolhubUpload({
+    input: 'csvFile',
+    zone: 'csvFileZone',
+    list: 'csvFileList',
+    extensions: ['.csv'],
+    onInvalid: nurCSVHinweis
   });
 
   // ----- Fehlende Abgaben ermitteln -----
@@ -357,8 +261,8 @@
   let fehlendeTeilnehmer = [];
 
   function vergleichen() {
-    const tFile = dateiAuswahl['teilnehmerCSV'][0];
-    const fFiles = dateiAuswahl['formularCSV'];
+    const tFile = teilnehmerUpload.files[0];
+    const fFiles = formularUpload.files;
 
     if (!tFile || fFiles.length === 0) {
       alert("Bitte Teilnehmerliste und mindestens eine Formulardatei auswählen.");
@@ -563,7 +467,7 @@
   }
 
   function bereinigen() {
-    const file = dateiAuswahl['csvFile'][0];
+    const file = csvUpload.files[0];
     if (!file) {
       alert('Bitte eine CSV-Datei auswählen.');
       return;
