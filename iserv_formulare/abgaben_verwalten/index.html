@@ -291,6 +291,56 @@
       white-space: nowrap;
     }
 
+    .file-box.dragover {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+
+    .file-list {
+      list-style: none;
+      margin: 8px 0 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .file-list li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--link-bg);
+      border: 1px solid var(--link-border);
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 0.9rem;
+    }
+
+    .file-list li span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-remove {
+      flex: 0 0 auto;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.15rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 2px 7px;
+      border-radius: 6px;
+      transition: color 0.15s ease, background 0.15s ease;
+    }
+
+    .file-remove:hover {
+      color: #e05656;
+      background: color-mix(in srgb, #e05656 15%, transparent);
+    }
+
     .btn-primary {
       background: var(--accent);
       color: var(--accent-text);
@@ -372,6 +422,33 @@
       background: var(--link-bg);
       font-weight: 700;
     }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    .uebersicht {
+      width: auto;
+      min-width: 320px;
+    }
+
+    .uebersicht .summe td {
+      font-weight: 700;
+      background: var(--link-bg);
+    }
+
+    tr.row-kept td {
+      background: color-mix(in srgb, #2f9e6e 14%, transparent);
+    }
+
+    tr.row-removed td {
+      background: color-mix(in srgb, #e05656 12%, transparent);
+    }
+
+    td.status {
+      font-weight: 700;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -432,6 +509,7 @@
         <span class="file-btn">Dateien ausw&auml;hlen</span>
         <span class="file-name" data-for="formularCSV">Keine Dateien ausgew&auml;hlt</span>
       </label>
+      <ul class="file-list" id="formularCSVList"></ul>
     </div>
     <button class="btn-primary" type="button" onclick="vergleichen()">Vergleichen</button>
     <div class="result" id="ergebnis"></div>
@@ -485,18 +563,80 @@
     });
   });
 
-  // ----- Dateinamen-Anzeige der Auswahlfelder -----
+  // ----- Dateiauswahl (Klick + Drag-and-Drop) -----
+  // Ausgewählte Dateien werden pro Feld in JS verwaltet, damit bei
+  // Mehrfachfeldern neue Dateien ergänzt statt ersetzt werden.
+  const dateiAuswahl = {};
+
+  function renderDateien(id) {
+    const input = document.getElementById(id);
+    const files = dateiAuswahl[id];
+    const nameEl = document.querySelector(`.file-name[data-for="${id}"]`);
+    if (input.multiple) {
+      const listEl = document.getElementById(id + 'List');
+      listEl.innerHTML = '';
+      files.forEach((f, idx) => {
+        const li = document.createElement('li');
+        const span = document.createElement('span');
+        span.textContent = f.name;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'file-remove';
+        btn.textContent = '×';
+        btn.setAttribute('aria-label', `${f.name} entfernen`);
+        btn.title = 'Datei entfernen';
+        btn.addEventListener('click', () => {
+          files.splice(idx, 1);
+          renderDateien(id);
+        });
+        li.append(span, btn);
+        listEl.appendChild(li);
+      });
+      nameEl.textContent = files.length === 0 ? 'Keine Dateien ausgewählt'
+        : files.length === 1 ? '1 Datei ausgewählt'
+        : `${files.length} Dateien ausgewählt`;
+    } else {
+      nameEl.textContent = files.length === 0 ? 'Keine Datei ausgewählt' : files[0].name;
+    }
+  }
+
+  function addDateien(id, fileList) {
+    if (fileList.length === 0) return;
+    const input = document.getElementById(id);
+    const csvs = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.csv'));
+    if (csvs.length === 0) {
+      alert('Bitte nur CSV-Dateien auswählen.');
+      return;
+    }
+    if (input.multiple) {
+      csvs.forEach(f => {
+        const schonVorhanden = dateiAuswahl[id].some(g =>
+          g.name === f.name && g.size === f.size && g.lastModified === f.lastModified);
+        if (!schonVorhanden) dateiAuswahl[id].push(f);
+      });
+    } else {
+      dateiAuswahl[id] = [csvs[0]];
+    }
+    renderDateien(id);
+  }
+
   document.querySelectorAll('.file-input').forEach(input => {
+    dateiAuswahl[input.id] = [];
     input.addEventListener('change', () => {
-      const nameEl = document.querySelector(`.file-name[data-for="${input.id}"]`);
-      const files = input.files;
-      if (files.length === 0) {
-        nameEl.textContent = input.multiple ? 'Keine Dateien ausgewählt' : 'Keine Datei ausgewählt';
-      } else if (files.length === 1) {
-        nameEl.textContent = files[0].name;
-      } else {
-        nameEl.textContent = Array.from(files).map(f => f.name).join(', ');
-      }
+      addDateien(input.id, input.files);
+      input.value = '';  // erlaubt erneutes Auswählen derselben Datei
+    });
+
+    const box = document.querySelector(`.file-box[for="${input.id}"]`);
+    ['dragenter', 'dragover'].forEach(ev => box.addEventListener(ev, e => {
+      e.preventDefault();
+      box.classList.add('dragover');
+    }));
+    box.addEventListener('dragleave', () => box.classList.remove('dragover'));
+    box.addEventListener('drop', e => {
+      e.preventDefault();
+      box.classList.remove('dragover');
+      addDateien(input.id, e.dataTransfer.files);
     });
   });
 
@@ -506,8 +646,8 @@
   let fehlendeTeilnehmer = [];
 
   function vergleichen() {
-    const tFile = document.getElementById('teilnehmerCSV').files[0];
-    const fFiles = document.getElementById('formularCSV').files;
+    const tFile = dateiAuswahl['teilnehmerCSV'][0];
+    const fFiles = dateiAuswahl['formularCSV'];
 
     if (!tFile || fFiles.length === 0) {
       alert("Bitte Teilnehmerliste und mindestens eine Formulardatei auswählen.");
@@ -609,11 +749,12 @@
       if (daten.length > 0) {
         html += `<button class="btn-secondary" type="button" onclick="exportiereCSV()">Als CSV exportieren</button>`;
       }
-      html += `<ul>`;
+      html += `<table class="uebersicht"><thead><tr><th>Klasse/Information</th><th>Fehlende Abgaben</th></tr></thead><tbody>`;
       gruppenKeys.forEach(gruppe => {
-        html += `<li>${gruppe}: ${alleKlassen.get(gruppe).length}</li>`;
+        html += `<tr><td>${gruppe}</td><td>${alleKlassen.get(gruppe).length}</td></tr>`;
       });
-      html += "</ul></div>";
+      html += `<tr class="summe"><td>Gesamt</td><td>${daten.length}</td></tr>`;
+      html += "</tbody></table></div>";
 
       gruppenKeys.forEach(gruppe => {
         const gruppeDaten = alleKlassen.get(gruppe);
@@ -711,7 +852,7 @@
   }
 
   function bereinigen() {
-    const file = document.getElementById('csvFile').files[0];
+    const file = dateiAuswahl['csvFile'][0];
     if (!file) {
       alert('Bitte eine CSV-Datei auswählen.');
       return;
@@ -730,6 +871,7 @@
 
         // Pro Import-ID nur die neueste Abgabe behalten
         const dataMap = new Map();
+        const gruppen = new Map();
         results.data.forEach(row => {
           const id = row['Import-ID'];
           const datum = parseDatum(row['Ausgefüllt am']);
@@ -737,6 +879,8 @@
           if (!vorhanden || datum > vorhanden.datum) {
             dataMap.set(id, { row, datum });
           }
+          if (!gruppen.has(id)) gruppen.set(id, []);
+          gruppen.get(id).push(row);
         });
 
         const bereinigt = Array.from(dataMap.values()).map(e => e.row);
@@ -748,13 +892,37 @@
         });
         downloadCSV(csv, 'bereinigt.csv');
 
-        document.getElementById('bereinigungsErgebnis').innerHTML =
+        let html =
           `<h3>Bereinigung abgeschlossen</h3>
            <ul>
              <li>${results.data.length} Abgaben eingelesen</li>
              <li>${entfernt} doppelte Abgabe${entfernt === 1 ? "" : "n"} entfernt</li>
              <li>${bereinigt.length} Abgaben in der bereinigten Datei</li>
            </ul>`;
+
+        // Übersicht aller doppelten Abgaben (behalten vs. entfernt)
+        const doppelte = Array.from(gruppen.entries()).filter(([, rows]) => rows.length > 1);
+        if (doppelte.length > 0) {
+          html += `<h4>Übersicht der doppelten Abgaben</h4>`;
+          html += `<p class="hint">Gr&uuml;n hinterlegte Datens&auml;tze wurden behalten, rot hinterlegte entfernt.</p>`;
+          html += `<div class="table-wrap"><table><thead><tr><th>Status</th>`;
+          headers.forEach(h => html += `<th>${h}</th>`);
+          html += `</tr></thead><tbody>`;
+          doppelte.forEach(([id, rows]) => {
+            rows.forEach(row => {
+              const behalten = row === dataMap.get(id).row;
+              html += `<tr class="${behalten ? 'row-kept' : 'row-removed'}">`;
+              html += `<td class="status">${behalten ? 'behalten' : 'entfernt'}</td>`;
+              headers.forEach(h => html += `<td>${row[h] ?? ''}</td>`);
+              html += `</tr>`;
+            });
+          });
+          html += `</tbody></table></div>`;
+        } else {
+          html += `<p class="success">Keine doppelten Abgaben gefunden.</p>`;
+        }
+
+        document.getElementById('bereinigungsErgebnis').innerHTML = html;
       }
     });
   }
