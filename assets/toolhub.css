@@ -1,0 +1,334 @@
+/*
+ * toolhub.css – gemeinsames Grunddesign für die Hauptseite und alle Tools.
+ *
+ * Einbindung (Tool-Seiten, zwei Ebenen unter dem Root):
+ *   <link rel="stylesheet" href="../../assets/toolhub.css">
+ *   <script src="../../assets/toolhub.js"></script>   (synchron im <head>!)
+ *
+ * Jede Tool-Seite setzt ihre Kategorie-Akzentfarbe selbst, z. B.:
+ *   :root                     { --accent: #2dd4bf; --accent-text: #06302a; }
+ *   :root[data-theme="light"] { --accent: #0d9488; --accent-text: #ffffff; }
+ */
+
+:root {
+  color-scheme: dark;
+  --accent: #60a5fa;
+  --accent-text: #10233b;
+  --bg-page:
+    radial-gradient(900px 500px at 85% -150px, rgba(56, 130, 200, 0.25) 0%, transparent 70%),
+    radial-gradient(700px 400px at 5% -100px, rgba(190, 60, 60, 0.18) 0%, transparent 70%),
+    #0f172a;
+  --card-bg: rgba(30, 41, 59, 0.75);
+  --card-border: rgba(255, 255, 255, 0.09);
+  --card-shadow: none;
+  --text: #e6edf6;
+  --text-muted: #94a3b8;
+  --link-bg: rgba(255, 255, 255, 0.055);
+  --link-border: rgba(255, 255, 255, 0.07);
+  --icon-opacity: 0.22;
+  --h1a: #f47c7c;
+  --h1b: #74b8ef;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --accent: #2b6cb0;
+  --accent-text: #ffffff;
+  --bg-page:
+    radial-gradient(900px 500px at 85% -150px, #d8eafc 0%, transparent 70%),
+    radial-gradient(700px 400px at 5% -100px, #fbe7d9 0%, transparent 70%),
+    #f2f6fa;
+  --card-bg: rgba(255, 255, 255, 0.85);
+  --card-border: rgba(20, 40, 70, 0.08);
+  --card-shadow: 0 1px 2px rgba(20, 40, 70, 0.06), 0 6px 20px rgba(20, 40, 70, 0.07);
+  --text: #1a2433;
+  --text-muted: #5c6b7f;
+  --link-bg: rgba(20, 40, 70, 0.04);
+  --link-border: rgba(20, 40, 70, 0.05);
+  --icon-opacity: 0.15;
+  --h1a: rgb(169, 0, 0);
+  --h1b: #00437a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Open Sans", "Calibri", "Ubuntu", "Arial", "Tahoma", sans-serif;
+  color: var(--text);
+  background: var(--bg-page);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  transition: color 0.25s ease;
+}
+
+/* ----- Zurück-Link & Theme-Umschalter (fixiert oben links/rechts) ----- */
+
+.back-link {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  backdrop-filter: blur(6px);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.back-link:hover {
+  transform: scale(1.05);
+  border-color: var(--text-muted);
+}
+
+.theme-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.theme-toggle:hover {
+  transform: scale(1.08);
+  border-color: var(--text-muted);
+}
+
+.theme-toggle svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Im Dunkelmodus die Sonne zeigen (Wechsel zu Hell), im Hellmodus den Mond */
+.icon-sun { display: block; }
+.icon-moon { display: none; }
+:root[data-theme="light"] .icon-sun { display: none; }
+:root[data-theme="light"] .icon-moon { display: block; }
+
+/* ----- Kopfbereich ----- */
+
+header {
+  text-align: center;
+  padding: 76px 16px 26px;
+}
+
+h1 {
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 700;
+  font-size: 2.1rem;
+  letter-spacing: -1px;
+  margin: 0;
+}
+
+#h1a { color: var(--h1a); }
+#h1b { color: var(--h1b); }
+
+.subtitle {
+  margin: 6px auto 0;
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  max-width: 760px;
+}
+
+/* ----- Seitenlayout (Tool-Seiten; die Hauptseite überschreibt dies lokal) ----- */
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 8px 20px 60px;
+}
+
+/* ----- Panel: Karte im Stil der Hauptseiten-Kacheln ----- */
+
+.panel {
+  position: relative;
+  overflow: hidden;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-left: 4px solid var(--accent);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(6px);
+}
+
+.panel-icon {
+  position: absolute;
+  top: -18px;
+  right: -18px;
+  width: 130px;
+  height: 130px;
+  color: var(--accent);
+  opacity: var(--icon-opacity);
+  pointer-events: none;
+  transform: rotate(-8deg);
+}
+
+.panel h2 {
+  position: relative;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  padding-right: 70px;
+}
+
+.panel .hint {
+  position: relative;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  margin: 0 0 18px;
+  max-width: 720px;
+}
+
+.hidden {
+  display: none;
+}
+
+/* ----- Buttons ----- */
+
+button {
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-text);
+  border: none;
+  border-radius: 10px;
+  padding: 11px 22px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ----- Dateiauswahl (verstecktes Input + gestyltes Label) ----- */
+
+.file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.file-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px;
+  background: var(--link-bg);
+  border: 1px dashed color-mix(in srgb, var(--text-muted) 45%, transparent);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.file-box:hover,
+.file-input:focus-visible ~ .file-box {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.file-box.dragover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.file-btn {
+  flex: 0 0 auto;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.file-name {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ----- Tabellen ----- */
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 10px;
+  font-size: 0.92rem;
+}
+
+th, td {
+  border: 1px solid var(--card-border);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: var(--link-bg);
+  font-weight: 700;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
