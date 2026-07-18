@@ -1687,50 +1687,57 @@ function generateLehrerExport() {
 
 // ===== EVENT LISTENERS =====
 
-document.getElementById('zsrFile').addEventListener('change', function() {
-    checkFilesReady();
+// Gemeinsame Upload-Komponente aus toolhub.js für alle vier Dateifelder
+const divisUpload = toolhubUpload({
+    input: 'divisFile', zone: 'divisFileZone', list: 'divisFileList',
+    extensions: ['.xlsx'], onChange: checkFilesReady
 });
 
-document.getElementById('divisFile').addEventListener('change', function() {
-    checkFilesReady();
+const zsrUpload = toolhubUpload({
+    input: 'zsrFile', zone: 'zsrFileZone', list: 'zsrFileList',
+    extensions: ['.xlsx'], onChange: checkFilesReady
 });
 
-// courseFile upload removed
+const electiveUpload = toolhubUpload({
+    input: 'electiveFile', zone: 'electiveFileZone', list: 'electiveFileList',
+    extensions: ['.xlsx'], onChange: checkFilesReady
+});
 
-document.getElementById('electiveFile').addEventListener('change', function() {
-    checkFilesReady();
+const classTeacherUpload = toolhubUpload({
+    input: 'classTeacherFile', zone: 'classTeacherFileZone', list: 'classTeacherFileList',
+    extensions: ['.xlsx'], onChange: checkFilesReady
 });
 
 function checkFilesReady() {
-    const zsrFile = document.getElementById('zsrFile').files[0];
-    const divisFile = document.getElementById('divisFile').files[0];
-    const electiveFile = document.getElementById('electiveFile').files[0];
-    const classTeacherFile = document.getElementById('classTeacherFile').files[0];
+    const zsrFile = zsrUpload.files[0];
+    const divisFile = divisUpload.files[0];
+    const electiveFile = electiveUpload.files[0];
+    const classTeacherFile = classTeacherUpload.files[0];
     const processButton = document.getElementById('processButton');
-    
+
     if (zsrFile && divisFile) {
         processButton.disabled = false;
-        
+
     const features = [];
     if (electiveFile) features.push('Kursdaten');
     if (classTeacherFile) features.push('Klassenlehrerdaten');
-        
+
         if (features.length > 0) {
-            processButton.textContent = `🚀 Zusammenführen (mit ${features.join(' + ')})`;
+            processButton.textContent = `Zusammenführen (mit ${features.join(' + ')})`;
         } else {
-            processButton.textContent = '🚀 Zusammenführen';
+            processButton.textContent = 'Zusammenführen';
         }
     } else {
         processButton.disabled = true;
-        processButton.textContent = '🔄 Zusammenführen (ZSR- und DiViS-Dateien auswählen)';
+        processButton.textContent = 'Zusammenführen (ZSR- und DiViS-Dateien auswählen)';
     }
 }
 
 document.getElementById('processButton').addEventListener('click', async function() {
-    const zsrFiles = document.getElementById('zsrFile').files;
-    const divisFile = document.getElementById('divisFile').files[0];
-    const electiveFile = document.getElementById('electiveFile').files[0];
-    const classTeacherFile = document.getElementById('classTeacherFile').files[0];
+    const zsrFiles = zsrUpload.files;
+    const divisFile = divisUpload.files[0];
+    const electiveFile = electiveUpload.files[0];
+    const classTeacherFile = classTeacherUpload.files[0];
 
     if (!zsrFiles.length || !divisFile) {
         showAlert('Bitte ZSR- und DiViS-Dateien auswählen.', 'error');
@@ -1772,10 +1779,11 @@ document.getElementById('processButton').addEventListener('click', async functio
                 showAlert('Fachkürzel.csv konnte nicht geladen werden – Fachkürzel in Kursnamen werden nicht normalisiert.', 'warning');
             }
             
-            const electiveFile = document.getElementById('electiveFile').files;
-            if (electiveFile && electiveFile.length > 0) {
-                updateProgress(17, `Lese ${electiveFile.length} Wahlpflichtkurs-Dateien...`);
-                electiveData = await readElectiveFiles(electiveFile);}
+            const electiveFiles = electiveUpload.files;
+            if (electiveFiles.length > 0) {
+                updateProgress(17, `Lese ${electiveFiles.length} Wahlpflichtkurs-Dateien...`);
+                electiveData = await readElectiveFiles(electiveFiles);
+            }
 
             const courseCount = [...new Set(electiveData.map(p => p.courseName))].length;
             const originalCourseCount = [...new Set(electiveData.map(p => p.originalCourseName))].length;
@@ -1914,38 +1922,7 @@ if (clearAlertsButton) {
     });
 }
 
-// === DRAG & DROP SUPPORT ===
-['zsrFile', 'divisFile', 'electiveFile'].forEach(id => {
-    const fileInput = document.getElementById(id);
-    const container = fileInput.parentElement;
-    
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        container.addEventListener(eventName, preventDefaults, false);
-    });
-    
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-    
-    ['dragenter', 'dragover'].forEach(eventName => {
-        container.addEventListener(eventName, () => container.classList.add('dragover'), false);
-    });
-    
-    ['dragleave', 'drop'].forEach(eventName => {
-        container.addEventListener(eventName, () => container.classList.remove('dragover'), false);
-    });
-    
-    container.addEventListener('drop', function(e) {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        
-        if (files.length > 0) {
-            fileInput.files = files;
-            checkFilesReady();
-        }
-    }, false);
-});
+// Drag-and-drop übernimmt die gemeinsame Upload-Komponente (toolhub.js)
 
 // === CLEANUP ===
 window.addEventListener('beforeunload', function() {
