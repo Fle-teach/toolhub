@@ -1940,7 +1940,7 @@ window.addEventListener('beforeunload', function() {
 // Fachkürzel-Zuordnung beim Start laden (für die Normalisierung der Kursnamen).
 // Schlägt das Laden fehl (z. B. Aufruf über file:// oder Datei fehlt), wird beim
 // Verarbeiten von Kurse-Dateien eine Warnung angezeigt und ohne Zuordnung gearbeitet.
-const fachKuerzelLoadPromise = fetch('Fachkürzel.csv')
+const fachKuerzelLoadPromise = fetch('../../assets/Fachk%C3%BCrzel.csv')
     .then(response => {
         if (!response.ok) throw new Error('HTTP ' + response.status);
         return response.text();

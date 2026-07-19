@@ -16,7 +16,7 @@
 //    Ausnahme: Oberstufenkurse (einzige "Klasse" ist der Jahrgang 11 oder 12) sind echte
 //    Parallelkurse und bleiben erhalten.
 //  - fachNormalisieren: Fachkürzel in der Kursbezeichnung werden anhand von
-//    Fachkürzel.csv (aus dem zsr_divis_merger) vereinheitlicht.
+//    Fachkürzel.csv (aus assets/) vereinheitlicht.
 
 const FELD_UNR = 0;
 const FELD_KLASSE = 4;
@@ -417,7 +417,7 @@ function erzeugeZip(dateien, datum = new Date()) {
 // Browser-UI (wird unter Node.js für Tests übersprungen)
 // ---------------------------------------------------------------------------
 if (typeof document !== 'undefined') {
-    const FACHKUERZEL_URL = '../../iserv_benutzerverwaltung/zsr_divis_merger/Fachk%C3%BCrzel.csv';
+    const FACHKUERZEL_URL = '../../assets/Fachk%C3%BCrzel.csv';
 
     let gpu002Text = null;
     let gpu001Text = null;
@@ -440,7 +440,7 @@ if (typeof document !== 'undefined') {
     const fachCsvFallback = document.getElementById('fachCsvFallback');
     const fachCsvInput = document.getElementById('fachCsvInput');
 
-    // Fachkürzel.csv aus dem zsr_divis_merger laden. Schlägt das fehl (z. B. beim Öffnen
+    // Fachkürzel.csv aus assets/ laden. Schlägt das fehl (z. B. beim Öffnen
     // der Seite über file://), kann die Datei manuell ausgewählt werden.
     fetch(FACHKUERZEL_URL)
         .then((r) => {
