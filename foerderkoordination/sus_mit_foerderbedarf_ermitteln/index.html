@@ -174,26 +174,6 @@
       padding: 12px 36px;
     }
 
-    /* ----- Meldungen ----- */
-
-    .error {
-      background: color-mix(in srgb, #e05656 14%, transparent);
-      border: 1px solid color-mix(in srgb, #e05656 45%, transparent);
-      padding: 12px 16px;
-      border-radius: 10px;
-      margin-bottom: 20px;
-      font-size: 0.95rem;
-    }
-
-    .success {
-      background: color-mix(in srgb, #2f9e6e 14%, transparent);
-      border: 1px solid color-mix(in srgb, #2f9e6e 45%, transparent);
-      padding: 12px 16px;
-      border-radius: 10px;
-      margin-bottom: 20px;
-      font-size: 0.95rem;
-    }
-
     /* ----- Ergebnisse ----- */
 
     .results-section {
@@ -202,43 +182,6 @@
 
     .results-section.visible {
       display: block;
-    }
-
-    .stats {
-      position: relative;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 14px;
-      margin-bottom: 24px;
-    }
-
-    .stat-card {
-      background: var(--link-bg);
-      border: 1px solid var(--link-border);
-      border-left: 4px solid var(--accent);
-      border-radius: 10px;
-      padding: 14px 16px;
-    }
-
-    .stat-card h3 {
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-      margin: 0 0 8px;
-    }
-
-    .stat-card .value {
-      font-size: 2rem;
-      font-weight: 700;
-      line-height: 1.1;
-      color: var(--accent);
-    }
-
-    .stat-card p {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      margin: 5px 0 0;
     }
 
     .group-section {
@@ -301,11 +244,8 @@
       margin: 0;
     }
 
+    /* Ergebnis-Buttons schließen direkt an die Tabelle an */
     .button-group {
-      position: relative;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
       margin-top: 10px;
     }
   </style>

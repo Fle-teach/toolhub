@@ -223,9 +223,11 @@ input[type="number"]:disabled {
     flex-wrap: wrap;
 }
 
+/* Farben liefern die geteilten Klassen .info/.success/.error/.warn
+ * aus toolhub.css; hier nur Abstand, Typografie und das Ein-/Ausblenden. */
 .status-message {
     position: relative;
-    margin-top: 16px;
+    margin: 16px 0 0;
     padding: 11px 14px;
     border-radius: 10px;
     font-size: 0.92rem;
@@ -235,26 +237,6 @@ input[type="number"]:disabled {
 
 .status-message.show {
     display: block;
-}
-
-.status-message.info {
-    background: color-mix(in srgb, #3182ce 14%, transparent);
-    border: 1px solid color-mix(in srgb, #3182ce 45%, transparent);
-}
-
-.status-message.success {
-    background: color-mix(in srgb, #38a169 14%, transparent);
-    border: 1px solid color-mix(in srgb, #38a169 45%, transparent);
-}
-
-.status-message.error {
-    background: color-mix(in srgb, #e05656 14%, transparent);
-    border: 1px solid color-mix(in srgb, #e05656 45%, transparent);
-}
-
-.status-message.warning {
-    background: color-mix(in srgb, #ed8936 14%, transparent);
-    border: 1px solid color-mix(in srgb, #ed8936 45%, transparent);
 }
 
 #preview {

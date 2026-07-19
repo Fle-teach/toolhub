@@ -28,6 +28,11 @@
   --icon-opacity: 0.22;
   --h1a: #f47c7c;
   --h1b: #74b8ef;
+  /* Semantische Farben für Meldungen, Badges usw. */
+  --ok: #4ade80;
+  --warn-col: #fbbf24;
+  --err: #f87171;
+  --info-col: #93c5fd;
 }
 
 :root[data-theme="light"] {
@@ -48,6 +53,10 @@
   --icon-opacity: 0.15;
   --h1a: rgb(169, 0, 0);
   --h1b: #00437a;
+  --ok: #2f9e6e;
+  --warn-col: #8a6100;
+  --err: #c0392b;
+  --info-col: #3b4cca;
 }
 
 * {
@@ -204,6 +213,117 @@ main {
 
 .hidden {
   display: none;
+}
+
+/* Panel-Inhalte über das dekorative Icon legen */
+.panel > *:not(.panel-icon) {
+  position: relative;
+}
+
+/* ----- Schritt-Abschnitte (per JS ein-/ausgeblendet) -----
+ *
+ *   <section class="panel section visible">…</section>
+ */
+
+.section {
+  display: none;
+}
+
+.section.visible {
+  display: block;
+}
+
+/* ----- Meldungen -----
+ *
+ *   <div class="error">…</div>   (analog: success, warn, info)
+ */
+
+.error, .success, .warn, .info {
+  position: relative;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+}
+
+.error {
+  background: color-mix(in srgb, var(--err) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--err) 45%, transparent);
+}
+
+.success {
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ok) 45%, transparent);
+}
+
+.warn {
+  background: color-mix(in srgb, var(--warn-col) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn-col) 45%, transparent);
+}
+
+.info {
+  background: color-mix(in srgb, var(--info-col) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--info-col) 45%, transparent);
+}
+
+/* ----- Statistik-Karten -----
+ *
+ *   <div class="stats">
+ *     <div class="stat-card">
+ *       <h3>Titel</h3><div class="value">42</div><p>Erläuterung</p>
+ *     </div>
+ *   </div>
+ */
+
+.stats {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin: 0 0 24px;
+}
+
+.stat-card {
+  background: var(--link-bg);
+  border: 1px solid var(--link-border);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.stat-card h3 {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin: 0 0 8px;
+}
+
+.stat-card .value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--accent);
+}
+
+:root[data-theme="light"] .stat-card .value {
+  color: color-mix(in srgb, var(--accent) 85%, #000000);
+}
+
+.stat-card p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 5px 0 0;
+}
+
+/* ----- Button-Gruppe ----- */
+
+.button-group {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
 }
 
 /* ----- Buttons ----- */

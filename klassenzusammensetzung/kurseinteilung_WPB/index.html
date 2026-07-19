@@ -18,30 +18,17 @@
             --accent: #a78bfa;
             --accent-text: #241250;
             --thead-bg: #253048;
-            --ok: #4ade80;
-            --warn-col: #fbbf24;
-            --err: #f87171;
-            --info-col: #93c5fd;
         }
 
         :root[data-theme="light"] {
             --accent: #805ad5;
             --accent-text: #ffffff;
             --thead-bg: #e9eef5;
-            --ok: #2f9e6e;
-            --warn-col: #8a6100;
-            --err: #c0392b;
-            --info-col: #3b4cca;
         }
 
         /* Breite Ergebnis-Boards: mehr Platz als das Standard-Layout */
         main {
             max-width: 1280px;
-        }
-
-        /* Inhalte über das dekorative Panel-Icon legen */
-        .panel > *:not(.panel-icon) {
-            position: relative;
         }
 
         /* --- Schritt-Anzeige --- */
@@ -77,43 +64,6 @@
             color: var(--ok);
         }
 
-        /* --- Schritt-Abschnitte (werden per JS ein-/ausgeblendet) --- */
-        .section {
-            display: none;
-        }
-
-        .section.visible {
-            display: block;
-        }
-
-        /* --- Meldungen --- */
-        .error, .success, .warn, .info {
-            padding: 12px 16px;
-            border-radius: 10px;
-            margin-bottom: 16px;
-            font-size: 0.95rem;
-        }
-
-        .error {
-            background: color-mix(in srgb, var(--err) 14%, transparent);
-            border: 1px solid color-mix(in srgb, var(--err) 45%, transparent);
-        }
-
-        .success {
-            background: color-mix(in srgb, var(--ok) 12%, transparent);
-            border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent);
-        }
-
-        .warn {
-            background: color-mix(in srgb, var(--warn-col) 14%, transparent);
-            border: 1px solid color-mix(in srgb, var(--warn-col) 45%, transparent);
-        }
-
-        .info {
-            background: color-mix(in srgb, var(--info-col) 14%, transparent);
-            border: 1px solid color-mix(in srgb, var(--info-col) 45%, transparent);
-        }
-
         h3.block-title {
             font-size: 1.05rem;
             margin: 24px 0 10px;
@@ -132,40 +82,6 @@
             font-size: 0.8rem;
             color: var(--text-muted);
             margin: 10px 0 0;
-        }
-
-        /* --- Statistik-Karten --- */
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .stat-card {
-            background: var(--link-bg);
-            border: 1px solid var(--link-border);
-            border-left: 4px solid var(--accent);
-            border-radius: 10px;
-            padding: 12px 14px;
-        }
-
-        .stat-card h3 {
-            font-size: 0.72rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            margin: 0 0 6px;
-        }
-
-        .stat-card .value {
-            font-size: 1.6rem;
-            font-weight: 700;
-            color: var(--accent);
-        }
-
-        :root[data-theme="light"] .stat-card .value {
-            color: color-mix(in srgb, var(--accent) 85%, #000000);
         }
 
         /* --- Tabellen (Geschlechtsprüfung) --- */
@@ -409,12 +325,6 @@
 
         .stu-card.dragging { opacity: 0.4; }
 
-        .button-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 22px;
-            flex-wrap: wrap;
-        }
     </style>
 </head>
 <body>

@@ -48,22 +48,12 @@
 			background: color-mix(in srgb, var(--accent) 18%, transparent);
 		}
 
-		/* ----- Meldungen ----- */
+		/* ----- Meldungen (Grunddesign: .error/.success in toolhub.css) ----- */
 
-		.warning {
-			background: color-mix(in srgb, #e05656 14%, transparent);
-			border: 1px solid color-mix(in srgb, #e05656 45%, transparent);
-			border-radius: 10px;
-			padding: 12px 16px;
-			font-size: 0.95rem;
-		}
-
-		.success {
-			background: color-mix(in srgb, #2f9e6e 14%, transparent);
-			border: 1px solid color-mix(in srgb, #2f9e6e 45%, transparent);
-			border-radius: 10px;
-			padding: 12px 16px;
-			font-size: 0.95rem;
+		/* Meldung füllt die Status-Karte komplett aus */
+		#statusCard > .error,
+		#statusCard > .success {
+			margin-bottom: 0;
 		}
 
 		/* ----- Kopfzeilen-Pills ----- */
@@ -311,7 +301,7 @@
 
 		function showStatus(message, isWarning) {
 			statusCard.className = "panel";
-			statusCard.innerHTML = `<div class="${isWarning ? "warning" : "success"}">${message}</div>`;
+			statusCard.innerHTML = `<div class="${isWarning ? "error" : "success"}">${message}</div>`;
 		}
 
 		function safeCellValue(value) {

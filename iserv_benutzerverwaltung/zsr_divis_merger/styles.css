@@ -205,14 +205,10 @@ button:disabled {
     border-color: color-mix(in srgb, #d69e2e 50%, transparent);
 }
 
-/* === STATISTIK === */
-.stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 14px;
-    margin: 0 0 20px;
-}
-
+/* === STATISTIK ===
+ * .stats-Raster kommt aus toolhub.css; hier nur die zentrierte
+ * Kartenvariante mit .stat-number/.stat-label statt h3/.value.
+ */
 .stat-card {
     background: var(--card-bg);
     border: 1px solid var(--card-border);
