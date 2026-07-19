@@ -22,9 +22,23 @@ class SerienriefApp {
      * Initialisiert Event-Listener
      */
     _initializeEventListeners() {
-        // File Input Events
-        document.getElementById('docxFile').addEventListener('change', (e) => this._handleDocxUpload(e));
-        document.getElementById('csvFile').addEventListener('change', (e) => this._handleCsvUpload(e));
+        // Gemeinsame Upload-Komponente aus toolhub.js (Klick + Drag-and-drop + Badge)
+        toolhubUpload({
+            input: 'docxFile',
+            zone: 'docxZone',
+            list: 'docxList',
+            extensions: ['.docx'],
+            onInvalid: () => this._showStatus('Bitte wählen Sie eine gültige DOCX-Datei.', 'error'),
+            onChange: (files) => this._handleDocxUpload(files[0] || null)
+        });
+        toolhubUpload({
+            input: 'csvFile',
+            zone: 'csvZone',
+            list: 'csvList',
+            extensions: ['.csv'],
+            onInvalid: () => this._showStatus('Bitte wählen Sie eine gültige CSV-Datei.', 'error'),
+            onChange: (files) => this._handleCsvUpload(files[0] || null)
+        });
 
         // Process Button
         document.getElementById('processBtn').addEventListener('click', () => this._processSerienbrief());
@@ -65,10 +79,19 @@ class SerienriefApp {
      * Rendert die UI für Schriftgrößen-Einstellungen pro Seite
      */
     _renderFontSizeSettings() {
-        const container = document.querySelector('.font-tier-container');
+        const container = document.getElementById('fontTierContainer');
         if (!container) return;
 
         container.innerHTML = '';
+
+        // Ohne Vorlage nur den Platzhalter-Hinweis anzeigen
+        if (this.pageCount === 0) {
+            const placeholder = document.createElement('p');
+            placeholder.className = 'placeholder';
+            placeholder.textContent = 'Die Einstellungen erscheinen, sobald eine DOCX-Vorlage ausgewählt wurde.';
+            container.appendChild(placeholder);
+            return;
+        }
 
         // Für jede Seite ein Einstellungs-Block
         for (let pageIdx = 0; pageIdx < this.pageCount; pageIdx++) {
@@ -76,16 +99,11 @@ class SerienriefApp {
 
             // Wrapper pro Seite, damit Überschrift keinen seitlichen Versatz erzeugt
             const pageGroup = document.createElement('div');
-            pageGroup.style.display = 'flex';
-            pageGroup.style.flexDirection = 'column';
-            pageGroup.style.gap = '6px';
-            pageGroup.style.width = '100%';
+            pageGroup.className = 'page-group';
 
             const pageTitle = document.createElement('div');
+            pageTitle.className = 'page-title';
             pageTitle.textContent = `Seite ${pageIdx + 1}`;
-            pageTitle.style.fontWeight = '600';
-            pageTitle.style.margin = pageIdx === 0 ? '0 0 6px 0' : '12px 0 6px 0';
-            pageTitle.style.lineHeight = '1.2';
             pageGroup.appendChild(pageTitle);
 
             // Vier Schwellen pro Seite
@@ -155,72 +173,92 @@ class SerienriefApp {
     }
 
     /**
-     * Verarbeitet DOCX-Upload
+     * Verarbeitet DOCX-Upload (file = null, wenn die Datei entfernt wurde)
      */
-    async _handleDocxUpload(event) {
-        const file = event.target.files[0];
-        if (file && file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-            this.docxFile = file;
-            document.getElementById('docxFileName').textContent = `✓ ${file.name}`;
-            
-            // Lade Seiten-Struktur aus DOCX
-            try {
-                const zip = await DOCXHandler.loadDOCX(file);
-                const xmlDoc = await DOCXHandler.getDocumentXML(zip);
-                this.pageStructure = this._extractPageStructure(xmlDoc);
-                this.pageCount = this.pageStructure.length;
-
-                // Fallback: Falls keine Felder gefunden, nutze geschätzte Seitenzahl
-                if (this.pageCount === 0) {
-                    this.pageCount = DOCXHandler.estimatePageCount(xmlDoc);
-                    this.pageStructure = Array.from({ length: this.pageCount }, () => []);
-                }
-
-                // Generiere Einstellungen basierend auf Seitenanzahl
-                this._initializePageFontSettings(this.pageCount);
-                
-                // Aktualisiere UI mit Seiten-spezifischen Einstellungen
-                this._renderFontSizeSettings();
-            } catch (err) {
-                console.warn('Konnte Seiten-Struktur nicht extrahieren:', err);
-                this.pageStructure = [];
-                this.pageCount = 0;
-            }
-            
+    async _handleDocxUpload(file) {
+        if (!file) {
+            this.docxFile = null;
+            this.pageStructure = [];
+            this.pageCount = 0;
+            this._renderFontSizeSettings();
             this._updateProcessButton();
-        } else {
-            this._showStatus('Bitte wählen Sie eine gültige DOCX-Datei.', 'error');
+            return;
         }
+
+        this.docxFile = file;
+
+        // Lade Seiten-Struktur aus DOCX
+        try {
+            const zip = await DOCXHandler.loadDOCX(file);
+            const xmlDoc = await DOCXHandler.getDocumentXML(zip);
+            this.pageStructure = this._extractPageStructure(xmlDoc);
+            this.pageCount = this.pageStructure.length;
+
+            // Fallback: Falls keine Felder gefunden, nutze geschätzte Seitenzahl
+            if (this.pageCount === 0) {
+                this.pageCount = DOCXHandler.estimatePageCount(xmlDoc);
+                this.pageStructure = Array.from({ length: this.pageCount }, () => []);
+            }
+
+            // Generiere Einstellungen basierend auf Seitenanzahl
+            this._initializePageFontSettings(this.pageCount);
+
+            // Aktualisiere UI mit Seiten-spezifischen Einstellungen
+            this._renderFontSizeSettings();
+        } catch (err) {
+            console.warn('Konnte Seiten-Struktur nicht extrahieren:', err);
+            this.pageStructure = [];
+            this.pageCount = 0;
+        }
+
+        this._updateProcessButton();
     }
 
     /**
-     * Verarbeitet CSV-Upload
+     * Verarbeitet CSV-Upload (file = null, wenn die Datei entfernt wurde)
      */
-    _handleCsvUpload(event) {
-        const file = event.target.files[0];
-        if (file && file.type === 'text/csv') {
-            file.text().then(content => {
-                try {
-                    // Erkenne Trennzeichen
-                    const delimiter = CSVParser.detectDelimiter(content);
-                    this.csvData = CSVParser.parse(content, delimiter);
-
-                    if (this.csvData.length === 0) {
-                        throw new Error('CSV enthält keine Datensätze');
-                    }
-
-                    document.getElementById('csvFileName').textContent = `✓ ${file.name} (${this.csvData.length} Datensätze)`;
-                    this._updateProcessButton();
-                    this._showStatus(`✓ CSV erfolgreich geladen: ${this.csvData.length} Datensätze`, 'success');
-                } catch (error) {
-                    this._showStatus(`CSV-Fehler: ${error.message}`, 'error');
-                }
-            }).catch(error => {
-                this._showStatus(`Datei-Lesefehler: ${error.message}`, 'error');
-            });
-        } else {
-            this._showStatus('Bitte wählen Sie eine gültige CSV-Datei.', 'error');
+    _handleCsvUpload(file) {
+        if (!file) {
+            this.csvData = [];
+            document.getElementById('dataOverviewSection').style.display = 'none';
+            document.getElementById('preview').style.display = 'none';
+            document.getElementById('downloadSection').style.display = 'none';
+            this._updateProcessButton();
+            return;
         }
+
+        file.text().then(content => {
+            try {
+                // PapaParse (gemeinsames Asset): erkennt das Trennzeichen automatisch
+                const result = Papa.parse(content, {
+                    header: true,
+                    skipEmptyLines: 'greedy',
+                    delimitersToGuess: [';', ',', '\t', '|'],
+                    transformHeader: (h) => h.trim(),
+                    transform: (v) => (v || '').trim()
+                });
+
+                const fatalErrors = result.errors.filter(e => e.type !== 'FieldMismatch');
+                if (fatalErrors.length > 0) {
+                    throw new Error(fatalErrors[0].message);
+                }
+
+                this.csvData = result.data;
+
+                if (this.csvData.length === 0) {
+                    throw new Error('CSV enthält keine Datensätze');
+                }
+
+                this._updateProcessButton();
+                this._showStatus(`✓ CSV erfolgreich geladen: ${this.csvData.length} Datensätze`, 'success');
+            } catch (error) {
+                this.csvData = [];
+                this._updateProcessButton();
+                this._showStatus(`CSV-Fehler: ${error.message}`, 'error');
+            }
+        }).catch(error => {
+            this._showStatus(`Datei-Lesefehler: ${error.message}`, 'error');
+        });
     }
 
     /**
@@ -495,7 +533,10 @@ class SerienriefApp {
         });
 
         table.appendChild(tbody);
-        container.appendChild(table);
+        const tableWrap = document.createElement('div');
+        tableWrap.className = 'table-wrap';
+        tableWrap.appendChild(table);
+        container.appendChild(tableWrap);
 
         // Info-Text
         const info = document.createElement('p');
@@ -512,19 +553,19 @@ class SerienriefApp {
         legend.className = 'data-overview-legend';
         legend.innerHTML = `
             <div class="legend-item">
-                <div class="legend-box" style="background: #fffbea;"></div>
+                <div class="legend-box cell-tier-1"></div>
                 <span>≥ ${threshold} (1x)</span>
             </div>
             <div class="legend-item">
-                <div class="legend-box" style="background: #fed7aa;"></div>
+                <div class="legend-box cell-tier-2"></div>
                 <span>≥ ${threshold * 2} (2x)</span>
             </div>
             <div class="legend-item">
-                <div class="legend-box" style="background: #fecaca;"></div>
+                <div class="legend-box cell-tier-3"></div>
                 <span>≥ ${threshold * 3} (3x)</span>
             </div>
             <div class="legend-item">
-                <div class="legend-box" style="background: #fca5a5;"></div>
+                <div class="legend-box cell-tier-4"></div>
                 <span>≥ ${threshold * 4} (4x)</span>
             </div>
         `;
@@ -776,7 +817,10 @@ class SerienriefApp {
         tbody.appendChild(totalRow);
 
         table.appendChild(tbody);
-        previewContent.appendChild(table);
+        const tableWrap = document.createElement('div');
+        tableWrap.className = 'table-wrap';
+        tableWrap.appendChild(table);
+        previewContent.appendChild(tableWrap);
 
         // Zeige Info-Text
         const infoDiv = document.createElement('div');
@@ -823,13 +867,27 @@ class SerienriefApp {
             }
 
             const zipBlob = await zip.generateAsync({ type: 'blob' });
-            saveAs(zipBlob, 'Serienbriefe.zip');
+            this._saveBlob(zipBlob, 'Serienbriefe.zip');
 
             this._showStatus(`✓ ZIP erfolgreich heruntergeladen!`, 'success');
         } catch (error) {
             this._showStatus(`Fehler beim Download: ${error.message}`, 'error');
             console.error(error);
         }
+    }
+
+    /**
+     * Löst den Download eines Blobs aus (ersetzt die FileSaver.js-Abhängigkeit)
+     */
+    _saveBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
     }
 
     /**
