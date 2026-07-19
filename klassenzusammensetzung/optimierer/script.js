@@ -36,12 +36,31 @@ const availableSymbols = [
     '🟦', '🟪', '⬛️', '⬜️', '🟫', '♠️', '♣️', '♦️'
 ];
 
+// Datei-Auswahl (gemeinsame Upload-Komponente aus toolhub.js)
+let wishesUpload = null;
+let studentDataUpload = null;
+
 // Initialize event listeners when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // File upload handlers
-    document.getElementById('wishesFile').addEventListener('change', handleWishesFile);
-    document.getElementById('studentDataFile').addEventListener('change', handleStudentDataFile);
-    
+    // File upload handlers (Klick + Drag-and-drop)
+    wishesUpload = toolhubUpload({
+        input: 'wishesFile',
+        zone: 'wishesFileZone',
+        list: 'wishesFileList',
+        extensions: ['.csv'],
+        onChange: (files) => readCsvFile(files[0], 'wishes'),
+        onInvalid: (names) => showError(`Bitte eine CSV-Datei auswählen: ${names.join(', ')}`)
+    });
+
+    studentDataUpload = toolhubUpload({
+        input: 'studentDataFile',
+        zone: 'studentDataFileZone',
+        list: 'studentDataFileList',
+        extensions: ['.csv'],
+        onChange: (files) => readCsvFile(files[0], 'studentData'),
+        onInvalid: (names) => showError(`Bitte eine CSV-Datei auswählen: ${names.join(', ')}`)
+    });
+
     // Checkbox handler for mutual pairs
     document.getElementById('showMutualPairs').addEventListener('change', function() {
         if (Object.keys(currentClasses).length > 0) {
@@ -67,24 +86,22 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // File handling functions
-function handleWishesFile(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = function(event) {
-        parseCSV(event.target.result, 'wishes');
-    };
-    reader.readAsText(file);
-}
+// Liest die ausgewählte CSV-Datei ein; ohne Datei (Auswahl entfernt) werden die
+// zugehörigen Daten verworfen.
+function readCsvFile(file, type) {
+    if (!file) {
+        if (type === 'wishes') {
+            wishesData = [];
+        } else {
+            studentData = [];
+        }
+        document.getElementById('generateBtn').disabled = true;
+        return;
+    }
 
-function handleStudentDataFile(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    
     const reader = new FileReader();
     reader.onload = function(event) {
-        parseCSV(event.target.result, 'studentData');
+        parseCSV(event.target.result, type);
     };
     reader.readAsText(file);
 }
@@ -2057,7 +2074,7 @@ function displayClasses() {
     
     markUnfulfilledWishes();
     updateStats();
-    document.getElementById('statsSection').style.display = 'flex';
+    document.getElementById('statsSection').style.display = 'block';
     reapplySelections();
 }
 
@@ -3303,8 +3320,8 @@ function resetAll() {
     manualExclusionHighlightStudentIds.clear();
     manualExclusionHighlightPairs.clear();
     
-    document.getElementById('wishesFile').value = '';
-    document.getElementById('studentDataFile').value = '';
+    if (wishesUpload) wishesUpload.clear();
+    if (studentDataUpload) studentDataUpload.clear();
     document.getElementById('generateBtn').disabled = true;
     document.getElementById('classesContainer').innerHTML = '';
     document.getElementById('statsSection').style.display = 'none';
