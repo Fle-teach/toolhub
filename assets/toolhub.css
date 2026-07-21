@@ -5,9 +5,9 @@
  *   <link rel="stylesheet" href="../../assets/toolhub.css">
  *   <script src="../../assets/toolhub.js"></script>   (synchron im <head>!)
  *
- * Jede Tool-Seite setzt ihre Kategorie-Akzentfarbe selbst, z. B.:
- *   :root                     { --accent: #2dd4bf; --accent-text: #06302a; }
- *   :root[data-theme="light"] { --accent: #0d9488; --accent-text: #ffffff; }
+ * Die Akzentfarbe kommt aus der Kategorie-Klasse am <body>, siehe Abschnitt
+ * "Kategoriefarben" weiter unten:
+ *   <body class="cat-foerderkoordination">
  */
 
 :root {
@@ -58,6 +58,33 @@
   --err: #c0392b;
   --info-col: #3b4cca;
 }
+
+/* ----- Kategoriefarben -----
+ *
+ * Eine Klasse je Kategorie – verwendet am <body> einer Tool-Seite und an der
+ * Kachel der Startseite. Dadurch bleiben Hub und Tool zwangsläufig gleich:
+ *
+ *   <body class="cat-klassenzusammensetzung">
+ *   <section class="card cat-klassenzusammensetzung">
+ *
+ * Der Name entspricht dem Kategorie-Ordner.
+ */
+
+.cat-foerderkoordination     { --accent: #2dd4bf; --accent-text: #06302a; }
+.cat-iserv_benutzerverwaltung { --accent: #60a5fa; --accent-text: #0f2b4d; }
+.cat-iserv_formulare         { --accent: #facc15; --accent-text: #1f2937; }
+.cat-iserv_klassenbuch       { --accent: #4ade80; --accent-text: #06301b; }
+.cat-iserv_stundenplan       { --accent: #fb923c; --accent-text: #3d2008; }
+.cat-legs                    { --accent: #f472b6; --accent-text: #3d0a26; }
+.cat-klassenzusammensetzung  { --accent: #a78bfa; --accent-text: #241250; }
+
+:root[data-theme="light"] .cat-foerderkoordination      { --accent: #0d9488; --accent-text: #ffffff; }
+:root[data-theme="light"] .cat-iserv_benutzerverwaltung { --accent: #2b6cb0; --accent-text: #ffffff; }
+:root[data-theme="light"] .cat-iserv_formulare          { --accent: #d69e2e; --accent-text: #1f2937; }
+:root[data-theme="light"] .cat-iserv_klassenbuch        { --accent: #2f9e6e; --accent-text: #ffffff; }
+:root[data-theme="light"] .cat-iserv_stundenplan        { --accent: #dd6b20; --accent-text: #ffffff; }
+:root[data-theme="light"] .cat-legs                     { --accent: #d53f8c; --accent-text: #ffffff; }
+:root[data-theme="light"] .cat-klassenzusammensetzung   { --accent: #805ad5; --accent-text: #ffffff; }
 
 * {
   box-sizing: border-box;

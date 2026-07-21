@@ -7,7 +7,8 @@ und Dateien ausschließlich lokal verarbeitet.
 ## Verzeichnisaufbau
 
 ```
-index.html                 Startseite mit den Kacheln aller Kategorien
+index.html                 Startseite (leeres Gerüst, Kacheln kommen aus assets/tools.js)
+styles.css                 nur für die Startseite
 assets/                    gemeinsame Stile, Skripte und Daten
 assets/vendor/             Fremdbibliotheken (lokal abgelegt, kein CDN)
 <kategorie>/<tool>/        ein Ordner je Tool
@@ -15,6 +16,19 @@ assets/vendor/             Fremdbibliotheken (lokal abgelegt, kein CDN)
 
 Der Kategorie-Ordner entspricht einer Kachel auf der Startseite. Ordnernamen in
 `kleinbuchstaben_mit_unterstrich`.
+
+## Ein neues Tool eintragen
+
+Es genügt der Eintrag in `assets/tools.js` – die Startseite wird daraus erzeugt und
+bleibt unverändert:
+
+```js
+{ name: 'Fehlzeiten nach Fächern auswerten', ordner: 'fehlzeiten_nach_faechern_auswerten' }
+```
+
+Ein Eintrag ohne `ordner` gilt als geplant und erscheint ausgegraut statt als toter Link.
+Neue Kategorie? Zusätzlich ein Icon in `TOOLHUB_ICONS` und eine Farbklasse `.cat-<id>`
+in `toolhub.css` anlegen.
 
 ## Aufbau eines Tools
 
@@ -55,8 +69,9 @@ Vor eigenen Hilfsfunktionen prüfen, ob es die Aufgabe schon gibt:
 
 | Datei | Inhalt |
 | --- | --- |
-| `assets/toolhub.css` | Grunddesign, `.panel`, `.section`, `.stats`, Meldungen, Buttons, Upload, Tabellen |
-| `assets/toolhub.js` | Theme-Umschaltung, `toolhubUpload()` (Datei-Auswahl inkl. Drag-and-drop) |
+| `assets/toolhub.css` | Grunddesign, Kategoriefarben, `.panel`, `.section`, `.stats`, Meldungen, Buttons, Upload, Tabellen |
+| `assets/toolhub.js` | Theme, Kopfzeile (Zurück-Link + Umschalter), `toolhubUpload()` (Datei-Auswahl inkl. Drag-and-drop) |
+| `assets/tools.js` | Verzeichnis aller Kategorien und Tools, Icon-Vorrat, Kacheln der Startseite |
 | `assets/toolhub-io.js` | Dateien lesen, Kodierung erkennen, CSV lesen/schreiben, Downloads, Meldungen, `toolhubEscapeHtml()` |
 | `assets/toolhub-xlsx.js` | Arbeitsmappen lesen und schreiben, Spaltenbreiten, Blattnamen |
 | `assets/toolhub-kurse.js` | Fachkürzel-Tabelle und Normalisierung von Fach- und Kursbezeichnungen |
@@ -70,16 +85,28 @@ werden.
 
 ## Gestaltung
 
-Farben, Abstände und Komponenten kommen aus `toolhub.css`. Ein Tool setzt nur seine
-Kategoriefarbe, und zwar über die Kategorie-Klasse am `<body>`:
+Farben, Abstände und Komponenten kommen aus `toolhub.css`. Ein Tool setzt keine Farbe
+selbst, sondern nur seine Kategorie-Klasse am `<body>` (Name = Kategorie-Ordner):
 
 ```html
 <body class="cat-klassenzusammensetzung">
 ```
 
-Die Kategoriefarben stehen ausschließlich in `toolhub.css` (`--cat-*`), damit Startseite und
-Tool nicht auseinanderlaufen. Eigene Farbwerte in Tool-CSS nur, wenn sie fachlich nötig sind
-(z. B. Legendenfarben) – ansonsten `var(--accent)`, `var(--text-muted)`, `var(--ok)` usw.
+Die Klasse setzt `--accent` und `--accent-text`; dieselbe Klasse trägt die Kachel auf der
+Startseite, damit Hub und Tool nicht auseinanderlaufen. Definiert sind die Farben
+ausschließlich in `toolhub.css`. Eigene Farbwerte in Tool-CSS nur, wenn sie fachlich nötig
+sind (z. B. Legendenfarben) – ansonsten `var(--accent)`, `var(--text-muted)`, `var(--ok)` usw.
+
+Zurück-Link und Theme-Umschalter erzeugt `toolhub.js` selbst – kein Markup dafür in der
+Tool-Seite. Der Zurück-Link erscheint, sobald der `<body>` eine `cat-*`-Klasse trägt;
+ein abweichendes Ziel geht über `<body data-zurueck="…">`.
+
+Mehrfach verwendete Icons stehen in `assets/tools.js` (`TOOLHUB_ICONS`) und werden im
+Markup als Platzhalter eingesetzt – nur für Motive, die auch anderswo vorkommen:
+
+```html
+<span data-icon="knoten" class="panel-icon"></span>
+```
 
 Emojis in Buttons und Hinweistexten sind gewollt und bleiben bei Umbauten erhalten.
 

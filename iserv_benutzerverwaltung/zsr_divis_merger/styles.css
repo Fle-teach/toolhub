@@ -4,17 +4,6 @@
  * kommen aus ../../assets/toolhub.css.
  */
 
-/* Kategorie-Akzentfarbe: IServ-Benutzerverwaltung (Blau) */
-:root {
-    --accent: #60a5fa;
-    --accent-text: #0f2b4d;
-}
-
-:root[data-theme="light"] {
-    --accent: #2b6cb0;
-    --accent-text: #ffffff;
-}
-
 /* Breitere Inhaltsspalte für die teils sehr breiten Ergebnistabellen */
 main {
     max-width: 1400px;

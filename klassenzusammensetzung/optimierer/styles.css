@@ -11,60 +11,39 @@
  * bleiben dadurch automatisch synchron.
  */
 
-/* ===== Kategorie-Akzentfarbe: Klassen- & Kurszusammensetzung (Violett) ===== */
-:root {
-    --accent: #a78bfa;
-    --accent-text: #241250;
-}
-
-:root[data-theme="light"] {
-    --accent: #805ad5;
-    --accent-text: #ffffff;
-}
-
 /* ===== Farbcodierung (designunabhängig) ===== */
 :root {
     /* Textfarbe auf hellen Codier-Flächen (damit sie auch im Dunkeldesign lesbar bleiben) */
     --code-ink: #14243a;
-
     --sel-bg: #3498db;
     --sel-border: #2980b9;
-
     --wish-1: #00963f;
     --wish-2: #2ecc71;
     --wish-3: #9bfec6;
-
     --wished-1: #8e44ad;
     --wished-2: #9b59b6;
     --wished-3: #9870aa;
-
     --excl: #e74c3c;
     --excl-conflict: #d92d20;
     --excl-conflict-bg: #fff1f1;
-
     --pair: #ff69b4;
     --pair-bg: #ffe0ec;
     --pair-sep: #e0b000;
     --pair-sep-bg: #fff4cc;
-
     --prio-1: #28a745;
     --prio-2: #ffc107;
     --prio-3: #f4511e;
     --prio-none: #8fd3ff;
     --prio-none-fg: #0b4f75;
     --prio-x: #d92d20;
-
     --gender-m: #2f80ed;
     --gender-w: #eb6fb0;
-
     --type-a-bg: #ffe2bf;
     --type-a-fg: #d2691e;
     --type-s-bg: #e7ddff;
     --type-s-fg: #7b3fe4;
-
     --grade-star: #f5dd8f;
     --grade-num: #5a4a00;
-
     /* Neutrale Flächen der Klassenansicht – diese folgen dem Design */
     --student-bg: rgba(255, 255, 255, 0.055);
     --student-bg-hover: rgba(255, 255, 255, 0.11);

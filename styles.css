@@ -1,0 +1,109 @@
+/* Startseite – Grunddesign siehe assets/toolhub.css */
+
+/* Hauptseiten-spezifisch: größerer Titel, Kachel-Raster statt Tool-Layout */
+header {
+  padding: 44px 16px 30px;
+}
+
+h1 {
+  font-size: 3rem;
+}
+
+main {
+  max-width: 1700px;
+  margin: 0 auto;
+  padding: 8px 20px 60px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-left: 4px solid var(--accent);
+  border-radius: 16px;
+  padding: 20px 20px 16px;
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(6px);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.25s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  border-left-color: var(--accent);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35),
+              0 0 24px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+:root[data-theme="light"] .card:hover {
+  box-shadow: 0 2px 4px rgba(20, 40, 70, 0.07),
+              0 14px 32px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.card-icon {
+  position: absolute;
+  top: -18px;
+  right: -18px;
+  width: 130px;
+  height: 130px;
+  color: var(--accent);
+  opacity: var(--icon-opacity);
+  pointer-events: none;
+  transform: rotate(-8deg);
+}
+
+.card h2 {
+  position: relative;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 14px;
+  padding-right: 70px;
+}
+
+.tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+}
+
+.tools a {
+  display: block;
+  background: var(--link-bg);
+  border: 1px solid var(--link-border);
+  border-radius: 10px;
+  padding: 11px 14px;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.tools a:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  transform: translateX(3px);
+}
+
+:root[data-theme="light"] .tools a:hover {
+  background: color-mix(in srgb, var(--accent) 10%, #ffffff);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* Tools ohne Ordner: als geplant kennzeichnen statt als toter Link */
+.tools .geplant {
+  display: block;
+  border: 1px dashed var(--link-border);
+  border-radius: 10px;
+  padding: 11px 14px;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  font-style: italic;
+}

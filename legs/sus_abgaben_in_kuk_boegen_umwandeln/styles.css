@@ -3,20 +3,12 @@
  * Grunddesign (Theme, Panels, Buttons, Upload, Tabellen) kommt aus ../../assets/toolhub.css.
  */
 
-/* Kategorie-Akzentfarbe: LEGs (Pink) */
 :root {
-    --accent: #f472b6;
-    --accent-text: #3d0a26;
     /* Farbstufen für die Zeichenanzahl-Übersicht */
     --tier-1: #eab308;
     --tier-2: #f97316;
     --tier-3: #ef4444;
     --tier-4: #b91c1c;
-}
-
-:root[data-theme="light"] {
-    --accent: #d53f8c;
-    --accent-text: #ffffff;
 }
 
 /* Breite Übersichtstabellen: etwas mehr Platz als das Standard-Layout */

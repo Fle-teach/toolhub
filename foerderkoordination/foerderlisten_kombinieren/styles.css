@@ -1,16 +1,5 @@
 /* Tool-spezifische Ergänzungen – Grunddesign siehe assets/toolhub.css */
 
-/* Kategorie-Akzentfarbe: Förderkoordination (teal) */
-:root {
-	--accent: #2dd4bf;
-	--accent-text: #06302a;
-}
-
-:root[data-theme="light"] {
-	--accent: #0d9488;
-	--accent-text: #ffffff;
-}
-
 .row {
 	position: relative;
 	display: flex;

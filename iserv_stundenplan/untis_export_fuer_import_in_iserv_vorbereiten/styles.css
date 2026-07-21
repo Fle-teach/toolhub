@@ -1,15 +1,10 @@
 /* Tool-spezifische Ergänzungen – Grunddesign siehe assets/toolhub.css */
 
-/* Kategorie-Akzentfarbe: IServ-Stundenplan (Orange) */
 :root {
-    --accent: #fb923c;
-    --accent-text: #3d2008;
     --thead-bg: #253048;
 }
 
 :root[data-theme="light"] {
-    --accent: #dd6b20;
-    --accent-text: #ffffff;
     --thead-bg: #e9eef5;
 }
 

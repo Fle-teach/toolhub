@@ -11,15 +11,129 @@ document.documentElement.dataset.theme =
   localStorage.getItem('toolhub-theme') ||
   (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
 
-// Umschalter (Button mit id="theme-toggle") verbinden, sobald das DOM bereit ist
-document.addEventListener('DOMContentLoaded', () => {
-  const toggle = document.getElementById('theme-toggle');
-  if (!toggle) return;
+// Icon-Motive, die an mehr als einer Stelle vorkommen (Kachel + Tool-Seiten).
+// Einbindung im Markup über <span data-icon="setzling" class="panel-icon"></span>.
+const TOOLHUB_ICONS = {
+  // Setzling / Wachstum
+  setzling:
+    '<path d="M12 22V12"/>' +
+    '<path d="M12 12C12 8.5 9.2 6 5 6c0 4.2 2.8 6.5 7 6.5"/>' +
+    '<path d="M12 12C12 8.5 14.8 6 19 6c0 4.2-2.8 6.5-7 6.5"/>' +
+    '<path d="M7 22h10"/>',
+  // Benutzergruppe
+  benutzer:
+    '<circle cx="9" cy="8" r="3.5"/>' +
+    '<path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/>' +
+    '<circle cx="17.5" cy="9.5" r="2.5"/>' +
+    '<path d="M16.5 14.2c2.7.4 4.8 2.8 4.8 5.8"/>',
+  // Formular mit Häkchen
+  formular:
+    '<rect x="5" y="3" width="14" height="18" rx="2"/>' +
+    '<path d="M8.5 9.5l1.3 1.3 2.4-2.6"/>' +
+    '<path d="M14.5 10h2"/>' +
+    '<path d="M8.5 15.5l1.3 1.3 2.4-2.6"/>' +
+    '<path d="M14.5 16h2"/>',
+  // Aufgeschlagenes Buch (Klassenbuch)
+  buch:
+    '<path d="M12 6c-2-1.5-4.5-2-8-2v14c3.5 0 6 .5 8 2 2-1.5 4.5-2 8-2V4c-3.5 0-6 .5-8 2z"/>' +
+    '<path d="M12 6v14"/>' +
+    '<path d="M7 9c1 0 2 .1 3 .4"/>' +
+    '<path d="M14 9.4c1-.3 2-.4 3-.4"/>',
+  // Stundenplan-Raster
+  stundenplan:
+    '<rect x="3" y="5" width="18" height="16" rx="2"/>' +
+    '<path d="M3 10h18"/>' +
+    '<path d="M9 10v11"/>' +
+    '<path d="M15 10v11"/>' +
+    '<path d="M8 3v4"/>' +
+    '<path d="M16 3v4"/>',
+  // Gesprächsblasen (Lernentwicklungsgespräche)
+  gespraech:
+    '<path d="M14 4H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2v3l4-3h3a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>' +
+    '<path d="M18 9h1a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1v3l-3.5-3"/>',
+  // Verbundene Knoten (Gruppenzusammensetzung)
+  knoten:
+    '<circle cx="5.5" cy="6" r="2.5"/>' +
+    '<circle cx="18.5" cy="6" r="2.5"/>' +
+    '<circle cx="12" cy="18" r="2.5"/>' +
+    '<path d="M8 6h8"/>' +
+    '<path d="M6.8 8.2l4 7.6"/>' +
+    '<path d="M17.2 8.2l-4 7.6"/>'
+};
+
+// Baut ein SVG aus dem Icon-Vorrat; `klasse` ist z. B. 'card-icon' oder 'panel-icon'.
+function toolhubIcon(name, klasse) {
+  const inhalt = TOOLHUB_ICONS[name];
+  if (!inhalt) return '';
+  return `<svg class="${klasse}" viewBox="0 0 24 24" fill="none" stroke="currentColor" ` +
+    'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    inhalt + '</svg>';
+}
+
+// Ersetzt <span data-icon="…"> durch das zugehörige SVG (Klassen bleiben erhalten)
+function toolhubSetzeIcons(wurzel = document) {
+  wurzel.querySelectorAll('[data-icon]').forEach((el) => {
+    const svg = toolhubIcon(el.dataset.icon, el.className);
+    if (svg) el.outerHTML = svg;
+  });
+}
+
+/*
+ * Kopfzeile jeder Seite: Zurück-Link (nur auf Tool-Seiten) und Theme-Umschalter.
+ * Beides wird hier erzeugt, damit das Markup nicht in jeder Tool-Seite steht.
+ *
+ * Der Zurück-Link erscheint, sobald der <body> eine Kategorie-Klasse trägt
+ * (z. B. class="cat-klassenzusammensetzung"); Ziel ist die Startseite zwei
+ * Ebenen höher, abweichend über <body data-zurueck="…"> einstellbar.
+ */
+const TOOLHUB_ICON_SONNE =
+  '<svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<circle cx="12" cy="12" r="4"/>' +
+  '<path d="M12 2v2"/><path d="M12 20v2"/>' +
+  '<path d="M4.9 4.9l1.4 1.4"/><path d="M17.7 17.7l1.4 1.4"/>' +
+  '<path d="M2 12h2"/><path d="M20 12h2"/>' +
+  '<path d="M4.9 19.1l1.4-1.4"/><path d="M17.7 6.3l1.4-1.4"/></svg>';
+
+const TOOLHUB_ICON_MOND =
+  '<svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+
+function toolhubKopf() {
+  const body = document.body;
+  const istToolSeite = [...body.classList].some((klasse) => klasse.startsWith('cat-'));
+
+  if (istToolSeite && !document.querySelector('.back-link')) {
+    const zurueck = document.createElement('a');
+    zurueck.className = 'back-link';
+    zurueck.href = body.dataset.zurueck || '../../index.html';
+    zurueck.innerHTML = '&#8592; <em id="h1a">tool</em><em id="h1b">hub</em>';
+    body.prepend(zurueck);
+  }
+
+  let toggle = document.getElementById('theme-toggle');
+  if (!toggle) {
+    toggle = document.createElement('button');
+    toggle.className = 'theme-toggle';
+    toggle.id = 'theme-toggle';
+    toggle.type = 'button';
+    toggle.title = 'Design wechseln';
+    toggle.setAttribute('aria-label', 'Zwischen hellem und dunklem Design wechseln');
+    toggle.innerHTML = TOOLHUB_ICON_SONNE + TOOLHUB_ICON_MOND;
+    body.prepend(toggle);
+  }
+
   toggle.addEventListener('click', () => {
     const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
     localStorage.setItem('toolhub-theme', next);
   });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  toolhubKopf();
+  toolhubSetzeIcons();
 });
 
 /*

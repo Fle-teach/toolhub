@@ -1,16 +1,5 @@
 /* Tool-spezifische Ergänzungen – Grunddesign siehe assets/toolhub.css */
 
-/* Kategorie-Akzentfarbe: IServ-Formulare (Gelb) */
-:root {
-  --accent: #facc15;
-  --accent-text: #1f2937;
-}
-
-:root[data-theme="light"] {
-  --accent: #d69e2e;
-  --accent-text: #1f2937;
-}
-
 .tabs {
   display: flex;
   gap: 8px;

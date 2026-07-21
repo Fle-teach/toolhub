@@ -1,15 +1,10 @@
 /* Tool-spezifische Ergänzungen – Grunddesign siehe assets/toolhub.css */
 
-/* Kategorie-Akzentfarbe: Klassen- & Kurszusammensetzung (Violett) */
 :root {
-    --accent: #a78bfa;
-    --accent-text: #241250;
     --thead-bg: #253048;
 }
 
 :root[data-theme="light"] {
-    --accent: #805ad5;
-    --accent-text: #ffffff;
     --thead-bg: #e9eef5;
 }
 

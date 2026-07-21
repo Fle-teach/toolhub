@@ -1,9 +1,6 @@
 /* Tool-spezifische Ergänzungen – Grunddesign siehe assets/toolhub.css */
 
-/* Kategorie-Akzentfarbe: IServ-Klassenbuch (Grün) */
 :root {
-    --accent: #4ade80;
-    --accent-text: #06301b;
     --thead-bg: #253048;
     --col-sum: #6cb6e8;
     --col-late: #f0a35e;
@@ -11,8 +8,6 @@
 }
 
 :root[data-theme="light"] {
-    --accent: #2f9e6e;
-    --accent-text: #ffffff;
     --thead-bg: #e9eef5;
     --col-sum: #2980b9;
     --col-late: #d35400;
