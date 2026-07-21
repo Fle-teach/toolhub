@@ -1,0 +1,324 @@
+/* Tool-spezifische Ergänzungen – Grunddesign siehe assets/toolhub.css */
+
+/* Kategorie-Akzentfarbe: IServ-Klassenbuch (Grün) */
+:root {
+    --accent: #4ade80;
+    --accent-text: #06301b;
+    --thead-bg: #253048;
+    --col-sum: #6cb6e8;
+    --col-late: #f0a35e;
+    --col-zero: #4ade80;
+}
+
+:root[data-theme="light"] {
+    --accent: #2f9e6e;
+    --accent-text: #ffffff;
+    --thead-bg: #e9eef5;
+    --col-sum: #2980b9;
+    --col-late: #d35400;
+    --col-zero: #2f9e6e;
+}
+
+/* Breite Ergebnistabelle: mehr Platz als das Standard-Layout */
+main {
+    max-width: 1600px;
+}
+
+.intro {
+    position: relative;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    line-height: 1.6;
+    margin: 0 0 18px;
+}
+
+.intro a {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+:root[data-theme="light"] .intro a {
+    color: color-mix(in srgb, var(--accent) 85%, #000000);
+}
+
+.processing {
+    position: relative;
+    margin-top: 16px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+/* Grunddesign in toolhub.css; hier nur der Abstand nach oben */
+.error {
+    margin: 16px 0 0;
+}
+
+/* === ZUSAMMENFASSUNG === */
+.summary h3,
+.controls h4 {
+    position: relative;
+    margin: 0 0 12px;
+    font-size: 1.05rem;
+}
+
+.summary-stats {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 22px;
+}
+
+.stat-item {
+    background: var(--link-bg);
+    border: 1px solid var(--link-border);
+    border-radius: 10px;
+    padding: 14px 10px;
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+:root[data-theme="light"] .stat-number {
+    color: color-mix(in srgb, var(--accent) 85%, #000000);
+}
+
+.stat-label {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    margin-top: 4px;
+}
+
+/* === FACH-FILTER === */
+.subject-filters {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.subject-filter {
+    display: flex;
+    align-items: center;
+    background: var(--link-bg);
+    border: 1px solid var(--link-border);
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+.subject-filter input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 15px;
+    height: 15px;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.subject-filter label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.subject-filter.sum-filter {
+    border-left: 4px solid var(--col-sum);
+}
+
+.subject-filter.sum-filter label {
+    color: var(--col-sum);
+}
+
+.subject-filter.late-filter {
+    border-left: 4px solid var(--col-late);
+}
+
+.subject-filter.late-filter label {
+    color: var(--col-late);
+}
+
+.filter-buttons {
+    position: relative;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 22px;
+}
+
+/* === ERGEBNISTABELLE === */
+.results-table {
+    position: relative;
+    overflow-x: auto;
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+}
+
+.results-table table {
+    margin: 0;
+    min-width: 600px;
+    font-size: 0.88rem;
+}
+
+.results-table th,
+.results-table td {
+    text-align: center;
+    border: none;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.results-table th {
+    background: var(--thead-bg);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* Farbige Spaltengruppen: gesättigte Farben mit weißer Schrift
+   funktionieren in beiden Themes */
+th.subject-group {
+    background-color: #8e44ad;
+    color: #ffffff;
+    border-left: 2px solid var(--card-border);
+}
+
+th.sum-group {
+    background-color: #2980b9;
+    color: #ffffff;
+    border-left: 2px solid var(--card-border);
+}
+
+th.late-group {
+    background-color: #e67e22;
+    color: #ffffff;
+    border-left: 2px solid var(--card-border);
+}
+
+th.late-col {
+    background-color: #d35400;
+    color: #ffffff;
+}
+
+th.total-col {
+    background-color: #e74c3c;
+    color: #ffffff;
+}
+
+th.unexcused-col {
+    background-color: #c0392b;
+    color: #ffffff;
+}
+
+th.student-header {
+    text-align: left;
+    min-width: 180px;
+}
+
+td.student-name {
+    text-align: left;
+    font-weight: 600;
+    background: var(--thead-bg);
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    border-right: 2px solid var(--card-border);
+}
+
+tr:nth-child(even) td:not(.student-name) {
+    background: var(--link-bg);
+}
+
+tr:hover td:not(.student-name) {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.total-cell {
+    font-weight: 600;
+    color: #e74c3c;
+}
+
+.unexcused-cell {
+    font-weight: 600;
+    color: #c0392b;
+}
+
+:root:not([data-theme="light"]) .total-cell:not(.zero) {
+    color: #f08a7e;
+}
+
+:root:not([data-theme="light"]) .unexcused-cell:not(.zero) {
+    color: #e57368;
+}
+
+.late-cell {
+    font-weight: 600;
+    color: var(--col-late);
+}
+
+.zero {
+    color: var(--col-zero);
+}
+
+td.clickable {
+    cursor: pointer;
+    text-decoration: underline dotted;
+}
+
+td.clickable:hover {
+    background: color-mix(in srgb, var(--accent) 22%, transparent) !important;
+}
+
+/* === DETAIL-POPUP === */
+.detail-popup {
+    position: absolute;
+    display: none;
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+    padding: 14px 16px;
+    z-index: 100;
+    min-width: 260px;
+    max-width: 400px;
+    max-height: 320px;
+    overflow-y: auto;
+    text-align: left;
+    font-size: 0.88rem;
+}
+
+.detail-popup .detail-title {
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.detail-popup .detail-subtitle {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    margin-bottom: 10px;
+}
+
+.detail-popup .detail-entry {
+    padding: 4px 0;
+    border-bottom: 1px solid var(--card-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.detail-popup .detail-entry:last-child {
+    border-bottom: none;
+}
+
+.detail-popup .detail-badge {
+    background: #c0392b;
+    color: #ffffff;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.7rem;
+    white-space: nowrap;
+}

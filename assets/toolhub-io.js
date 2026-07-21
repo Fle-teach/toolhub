@@ -112,9 +112,13 @@ function toolhubDownload(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-// BOM voranstellen, damit Excel die Umlaute korrekt anzeigt
-function toolhubDownloadCsv(text, filename) {
-  toolhubDownload(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8;' }), filename);
+/*
+ * Lädt CSV-Text herunter. Standardmäßig mit BOM, damit Excel die Umlaute korrekt
+ * anzeigt. Für Dateien, die wieder in ein Fremdsystem eingelesen werden, kann das
+ * BOM mit { bom: false } entfallen – manche Importer stolpern darüber.
+ */
+function toolhubDownloadCsv(text, filename, { bom = true } = {}) {
+  toolhubDownload(new Blob([(bom ? '﻿' : '') + text], { type: 'text/csv;charset=utf-8;' }), filename);
 }
 
 // ---------------------------------------------------------------------------

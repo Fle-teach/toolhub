@@ -1,0 +1,299 @@
+/* Tool-spezifische Ergänzungen – Grunddesign siehe assets/toolhub.css */
+
+/* Kategorie-Akzentfarbe: Klassen- & Kurszusammensetzung (Violett) */
+:root {
+    --accent: #a78bfa;
+    --accent-text: #241250;
+    --thead-bg: #253048;
+}
+
+:root[data-theme="light"] {
+    --accent: #805ad5;
+    --accent-text: #ffffff;
+    --thead-bg: #e9eef5;
+}
+
+/* Breite Ergebnis-Boards: mehr Platz als das Standard-Layout */
+main {
+    max-width: 1280px;
+}
+
+/* --- Schritt-Anzeige --- */
+.steps {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.step-chip {
+    flex: 1;
+    min-width: 170px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: var(--link-bg);
+    border: 1px solid var(--link-border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.step-chip.active {
+    background: var(--accent);
+    color: var(--accent-text);
+    border-color: transparent;
+}
+
+.step-chip.done {
+    background: color-mix(in srgb, var(--ok) 14%, transparent);
+    border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+    color: var(--ok);
+}
+
+h3.block-title {
+    font-size: 1.05rem;
+    margin: 24px 0 10px;
+}
+
+h3.block-title:first-of-type {
+    margin-top: 4px;
+}
+
+.muted {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+}
+
+.inline-tip {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 10px 0 0;
+}
+
+/* --- Tabellen (Geschlechtsprüfung) --- */
+.scroll-box {
+    max-height: 460px;
+    overflow: auto;
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+}
+
+table.grid {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+table.grid th,
+table.grid td {
+    border: none;
+    border-bottom: 1px solid var(--card-border);
+    vertical-align: middle;
+}
+
+table.grid thead th {
+    background: var(--thead-bg);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+tr.row-ambig td { background: color-mix(in srgb, var(--err) 10%, transparent); }
+tr.row-unsure td { background: color-mix(in srgb, var(--warn-col) 10%, transparent); }
+
+.badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.badge.sure {
+    background: color-mix(in srgb, var(--ok) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent);
+    color: var(--ok);
+}
+
+.badge.unsure {
+    background: color-mix(in srgb, var(--warn-col) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warn-col) 40%, transparent);
+    color: var(--warn-col);
+}
+
+.badge.ambig {
+    background: color-mix(in srgb, var(--err) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--err) 40%, transparent);
+    color: var(--err);
+}
+
+/* --- Formularelemente (Grundstile: toolhub.css) --- */
+select.g-select { min-width: 150px; }
+
+/* --- Konfiguration --- */
+.crit-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px 16px;
+    align-items: center;
+    max-width: 720px;
+}
+
+.crit-grid .crit-label { font-size: 0.95rem; font-weight: 600; }
+.crit-grid .crit-sub { font-size: 0.8rem; color: var(--text-muted); }
+.crit-ctrl { display: flex; gap: 8px; align-items: center; }
+
+.subject-config {
+    border: 1px solid var(--link-border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 14px;
+    background: var(--link-bg);
+}
+
+.subject-config h3 {
+    font-size: 1.02rem;
+    margin: 0 0 4px;
+}
+
+.subject-config .sub-meta {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.matrix { border-collapse: collapse; margin-top: 8px; width: auto; }
+
+.matrix th, .matrix td {
+    border: 1px solid var(--card-border);
+    padding: 5px 10px;
+    text-align: center;
+    font-size: 0.85rem;
+}
+
+.matrix th { background: var(--thead-bg); }
+
+.matrix td.rowhead {
+    background: var(--link-bg);
+    font-weight: 600;
+    text-align: left;
+}
+
+.bands-toggle {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--accent);
+    cursor: pointer;
+    user-select: none;
+}
+
+:root[data-theme="light"] .bands-toggle {
+    color: color-mix(in srgb, var(--accent) 85%, #000000);
+}
+
+/* --- Ergebnis-Board --- */
+.subject-board { margin-bottom: 30px; }
+
+.subject-board > h3 {
+    font-size: 1.05rem;
+    margin: 0 0 6px;
+}
+
+.board-warn { margin-bottom: 10px; }
+
+.courses-row {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    align-items: flex-start;
+}
+
+.course-col {
+    flex: 1 1 0;
+    min-width: 210px;
+    background: var(--link-bg);
+    border: 1px solid var(--link-border);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+}
+
+.course-col.dragover {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.course-col.violation {
+    border-color: var(--err);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--err) 30%, transparent) inset;
+}
+
+.course-head {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--link-border);
+}
+
+.course-head .ct {
+    font-weight: 700;
+    color: var(--accent);
+}
+
+:root[data-theme="light"] .course-head .ct {
+    color: color-mix(in srgb, var(--accent) 85%, #000000);
+}
+
+.course-head .cmeta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    line-height: 1.5;
+}
+
+.course-head .cls-dist {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    margin-top: 3px;
+}
+
+.course-body {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 60px;
+}
+
+.stu-card {
+    padding: 6px 9px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    cursor: grab;
+    border: 1px solid transparent;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+}
+
+.stu-card:active { cursor: grabbing; }
+
+.stu-card.m {
+    background: color-mix(in srgb, #60a5fa 16%, transparent);
+    border-color: color-mix(in srgb, #60a5fa 40%, transparent);
+}
+
+.stu-card.w {
+    background: color-mix(in srgb, #f472b6 16%, transparent);
+    border-color: color-mix(in srgb, #f472b6 40%, transparent);
+}
+
+.stu-card .kl {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.stu-card.dragging { opacity: 0.4; }
