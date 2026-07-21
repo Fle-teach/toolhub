@@ -227,37 +227,19 @@ class SerienriefApp {
             return;
         }
 
-        file.text().then(content => {
-            try {
-                // PapaParse (gemeinsames Asset): erkennt das Trennzeichen automatisch
-                const result = Papa.parse(content, {
-                    header: true,
-                    skipEmptyLines: 'greedy',
-                    delimitersToGuess: [';', ',', '\t', '|'],
-                    transformHeader: (h) => h.trim(),
-                    transform: (v) => (v || '').trim()
-                });
+        toolhubReadCsv(file).then(({ rows }) => {
+            this.csvData = rows;
 
-                const fatalErrors = result.errors.filter(e => e.type !== 'FieldMismatch');
-                if (fatalErrors.length > 0) {
-                    throw new Error(fatalErrors[0].message);
-                }
-
-                this.csvData = result.data;
-
-                if (this.csvData.length === 0) {
-                    throw new Error('CSV enthält keine Datensätze');
-                }
-
-                this._updateProcessButton();
-                this._showStatus(`✓ CSV erfolgreich geladen: ${this.csvData.length} Datensätze`, 'success');
-            } catch (error) {
-                this.csvData = [];
-                this._updateProcessButton();
-                this._showStatus(`CSV-Fehler: ${error.message}`, 'error');
+            if (this.csvData.length === 0) {
+                throw new Error('CSV enthält keine Datensätze');
             }
+
+            this._updateProcessButton();
+            this._showStatus(`✓ CSV erfolgreich geladen: ${this.csvData.length} Datensätze`, 'success');
         }).catch(error => {
-            this._showStatus(`Datei-Lesefehler: ${error.message}`, 'error');
+            this.csvData = [];
+            this._updateProcessButton();
+            this._showStatus(`CSV-Fehler: ${error.message}`, 'error');
         });
     }
 
@@ -867,27 +849,13 @@ class SerienriefApp {
             }
 
             const zipBlob = await zip.generateAsync({ type: 'blob' });
-            this._saveBlob(zipBlob, 'Serienbriefe.zip');
+            toolhubDownload(zipBlob, 'Serienbriefe.zip');
 
             this._showStatus(`✓ ZIP erfolgreich heruntergeladen!`, 'success');
         } catch (error) {
             this._showStatus(`Fehler beim Download: ${error.message}`, 'error');
             console.error(error);
         }
-    }
-
-    /**
-     * Löst den Download eines Blobs aus (ersetzt die FileSaver.js-Abhängigkeit)
-     */
-    _saveBlob(blob, filename) {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
     }
 
     /**

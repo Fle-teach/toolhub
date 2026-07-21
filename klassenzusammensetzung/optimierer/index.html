@@ -8,8 +8,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../../assets/toolhub.css">
-    <script src="../../assets/toolhub.js"></script>
     <link rel="stylesheet" href="styles.css">
+    <script src="../../assets/toolhub.js"></script>
+    <script src="../../assets/vendor/papaparse.min.js" defer></script>
+    <script src="../../assets/vendor/xlsx.full.min.js" defer></script>
+    <script src="../../assets/toolhub-io.js" defer></script>
+    <script src="../../assets/toolhub-xlsx.js" defer></script>
+    <script src="script.js" defer></script>
 </head>
 <body>
 
@@ -74,10 +79,10 @@
 
             <p class="inline-tip">Oder eine gespeicherte Zusammenstellung laden &ndash; sie enthält Schüler- &amp; Wünsche-Daten, die CSV-Dateien werden dann nicht benötigt.</p>
             <div class="button-group">
-                <button type="button" class="btn-secondary" onclick="document.getElementById('importFileStart').click()">
+                <button type="button" class="btn-secondary" id="importStartBtn">
                     📥 Zusammenstellung importieren (JSON)
                 </button>
-                <input type="file" id="importFileStart" class="file-input" accept=".json" onchange="importClasses(event)">
+                <input type="file" id="importFileStart" class="file-input" accept=".json">
             </div>
         </section>
 
@@ -242,19 +247,19 @@
             </div>
 
             <div class="button-group">
-                <button class="btn-primary" onclick="generateClasses()" id="generateBtn" disabled>
+                <button class="btn-primary" id="generateBtn" disabled>
                     ⚙️ Klassen generieren
                 </button>
-                <button class="btn-secondary" onclick="pauseOptimization()" id="pauseBtn" style="display: none;">
+                <button class="btn-secondary" id="pauseBtn" style="display: none;">
                     ⏸ Pausieren
                 </button>
-                <button class="btn-primary" onclick="resumeOptimization()" id="resumeBtn" style="display: none;">
+                <button class="btn-primary" id="resumeBtn" style="display: none;">
                     ▶ Fortsetzen
                 </button>
-                <button class="btn-secondary" onclick="stopOptimization()" id="stopBtn" style="display: none;">
+                <button class="btn-secondary" id="stopBtn" style="display: none;">
                     ⏹ Beenden
                 </button>
-                <button class="btn-secondary" onclick="resetAll()">
+                <button class="btn-secondary" id="resetBtn">
                     Zurücksetzen
                 </button>
             </div>
@@ -299,16 +304,16 @@
             <div class="score-details" id="scoreDetails"></div>
 
             <div class="button-group">
-                <button class="btn-primary" onclick="exportExcel()">
+                <button class="btn-primary" id="exportExcelBtn">
                     📊 Als Excel exportieren
                 </button>
-                <button class="btn-secondary" onclick="exportClasses()">
+                <button class="btn-secondary" id="exportJsonBtn">
                     💾 Zusammenstellung exportieren
                 </button>
-                <button class="btn-secondary" onclick="document.getElementById('importFile').click()">
+                <button class="btn-secondary" id="importBtn">
                     📥 Zusammenstellung importieren
                 </button>
-                <input type="file" id="importFile" class="file-input" accept=".json" onchange="importClasses(event)">
+                <input type="file" id="importFile" class="file-input" accept=".json">
             </div>
         </section>
 
@@ -391,7 +396,5 @@
     </main>
 
     <!-- SheetJS lokal eingebunden -> Export funktioniert auch offline -->
-    <script src="../../assets/vendor/xlsx.full.min.js"></script>
-    <script src="script.js"></script>
 </body>
 </html>

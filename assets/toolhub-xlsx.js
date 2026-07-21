@@ -71,9 +71,11 @@ function toolhubSheetName(name) {
  *
  *   toolhubWriteXlsx({ 'Fehlzeiten': zeilen }, 'Auswertung.xlsx');
  *   toolhubWriteXlsx([{ name: '05A', rows }, { name: '05B', rows }], 'Klassen.xlsx');
+ *   toolhubWriteXlsx([{ name: '05A', rows, cols: [22, 22, 14] }], 'Klassen.xlsx');
  *
- * Zeilen sind Arrays von Arrays (erste Zeile = Kopfzeile). Die Spaltenbreiten werden
- * automatisch gesetzt; Blattnamen werden über toolhubSheetName() bereinigt.
+ * Zeilen sind Arrays von Arrays (erste Zeile = Kopfzeile). Die Spaltenbreiten richten
+ * sich nach dem längsten Inhalt; mit `cols` lassen sie sich fest vorgeben.
+ * Blattnamen werden über toolhubSheetName() bereinigt.
  */
 function toolhubWriteXlsx(sheets, filename) {
   const liste = Array.isArray(sheets)
@@ -81,9 +83,9 @@ function toolhubWriteXlsx(sheets, filename) {
     : Object.entries(sheets).map(([name, rows]) => ({ name, rows }));
 
   const wb = XLSX.utils.book_new();
-  liste.forEach(({ name, rows }) => {
+  liste.forEach(({ name, rows, cols }) => {
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = toolhubColWidths(rows);
+    ws['!cols'] = cols ? cols.map((wch) => ({ wch })) : toolhubColWidths(rows);
     XLSX.utils.book_append_sheet(wb, ws, toolhubSheetName(name));
   });
   XLSX.writeFile(wb, filename);

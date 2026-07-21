@@ -61,6 +61,24 @@ document.addEventListener('DOMContentLoaded', function() {
         onInvalid: (names) => showError(`Bitte eine CSV-Datei auswählen: ${names.join(', ')}`)
     });
 
+    // Steuerung und Export (früher onclick/onchange im Markup)
+    const verdrahte = (id, ereignis, handler) =>
+        document.getElementById(id).addEventListener(ereignis, handler);
+
+    verdrahte('generateBtn', 'click', generateClasses);
+    verdrahte('pauseBtn', 'click', pauseOptimization);
+    verdrahte('resumeBtn', 'click', resumeOptimization);
+    verdrahte('stopBtn', 'click', stopOptimization);
+    verdrahte('resetBtn', 'click', resetAll);
+    verdrahte('exportExcelBtn', 'click', exportExcel);
+    verdrahte('exportJsonBtn', 'click', exportClasses);
+
+    // Die verborgenen Datei-Felder werden über die sichtbaren Buttons ausgelöst
+    verdrahte('importStartBtn', 'click', () => document.getElementById('importFileStart').click());
+    verdrahte('importBtn', 'click', () => document.getElementById('importFile').click());
+    verdrahte('importFileStart', 'change', importClasses);
+    verdrahte('importFile', 'change', importClasses);
+
     // Checkbox handler for mutual pairs
     document.getElementById('showMutualPairs').addEventListener('change', function() {
         if (Object.keys(currentClasses).length > 0) {
@@ -87,8 +105,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // File handling functions
 // Liest die ausgewählte CSV-Datei ein; ohne Datei (Auswahl entfernt) werden die
-// zugehörigen Daten verworfen.
-function readCsvFile(file, type) {
+// zugehörigen Daten verworfen. Trennzeichen und Kodierung erkennt toolhub-io.js.
+async function readCsvFile(file, type) {
     if (!file) {
         if (type === 'wishes') {
             wishesData = [];
@@ -99,111 +117,23 @@ function readCsvFile(file, type) {
         return;
     }
 
-    const reader = new FileReader();
-    reader.onload = function(event) {
-        parseCSV(event.target.result, type);
-    };
-    reader.readAsText(file);
-}
-
-// Erkennt das Trennzeichen anhand der Kopfzeile (nur Vorkommen außerhalb von
-// Anführungszeichen zählen). Unterstützt Komma, Semikolon, Tab und Pipe.
-function detectDelimiter(headerLine) {
-    const candidates = [',', ';', '\t', '|'];
-    let best = ',';
-    let bestCount = -1;
-    for (const delim of candidates) {
-        let count = 0;
-        let inQuotes = false;
-        for (let i = 0; i < headerLine.length; i++) {
-            const ch = headerLine[i];
-            if (ch === '"') inQuotes = !inQuotes;
-            else if (ch === delim && !inQuotes) count++;
-        }
-        if (count > bestCount) {
-            bestCount = count;
-            best = delim;
-        }
-    }
-    return best;
-}
-
-// Tokenisiert getrennten Text RFC-4180-nah: berücksichtigt Anführungszeichen
-// (inkl. verdoppelter "" als Escape) und akzeptiert \n, \r\n und \r als Zeilenenden.
-function parseDelimitedText(text, delimiter) {
-    const rows = [];
-    let row = [];
-    let field = '';
-    let inQuotes = false;
-    const n = text.length;
-
-    for (let i = 0; i < n; i++) {
-        const ch = text[i];
-
-        if (inQuotes) {
-            if (ch === '"') {
-                if (text[i + 1] === '"') { field += '"'; i++; }
-                else inQuotes = false;
-            } else {
-                field += ch;
-            }
-            continue;
-        }
-
-        if (ch === '"') {
-            inQuotes = true;
-        } else if (ch === delimiter) {
-            row.push(field);
-            field = '';
-        } else if (ch === '\n' || ch === '\r') {
-            row.push(field);
-            rows.push(row);
-            row = [];
-            field = '';
-            if (ch === '\r' && text[i + 1] === '\n') i++;
-        } else {
-            field += ch;
-        }
+    let rows;
+    try {
+        ({ rows } = await toolhubReadCsv(file));
+    } catch (error) {
+        showError(error.message);
+        return;
     }
 
-    // Letztes Feld/Zeile abschließen
-    row.push(field);
-    rows.push(row);
-
-    // Komplett leere Zeilen verwerfen (z. B. abschließender Zeilenumbruch)
-    return rows.filter(r => r.some(cell => cell.trim() !== ''));
-}
-
-function parseCSV(csvText, type) {
-    // BOM entfernen
-    const text = csvText.replace(/^﻿/, '');
-
-    const firstLine = (text.split(/\r\n|\r|\n/).find(line => line.trim() !== '') || '');
-    const delimiter = detectDelimiter(firstLine);
-
-    const rawRows = parseDelimitedText(text, delimiter);
-
-    if (rawRows.length < 2) {
+    if (rows.length === 0) {
         showError('Die Datei enthält keine verwertbaren Daten (Kopfzeile + mindestens eine Datenzeile erforderlich).');
         return;
     }
 
-    const headers = rawRows[0].map(h => h.trim());
-    const data = [];
-
-    for (let i = 1; i < rawRows.length; i++) {
-        const values = rawRows[i];
-        const row = {};
-        headers.forEach((header, index) => {
-            row[header] = (values[index] !== undefined ? values[index] : '').trim();
-        });
-        data.push(row);
-    }
-
     if (type === 'wishes') {
-        wishesData = data;
+        wishesData = rows;
     } else {
-        studentData = data;
+        studentData = rows;
     }
 
     checkIfReady();
@@ -2248,7 +2178,7 @@ function createClassStats(students, constraintFlags = getClassConstraintFlags(st
         if (issues.minNames.length) parts.push('zu wenige – ' + issues.minNames.join(', '));
         if (issues.maxLabels.length) parts.push('zu viele – ' + issues.maxLabels.join(', '));
         const text = parts.length ? parts.join(' | ') : 'Mindest-/Höchstanzahl verletzt';
-        genderOldClassRow = `<div class="stat-row stat-row-wide constraint-violation"><span class="stat-label">Geschlecht je alte Klasse:</span><span>${escapeHtml(text)}</span></div>`;
+        genderOldClassRow = `<div class="stat-row stat-row-wide constraint-violation"><span class="stat-label">Geschlecht je alte Klasse:</span><span>${toolhubEscapeHtml(text)}</span></div>`;
     }
 
     stats.innerHTML = `
@@ -2266,7 +2196,7 @@ function createClassStats(students, constraintFlags = getClassConstraintFlags(st
         </div>
         <div class="stat-row ${constraintFlags.oldClass ? 'constraint-violation' : ''}">
             <span class="stat-label">Alte Klassen:</span>
-            <span>${oldClassEntries.map(([k, v]) => `${escapeHtml(String(k))}: ${v}`).join(', ')}</span>
+            <span>${oldClassEntries.map(([k, v]) => `${toolhubEscapeHtml(String(k))}: ${v}`).join(', ')}</span>
         </div>
         ${genderOldClassRow}
         ${constraintFlags.classSize ? '<div class="stat-row stat-row-wide constraint-violation"><span class="stat-label">Klassengröße:</span><span>Min/Max verletzt</span></div>' : ''}
@@ -2306,14 +2236,6 @@ function getGenderOldClassIssues(studentsInClass) {
     return { minNames, maxLabels, hasIssue: minNames.length > 0 || maxLabels.length > 0 };
 }
 
-function escapeHtml(text) {
-    return String(text)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
 
 function getClassConstraintFlags(studentsInClass, className = '') {
     if (className === 'Ignorierte Schüler') {
@@ -2867,8 +2789,8 @@ function buildGroupSummaryElement(memberObjs) {
         <div class="group-summary-title">Auswahl (${memberObjs.length} Schüler)</div>
         <div class="stat-row"><span class="stat-label">Geschlecht:</span><span>m: ${genderCounts.m}, w: ${genderCounts.w}, d: ${genderCounts.d}</span></div>
         <div class="stat-row"><span class="stat-label">Typ:</span><span>still: ${typeCounts.s}, aktiv: ${typeCounts.a}</span></div>
-        <div class="stat-row"><span class="stat-label">Noten:</span><span>${Object.entries(gradeCounts).map(([k, v]) => `${escapeHtml(String(k))}: ${v}`).join(', ')}</span></div>
-        <div class="stat-row"><span class="stat-label">Alte Klassen:</span><span>${oldClassEntries.map(([k, v]) => `${escapeHtml(String(k))}: ${v}`).join(', ')}</span></div>
+        <div class="stat-row"><span class="stat-label">Noten:</span><span>${Object.entries(gradeCounts).map(([k, v]) => `${toolhubEscapeHtml(String(k))}: ${v}`).join(', ')}</span></div>
+        <div class="stat-row"><span class="stat-label">Alte Klassen:</span><span>${oldClassEntries.map(([k, v]) => `${toolhubEscapeHtml(String(k))}: ${v}`).join(', ')}</span></div>
     `;
     return summary;
 }
@@ -3056,13 +2978,13 @@ function exportExcel() {
         return;
     }
 
-    const wb = XLSX.utils.book_new();
+    const blaetter = [];
     const usedNames = new Set();
 
-    // Sheetnamen dürfen max. 31 Zeichen lang sein, keine Sonderzeichen \ / ? * [ ] :
-    // enthalten und müssen eindeutig sein.
-    const sanitizeSheetName = (name) => {
-        const base = String(name).replace(/[\\\/?*\[\]:]/g, ' ').trim().slice(0, 31) || 'Klasse';
+    // toolhubSheetName kürzt und bereinigt; eindeutig machen muss dieses Tool selbst,
+    // weil zwei Klassen denselben bereinigten Namen ergeben können.
+    const sheetName = (name) => {
+        const base = toolhubSheetName(name);
         let candidate = base;
         let i = 2;
         while (usedNames.has(candidate.toLowerCase())) {
@@ -3092,14 +3014,15 @@ function exportExcel() {
             return (a['Vorname'] || '').toString().localeCompare((b['Vorname'] || '').toString(), 'de');
         });
 
-        const aoa = [['Nachname', 'Vorname', 'Alte Klasse'], ...sorted.map(toRow)];
-        const ws = XLSX.utils.aoa_to_sheet(aoa);
-        ws['!cols'] = [{ wch: 22 }, { wch: 22 }, { wch: 14 }];
-        XLSX.utils.book_append_sheet(wb, ws, sanitizeSheetName(className));
+        blaetter.push({
+            name: sheetName(className),
+            rows: [['Nachname', 'Vorname', 'Alte Klasse'], ...sorted.map(toRow)],
+            cols: [22, 22, 14]
+        });
     }
 
     const dateStr = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(wb, `Klasseneinteilung_${dateStr}.xlsx`);
+    toolhubWriteXlsx(blaetter, `Klasseneinteilung_${dateStr}.xlsx`);
     showSuccess('Excel-Datei erfolgreich erstellt!');
 }
 
@@ -3152,162 +3075,149 @@ function exportClasses() {
         exportData.classes[className] = currentClasses[className].map(s => s['Schüler']);
     }
     
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `klasseneinteilung_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    toolhubDownload(blob, `klasseneinteilung_${new Date().toISOString().split('T')[0]}.json`);
     
     showSuccess('Klasseneinteilung erfolgreich exportiert!');
 }
 
-function importClasses(event) {
+async function importClasses(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const importData = JSON.parse(e.target.result);
+    const inhalt = await toolhubReadText(file);
+    try {
+        const importData = JSON.parse(inhalt);
 
-            if (!importData.version || !importData.classes) {
-                throw new Error('Ungültiges Dateiformat');
-            }
-
-            // Eingebettete Rohdaten wiederherstellen (Format ab v1.6) — dann müssen die
-            // CSV-Dateien zum Weiterarbeiten nicht erneut hochgeladen werden.
-            if (Array.isArray(importData.studentData) && Array.isArray(importData.wishesData)) {
-                studentData = importData.studentData;
-                wishesData = importData.wishesData;
-            } else if (studentData.length === 0 || wishesData.length === 0) {
-                throw new Error('Diese Datei enthält keine eingebetteten Schüler-/Wünsche-Daten. Bitte zuerst die CSV-Dateien laden (oder eine neuere Zusammenstellung importieren).');
-            }
-
-            if (importData.classCount) {
-                document.getElementById('classCount').value = importData.classCount;
-            }
-            if (importData.includeIgnored !== undefined) {
-                document.getElementById('includeIgnored').checked = importData.includeIgnored;
-            }
-            if (importData.showMutualPairs !== undefined) {
-                document.getElementById('showMutualPairs').checked = importData.showMutualPairs;
-            }
-            if (importData.showFulfilledPriority !== undefined) {
-                document.getElementById('showFulfilledPriority').checked = importData.showFulfilledPriority;
-            }
-            if (importData.showGenderHighlight !== undefined) {
-                document.getElementById('showGenderHighlight').checked = importData.showGenderHighlight;
-            }
-            if (importData.showType !== undefined) {
-                document.getElementById('showType').checked = importData.showType;
-            }
-            if (importData.showGrades !== undefined) {
-                document.getElementById('showGrades').checked = importData.showGrades;
-            }
-            if (importData.showGroupSummary !== undefined) {
-                document.getElementById('showGroupSummary').checked = importData.showGroupSummary;
-            }
-
-            // Import distribution rules
-            if (importData.distributionRules) {
-                if (importData.distributionRules.maxSameGender !== undefined) {
-                    document.getElementById('maxSameGender').value = importData.distributionRules.maxSameGender;
-                }
-                if (importData.distributionRules.maxSameOldClass !== undefined) {
-                    document.getElementById('maxSameOldClass').value = importData.distributionRules.maxSameOldClass;
-                }
-                if (importData.distributionRules.minSameOldClass !== undefined) {
-                    document.getElementById('minSameOldClass').value = importData.distributionRules.minSameOldClass;
-                }
-                if (importData.distributionRules.maxClassSize !== undefined) {
-                    document.getElementById('maxClassSize').value = importData.distributionRules.maxClassSize;
-                }
-                if (importData.distributionRules.minClassSize !== undefined) {
-                    document.getElementById('minClassSize').value = importData.distributionRules.minClassSize;
-                }
-                if (importData.distributionRules.maxActive !== undefined) {
-                    document.getElementById('maxActive').value = importData.distributionRules.maxActive;
-                }
-                if (importData.distributionRules.maxGrade1 !== undefined) {
-                    document.getElementById('maxGrade1').value = importData.distributionRules.maxGrade1;
-                }
-                if (importData.distributionRules.maxGrade3 !== undefined) {
-                    document.getElementById('maxGrade3').value = importData.distributionRules.maxGrade3;
-                }
-                if (importData.distributionRules.minDistinctOldClasses !== undefined) {
-                    document.getElementById('minDistinctOldClasses').value = importData.distributionRules.minDistinctOldClasses;
-                }
-                if (importData.distributionRules.maxFemale !== undefined) {
-                    document.getElementById('maxFemale').value = importData.distributionRules.maxFemale;
-                }
-                if (importData.distributionRules.maxMale !== undefined) {
-                    document.getElementById('maxMale').value = importData.distributionRules.maxMale;
-                }
-                if (importData.distributionRules.minSameGenderOldClass !== undefined) {
-                    document.getElementById('minSameGenderOldClass').value = importData.distributionRules.minSameGenderOldClass;
-                }
-                if (importData.distributionRules.maxSameGenderOldClass !== undefined) {
-                    document.getElementById('maxSameGenderOldClass').value = importData.distributionRules.maxSameGenderOldClass;
-                }
-                if (importData.distributionRules.mutualWishOneRequired !== undefined) {
-                    document.getElementById('mutualWishOneRequired').checked = importData.distributionRules.mutualWishOneRequired;
-                }
-            }
-            
-            currentClasses = {};
-            selectedStudent = null;
-            selectedGroupKey = null;
-            manualExclusionHighlightStudentIds.clear();
-            manualExclusionHighlightPairs.clear();
-
-            for (const className in importData.classes) {
-                currentClasses[className] = [];
-
-                for (const studentName of importData.classes[className]) {
-                    const student = studentData.find(s => s['Schüler'] === studentName);
-                    if (student) {
-                        currentClasses[className].push(student);
-                    }
-                }
-            }
-
-            // Importierte Zusammenstellung als aktuelle (beste) Lösung übernehmen, damit
-            // sie fortgesetzt werden kann, statt von vorne zu generieren (Letzteres kann
-            // an strengen Regeln scheitern, obwohl die importierte Lösung gültig ist).
-            optimizationRunning = false;
-            iterations = 0;
-            improvements = 0;
-            optimizerStagnation = 0;
-            bestClasses = JSON.parse(JSON.stringify(currentClasses));
-            bestScore = calculateTotalScore();
-
-            document.getElementById('generateBtn').disabled = false;
-
-            displayClasses();
-
-            // Button-Zustand: nach dem Import "Fortsetzen" statt "Klassen generieren".
-            document.getElementById('generateBtn').style.display = 'none';
-            document.getElementById('pauseBtn').style.display = 'none';
-            document.getElementById('resumeBtn').style.display = 'inline-block';
-            document.getElementById('stopBtn').style.display = 'none';
-            document.getElementById('optimizationStatus').style.display = 'none';
-
-            showSuccess(`Klasseneinteilung erfolgreich importiert! (Score: ${importData.totalScore})`);
-
-        } catch (error) {
-            showError('Fehler beim Importieren: ' + error.message);
+        if (!importData.version || !importData.classes) {
+            throw new Error('Ungültiges Dateiformat');
         }
 
-        event.target.value = '';
-    };
+        // Eingebettete Rohdaten wiederherstellen (Format ab v1.6) — dann müssen die
+        // CSV-Dateien zum Weiterarbeiten nicht erneut hochgeladen werden.
+        if (Array.isArray(importData.studentData) && Array.isArray(importData.wishesData)) {
+            studentData = importData.studentData;
+            wishesData = importData.wishesData;
+        } else if (studentData.length === 0 || wishesData.length === 0) {
+            throw new Error('Diese Datei enthält keine eingebetteten Schüler-/Wünsche-Daten. Bitte zuerst die CSV-Dateien laden (oder eine neuere Zusammenstellung importieren).');
+        }
 
-    reader.readAsText(file);
+        if (importData.classCount) {
+            document.getElementById('classCount').value = importData.classCount;
+        }
+        if (importData.includeIgnored !== undefined) {
+            document.getElementById('includeIgnored').checked = importData.includeIgnored;
+        }
+        if (importData.showMutualPairs !== undefined) {
+            document.getElementById('showMutualPairs').checked = importData.showMutualPairs;
+        }
+        if (importData.showFulfilledPriority !== undefined) {
+            document.getElementById('showFulfilledPriority').checked = importData.showFulfilledPriority;
+        }
+        if (importData.showGenderHighlight !== undefined) {
+            document.getElementById('showGenderHighlight').checked = importData.showGenderHighlight;
+        }
+        if (importData.showType !== undefined) {
+            document.getElementById('showType').checked = importData.showType;
+        }
+        if (importData.showGrades !== undefined) {
+            document.getElementById('showGrades').checked = importData.showGrades;
+        }
+        if (importData.showGroupSummary !== undefined) {
+            document.getElementById('showGroupSummary').checked = importData.showGroupSummary;
+        }
+
+        // Import distribution rules
+        if (importData.distributionRules) {
+            if (importData.distributionRules.maxSameGender !== undefined) {
+                document.getElementById('maxSameGender').value = importData.distributionRules.maxSameGender;
+            }
+            if (importData.distributionRules.maxSameOldClass !== undefined) {
+                document.getElementById('maxSameOldClass').value = importData.distributionRules.maxSameOldClass;
+            }
+            if (importData.distributionRules.minSameOldClass !== undefined) {
+                document.getElementById('minSameOldClass').value = importData.distributionRules.minSameOldClass;
+            }
+            if (importData.distributionRules.maxClassSize !== undefined) {
+                document.getElementById('maxClassSize').value = importData.distributionRules.maxClassSize;
+            }
+            if (importData.distributionRules.minClassSize !== undefined) {
+                document.getElementById('minClassSize').value = importData.distributionRules.minClassSize;
+            }
+            if (importData.distributionRules.maxActive !== undefined) {
+                document.getElementById('maxActive').value = importData.distributionRules.maxActive;
+            }
+            if (importData.distributionRules.maxGrade1 !== undefined) {
+                document.getElementById('maxGrade1').value = importData.distributionRules.maxGrade1;
+            }
+            if (importData.distributionRules.maxGrade3 !== undefined) {
+                document.getElementById('maxGrade3').value = importData.distributionRules.maxGrade3;
+            }
+            if (importData.distributionRules.minDistinctOldClasses !== undefined) {
+                document.getElementById('minDistinctOldClasses').value = importData.distributionRules.minDistinctOldClasses;
+            }
+            if (importData.distributionRules.maxFemale !== undefined) {
+                document.getElementById('maxFemale').value = importData.distributionRules.maxFemale;
+            }
+            if (importData.distributionRules.maxMale !== undefined) {
+                document.getElementById('maxMale').value = importData.distributionRules.maxMale;
+            }
+            if (importData.distributionRules.minSameGenderOldClass !== undefined) {
+                document.getElementById('minSameGenderOldClass').value = importData.distributionRules.minSameGenderOldClass;
+            }
+            if (importData.distributionRules.maxSameGenderOldClass !== undefined) {
+                document.getElementById('maxSameGenderOldClass').value = importData.distributionRules.maxSameGenderOldClass;
+            }
+            if (importData.distributionRules.mutualWishOneRequired !== undefined) {
+                document.getElementById('mutualWishOneRequired').checked = importData.distributionRules.mutualWishOneRequired;
+            }
+        }
+        
+        currentClasses = {};
+        selectedStudent = null;
+        selectedGroupKey = null;
+        manualExclusionHighlightStudentIds.clear();
+        manualExclusionHighlightPairs.clear();
+
+        for (const className in importData.classes) {
+            currentClasses[className] = [];
+
+            for (const studentName of importData.classes[className]) {
+                const student = studentData.find(s => s['Schüler'] === studentName);
+                if (student) {
+                    currentClasses[className].push(student);
+                }
+            }
+        }
+
+        // Importierte Zusammenstellung als aktuelle (beste) Lösung übernehmen, damit
+        // sie fortgesetzt werden kann, statt von vorne zu generieren (Letzteres kann
+        // an strengen Regeln scheitern, obwohl die importierte Lösung gültig ist).
+        optimizationRunning = false;
+        iterations = 0;
+        improvements = 0;
+        optimizerStagnation = 0;
+        bestClasses = JSON.parse(JSON.stringify(currentClasses));
+        bestScore = calculateTotalScore();
+
+        document.getElementById('generateBtn').disabled = false;
+
+        displayClasses();
+
+        // Button-Zustand: nach dem Import "Fortsetzen" statt "Klassen generieren".
+        document.getElementById('generateBtn').style.display = 'none';
+        document.getElementById('pauseBtn').style.display = 'none';
+        document.getElementById('resumeBtn').style.display = 'inline-block';
+        document.getElementById('stopBtn').style.display = 'none';
+        document.getElementById('optimizationStatus').style.display = 'none';
+
+        showSuccess(`Klasseneinteilung erfolgreich importiert! (Score: ${importData.totalScore})`);
+
+    } catch (error) {
+        showError('Fehler beim Importieren: ' + error.message);
+    }
+
+    event.target.value = '';
 }
 
 function resetAll() {
