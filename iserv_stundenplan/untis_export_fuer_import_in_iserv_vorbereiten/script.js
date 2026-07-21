@@ -1,3 +1,9 @@
+// Unter Node.js (Tests) die gemeinsamen Bausteine nachladen –
+// im Browser stellt assets/toolhub-kurse.js sie global bereit.
+if (typeof require !== 'undefined' && typeof toolhubNormalisiereFach === 'undefined') {
+    Object.assign(globalThis, require('../../assets/toolhub-kurse.js'));
+}
+
 // Aufbereitung der Untis-Exportdateien GPU001.TXT (Stundenplan) und GPU002.TXT (Unterricht)
 // für den Import in IServ. GPU001 bleibt unverändert; in GPU002 werden die Kursbezeichnungen
 // (Schülergruppen) normalisiert:
@@ -16,7 +22,7 @@
 //    Ausnahme: Oberstufenkurse (einzige "Klasse" ist der Jahrgang 11 oder 12) sind echte
 //    Parallelkurse und bleiben erhalten.
 //  - fachNormalisieren: Fachkürzel in der Kursbezeichnung werden anhand von
-//    Fachkürzel.csv (aus assets/) vereinheitlicht.
+//    fachkuerzel.csv (aus assets/) vereinheitlicht.
 
 const FELD_UNR = 0;
 const FELD_KLASSE = 4;
@@ -68,41 +74,6 @@ function quote(value) {
     return '"' + value.replace(/"/g, '""') + '"';
 }
 
-// ---------------------------------------------------------------------------
-// Fachkürzel-Normalisierung (Tabelle und Semantik wie im zsr_divis_merger)
-// ---------------------------------------------------------------------------
-
-// Erwartetes Format: "Fach;Normalisiertes Kürzel;Zu Ersetzen[;weitere Varianten...]"
-// Es wird gegen alle Spalten (Fachname, Kürzel, Varianten) case-insensitiv gematcht.
-function parseFachKuerzelCSV(text) {
-    const map = new Map();
-    const lines = text.replace(/^﻿/, '').split(/\r?\n/); // BOM entfernen
-    lines.slice(1).forEach((line) => {
-        if (!line.trim()) return;
-        const fields = line.split(';').map((f) => f.trim());
-        const normalized = fields[1];
-        if (!normalized) return;
-        fields.forEach((key) => {
-            if (!key) return;
-            map.set(key.toLowerCase().replace(/\s+/g, ' '), normalized);
-        });
-    });
-    return map;
-}
-
-// Normalisiert ein einzelnes Fachkürzel:
-// - Ist die komplette Phrase bekannt (case-insensitiv), wird sie ersetzt.
-// - Sonst gilt sie als EIN unbekanntes Kürzel: mehrteilige werden mit Unterstrich
-//   verbunden ("RS Fö" -> "RS_Fö"), damit die Bestandteile der Kursbezeichnung
-//   eindeutig durch Leerzeichen getrennt bleiben; einteilige bleiben unverändert.
-function normalisiereFach(fach, fachMap) {
-    if (fachMap && fachMap.size > 0) {
-        const key = fach.toLowerCase().replace(/\s+/g, ' ');
-        const normalized = fachMap.get(key);
-        if (normalized) return normalized;
-    }
-    return fach.replace(/\s+/g, '_');
-}
 
 // ---------------------------------------------------------------------------
 // Stundenplan (GPU001)
@@ -161,10 +132,6 @@ function parseKlasse(klasse) {
     return { jahrgang: parseInt(match[1], 10), suffix: match[2] };
 }
 
-function padJahrgang(jahrgang) {
-    return String(jahrgang).padStart(2, '0');
-}
-
 // Bestimmt den Klassen-Teil der Kursbezeichnung aus allen Klassen eines Kurses.
 function klassenTeil(klassen) {
     const eindeutig = [...new Set(klassen.filter((k) => k !== ''))];
@@ -180,12 +147,12 @@ function klassenTeil(klassen) {
     if (eindeutig.length === 1) {
         // Genau eine Klasse: Jahrgang mit führender Null, Suffix erhalten (z. B. "08A", "11").
         const p = geparst[0];
-        return p.jahrgang !== null ? padJahrgang(p.jahrgang) + p.suffix : eindeutig[0];
+        return p.jahrgang !== null ? toolhubPadJahrgang(p.jahrgang) + p.suffix : eindeutig[0];
     }
     const min = Math.min(...jahrgaenge);
     const max = Math.max(...jahrgaenge);
     // Mehrere Klassen: Jahrgang (z. B. "08") oder Jahrgangsspanne (z. B. "08-10").
-    return min === max ? padJahrgang(min) : padJahrgang(min) + '-' + padJahrgang(max);
+    return min === max ? toolhubPadJahrgang(min) : toolhubPadJahrgang(min) + '-' + toolhubPadJahrgang(max);
 }
 
 // Baut aus allen Zeilen eines Kurses den Basis-Namen (ohne Unterscheidungszusatz).
@@ -193,7 +160,7 @@ function basisName(zeilen, fachMap) {
     const klassen = zeilen.map((z) => z.klasse);
     let faecher = [...new Set(zeilen.map((z) => z.fach).filter((f) => f !== ''))];
     if (fachMap) {
-        faecher = [...new Set(faecher.map((f) => normalisiereFach(f, fachMap)))];
+        faecher = [...new Set(faecher.map((f) => toolhubNormalisiereFach(f, fachMap)))];
     }
     faecher.sort((a, b) => a.localeCompare(b, 'de'));
     // '?' ist der Untis-Platzhalter für "keine Lehrkraft zugewiesen" und entfällt.
@@ -417,7 +384,7 @@ function erzeugeZip(dateien, datum = new Date()) {
 // Browser-UI (wird unter Node.js für Tests übersprungen)
 // ---------------------------------------------------------------------------
 if (typeof document !== 'undefined') {
-    const FACHKUERZEL_URL = '../../assets/Fachk%C3%BCrzel.csv';
+    
 
     let gpu002Text = null;
     let gpu001Text = null;
@@ -440,15 +407,11 @@ if (typeof document !== 'undefined') {
     const fachCsvFallback = document.getElementById('fachCsvFallback');
     const fachCsvInput = document.getElementById('fachCsvInput');
 
-    // Fachkürzel.csv aus assets/ laden. Schlägt das fehl (z. B. beim Öffnen
+    // Fachkürzel-Tabelle aus assets/ laden. Schlägt das fehl (z. B. beim Öffnen
     // der Seite über file://), kann die Datei manuell ausgewählt werden.
-    fetch(FACHKUERZEL_URL)
-        .then((r) => {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.text();
-        })
-        .then((text) => {
-            fachMap = parseFachKuerzelCSV(text);
+    toolhubLadeFachkuerzel()
+        .then((map) => {
+            fachMap = map;
             aktualisiere();
         })
         .catch(() => {
@@ -456,15 +419,11 @@ if (typeof document !== 'undefined') {
             aktualisiere();
         });
 
-    fachCsvInput.addEventListener('change', (e) => {
+    fachCsvInput.addEventListener('change', async (e) => {
         if (e.target.files.length === 0) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-            fachMap = parseFachKuerzelCSV(reader.result);
-            fachCsvFallback.style.display = 'none';
-            aktualisiere();
-        };
-        reader.readAsText(e.target.files[0], 'UTF-8');
+        fachMap = toolhubParseFachkuerzelCsv(await toolhubReadText(e.target.files[0]));
+        fachCsvFallback.style.display = 'none';
+        aktualisiere();
     });
 
     uploadArea.addEventListener('dragover', (e) => {
@@ -481,15 +440,6 @@ if (typeof document !== 'undefined') {
     optKlassenuebergreifend.addEventListener('change', aktualisiere);
     optFachNormalisieren.addEventListener('change', aktualisiere);
 
-    // Untis exportiert je nach System UTF-8 oder Windows-1252.
-    function dekodiere(buffer) {
-        try {
-            return { text: new TextDecoder('utf-8', { fatal: true }).decode(buffer), kodierung: 'UTF-8' };
-        } catch {
-            return { text: new TextDecoder('windows-1252').decode(buffer), kodierung: 'Windows-1252' };
-        }
-    }
-
     // Unterscheidet GPU001 (9 Felder) und GPU002 (47 Felder) anhand der Spaltenzahl;
     // der Dateiname dient nur als Rückfallebene.
     function erkenneDatei(name, text) {
@@ -504,25 +454,23 @@ if (typeof document !== 'undefined') {
         return null;
     }
 
-    function handleFiles(files) {
+    async function handleFiles(files) {
         errorDiv.textContent = '';
         for (const file of files) {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const { text, kodierung } = dekodiere(reader.result);
-                const typ = erkenneDatei(file.name, text);
-                if (typ === 'GPU002') {
-                    gpu002Text = text;
-                    erkannteKodierung = kodierung;
-                } else if (typ === 'GPU001') {
-                    gpu001Text = text;
-                    gpu001Bytes = new Uint8Array(reader.result);
-                } else {
-                    errorDiv.textContent = `"${file.name}" wurde nicht als GPU001 oder GPU002 erkannt.`;
-                }
-                aktualisiere();
-            };
-            reader.readAsArrayBuffer(file);
+            // Untis exportiert je nach System UTF-8 oder Windows-1252 – toolhubDecode erkennt beides
+            const buffer = await toolhubReadArrayBuffer(file);
+            const { text, encoding } = toolhubDecode(buffer);
+            const typ = erkenneDatei(file.name, text);
+            if (typ === 'GPU002') {
+                gpu002Text = text;
+                erkannteKodierung = encoding;
+            } else if (typ === 'GPU001') {
+                gpu001Text = text;
+                gpu001Bytes = new Uint8Array(buffer);
+            } else {
+                errorDiv.textContent = `"${file.name}" wurde nicht als GPU001 oder GPU002 erkannt.`;
+            }
+            aktualisiere();
         }
     }
 
@@ -538,7 +486,7 @@ if (typeof document !== 'undefined') {
         try {
             const hinweise = [];
             if (optFachNormalisieren.checked && !fachMap) {
-                hinweise.push('Fachkürzel.csv ist nicht geladen — die Fachkürzel bleiben unverändert.');
+                hinweise.push('fachkuerzel.csv ist nicht geladen — die Fachkürzel bleiben unverändert.');
             }
             if (gpu001Text === null) {
                 hinweise.push('GPU001.TXT fehlt — Kurse mit gleichem Namen werden vorerst nummeriert statt ' +
@@ -600,14 +548,7 @@ if (typeof document !== 'undefined') {
             { name: 'GPU001.TXT', daten: gpu001Bytes },
             { name: 'GPU002.TXT', daten: new TextEncoder().encode(ergebnis.inhalt) },
         ]);
-        const blob = new Blob([zip], { type: 'application/zip' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = 'untis_iserv_import.zip';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
+        toolhubDownload(new Blob([zip], { type: 'application/zip' }), 'untis_iserv_import.zip');
     });
 }
 
@@ -615,7 +556,9 @@ if (typeof document !== 'undefined') {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         normalisiereGPU002, klassenTeil, basisName, splitRaw, unquote,
-        parseFachKuerzelCSV, normalisiereFach, istEinKlassenKurs,
+        parseFachKuerzelCSV: toolhubParseFachkuerzelCsv,
+        normalisiereFach: toolhubNormalisiereFach,
+        istEinKlassenKurs,
         parseGPU001, zeitAngabe, erzeugeZip, crc32,
     };
 }

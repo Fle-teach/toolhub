@@ -287,48 +287,17 @@ function calculateInitPW(zsrId) {
 
 // ===== FACHKÜRZEL-NORMALISIERUNG =====
 
-// Zuordnungstabelle aus Fachkürzel.csv: Schreibvariante (lowercase) -> normalisiertes Kürzel
+// Zuordnungstabelle aus fachkuerzel.csv: Schreibvariante (lowercase) -> normalisiertes Kürzel
 let fachKuerzelMap = null;
 let fachKuerzelLoadError = false;
 
-// Erwartetes Format: "Fach;Normalisiertes Kürzel;Zu Ersetzen[;weitere Varianten...]"
-// Es wird gegen alle Spalten (Fachname, Kürzel, Varianten) case-insensitiv gematcht.
-function parseFachKuerzelCSV(text) {
-    const map = new Map();
-    const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/); // BOM entfernen
-    lines.slice(1).forEach(line => {
-        if (!line.trim()) return;
-        const fields = line.split(';').map(f => f.trim());
-        const fach = fields[0];
-        const normalized = fields[1];
-        if (!normalized) return;
-        [fach, normalized, ...fields.slice(2)].forEach(key => {
-            if (!key) return;
-            map.set(key.toLowerCase().replace(/\s+/g, ' '), normalized);
-        });
-    });
-    return map;
-}
 
-// Normalisiert den Fach-Anteil einer Kursbezeichnung anhand der Fachkürzel-Tabelle.
-// Entscheidend: Die gesamte Fach-Phrase wird als Ganzes geprüft, nicht ihre
-// Einzelwörter – sonst würden Bestandteile eines unbekannten mehrteiligen Kürzels
-// einzeln ersetzt (z. B. "muPr Orchester" fälschlich zu "muPr Orch").
-// - Ist die komplette Phrase bekannt (case-insensitiv, auch mehrwortig wie
-//   "E cam" oder "Big Band"), wird sie durch das normalisierte Kürzel ersetzt.
-// - Sonst gilt die Phrase als EIN unbekanntes Kürzel: mehrteilige werden mit
-//   Unterstrich verbunden ("muPr Band" -> "muPr_Band", "muPr Orchester" ->
-//   "muPr_Orchester"), einteilige bleiben unverändert.
+// Fach-Anteil einer Kursbezeichnung vereinheitlichen. Die Phrase wird als Ganzes
+// geprüft (Semantik siehe toolhubNormalisiereFach in assets/toolhub-kurse.js);
+// hier bleibt nur die Umhüllung als Array, wie der Kursname-Aufbau sie erwartet.
 function normalizeFachKuerzel(subjectParts) {
     if (subjectParts.length === 0) return subjectParts;
-
-    if (fachKuerzelMap && fachKuerzelMap.size > 0) {
-        const lookupKey = subjectParts.join(' ').toLowerCase().replace(/\s+/g, ' ');
-        const normalized = fachKuerzelMap.get(lookupKey);
-        if (normalized) return [normalized];
-    }
-
-    return subjectParts.length > 1 ? [subjectParts.join('_')] : subjectParts;
+    return [toolhubNormalisiereFach(subjectParts.join(' '), fachKuerzelMap)];
 }
 
 // Normalisiert einen Kursnamen auf das einheitliche Muster:
@@ -342,7 +311,7 @@ function normalizeFachKuerzel(subjectParts) {
 // - Klasse/Jahrgang steht vorn; einstellige Zahlen erhalten eine führende Null.
 // - Buchstabenanteile der Klasse werden großgeschrieben ("5a" -> "05A").
 // - Zahlen, die keine Klasse/Jahrgang repräsentieren (Kursnummern wie "1" oder ".1"), entfallen.
-// - Fachkürzel werden anhand von Fachkürzel.csv vereinheitlicht (siehe normalizeFachKuerzel).
+// - Fachkürzel werden anhand von fachkuerzel.csv vereinheitlicht (siehe normalizeFachKuerzel).
 // - Lehrerkürzel werden alphabetisch sortiert angehängt.
 function normalizeCourseName(courseTitle, teacherKuerzelList, participants) {
     const parts = (courseTitle || '').toString().trim().split(/\s+/).filter(p => p !== '');
@@ -500,147 +469,119 @@ async function readZSRFiles(fileList) {
 }
 
 async function readZSRFile(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
+    const workbook = await toolhubReadWorkbook(file);
+    try {
+        const rawData = toolhubSheetRows(workbook, { header: false });
 
-                if (!workbook.SheetNames.length) {
-                    throw new Error('Keine Arbeitsblätter gefunden');
+        const headerRowIndex = findZSRHeaderRow(rawData);
+        if (headerRowIndex === -1) {
+            throw new Error('Keine Header-Zeile mit den Spalten ZSR-ID, Nachname und Geburtsdatum gefunden');
+        }
+
+        const headers = rawData[headerRowIndex].map(h =>
+            (h === undefined || h === null) ? '' : canonicalZSRHeader(h)
+        );
+        const dataRows = rawData.slice(headerRowIndex + 1);
+
+        if (dataRows.length === 0) {
+            throw new Error('Keine Datenzeilen unterhalb der Header-Zeile gefunden');
+        }
+
+        // Validierung der erforderlichen Spalten
+        const missingColumns = CONFIG.REQUIRED_ZSR_COLUMNS.filter(col =>
+            !headers.some(header => header && header.includes(col))
+        );
+
+        if (missingColumns.length > 0) {
+            throw new Error(`Fehlende Spalten: ${missingColumns.join(', ')}`);
+        }
+
+        const processedData = dataRows.map(row => {
+            const zsrRow = {};
+            headers.forEach((header, index) => {
+                if (header) {
+                    zsrRow[header + "-ZSR"] = header.includes('Geburtsdatum')
+                        ? normalizeBirthdate(row[index])
+                        : (row[index] ? row[index].toString().trim() : "");
                 }
+            });
 
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            zsrRow["InitPW"] = calculateInitPW(zsrRow["ZSR-ID-ZSR"]);
+            // "Bestandteil Familienname" existiert nicht in allen Export-Varianten
+            zsrRow["Zusammengesetzter-Nachname-ZSR"] =
+                ((zsrRow["Bestandteil Familienname-ZSR"] || "") + " " + (zsrRow["Nachname-ZSR"] || "")).trim();
 
-                const headerRowIndex = findZSRHeaderRow(rawData);
-                if (headerRowIndex === -1) {
-                    throw new Error('Keine Header-Zeile mit den Spalten ZSR-ID, Nachname und Geburtsdatum gefunden');
-                }
+            return zsrRow;
+        }).filter(row =>
+            // Nur Zeilen mit ZSR-ID; wiederholte Header-Zeilen (mehrseitige Print-Exporte) überspringen
+            row["ZSR-ID-ZSR"] &&
+            row["ZSR-ID-ZSR"].replace(/[\s_-]/g, '').toUpperCase() !== 'ZSRID'
+        );
 
-                const headers = rawData[headerRowIndex].map(h =>
-                    (h === undefined || h === null) ? '' : canonicalZSRHeader(h)
-                );
-                const dataRows = rawData.slice(headerRowIndex + 1);
+        return processedData;
 
-                if (dataRows.length === 0) {
-                    throw new Error('Keine Datenzeilen unterhalb der Header-Zeile gefunden');
-                }
-
-                // Validierung der erforderlichen Spalten
-                const missingColumns = CONFIG.REQUIRED_ZSR_COLUMNS.filter(col =>
-                    !headers.some(header => header && header.includes(col))
-                );
-
-                if (missingColumns.length > 0) {
-                    throw new Error(`Fehlende Spalten: ${missingColumns.join(', ')}`);
-                }
-
-                const processedData = dataRows.map(row => {
-                    const zsrRow = {};
-                    headers.forEach((header, index) => {
-                        if (header) {
-                            zsrRow[header + "-ZSR"] = header.includes('Geburtsdatum')
-                                ? normalizeBirthdate(row[index])
-                                : (row[index] ? row[index].toString().trim() : "");
-                        }
-                    });
-
-                    zsrRow["InitPW"] = calculateInitPW(zsrRow["ZSR-ID-ZSR"]);
-                    // "Bestandteil Familienname" existiert nicht in allen Export-Varianten
-                    zsrRow["Zusammengesetzter-Nachname-ZSR"] =
-                        ((zsrRow["Bestandteil Familienname-ZSR"] || "") + " " + (zsrRow["Nachname-ZSR"] || "")).trim();
-
-                    return zsrRow;
-                }).filter(row =>
-                    // Nur Zeilen mit ZSR-ID; wiederholte Header-Zeilen (mehrseitige Print-Exporte) überspringen
-                    row["ZSR-ID-ZSR"] &&
-                    row["ZSR-ID-ZSR"].replace(/[\s_-]/g, '').toUpperCase() !== 'ZSRID'
-                );
-
-                resolve(processedData);
-
-            } catch (error) {
-                reject(new Error(`Fehler beim Lesen der ZSR-Datei "${file.name}": ${error.message}`));
-            }
-        };
-        reader.onerror = () => reject(new Error(`Fehler beim Lesen der ZSR-Datei "${file.name}"`));
-        reader.readAsArrayBuffer(file);
-    });
+    } catch (error) {
+        throw new Error(`Fehler beim Lesen der ZSR-Datei "${file.name}": ${error.message}`);
+    }
 }
 
 async function readDivisFile(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                
-                if (!workbook.SheetNames.length) {
-                    throw new Error('Keine Arbeitsblätter in der DiViS-Datei gefunden');
+    const workbook = await toolhubReadWorkbook(file);
+    try {
+        const rawData = toolhubSheetRows(workbook, { header: false });
+        
+        const headers = rawData[CONFIG.DIVIS_HEADER_ROW];
+        const dataRows = rawData.slice(CONFIG.DIVIS_DATA_START_ROW);
+        
+        // Validierung der erforderlichen Spalten
+        const missingColumns = CONFIG.REQUIRED_DIVIS_COLUMNS.filter(col => 
+            !headers.includes(col)
+        );
+        
+        if (missingColumns.length > 0) {
+            throw new Error(`DiViS-Datei: Fehlende Spalten: ${missingColumns.join(', ')}`);
+        }
+        
+        const processedData = dataRows.map(row => {
+            const divisRow = {};
+            headers.forEach((header, index) => {
+                if (header) {
+                    divisRow[header.trim() + "-DiViS"] = header.includes('Geburtsdatum')
+                        ? normalizeBirthdate(row[index])
+                        : (row[index] ? row[index].toString().trim() : "");
                 }
-                
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-                
-                const headers = rawData[CONFIG.DIVIS_HEADER_ROW];
-                const dataRows = rawData.slice(CONFIG.DIVIS_DATA_START_ROW);
-                
-                // Validierung der erforderlichen Spalten
-                const missingColumns = CONFIG.REQUIRED_DIVIS_COLUMNS.filter(col => 
-                    !headers.includes(col)
-                );
-                
-                if (missingColumns.length > 0) {
-                    throw new Error(`DiViS-Datei: Fehlende Spalten: ${missingColumns.join(', ')}`);
-                }
-                
-                const processedData = dataRows.map(row => {
-                    const divisRow = {};
-                    headers.forEach((header, index) => {
-                        if (header) {
-                            divisRow[header.trim() + "-DiViS"] = header.includes('Geburtsdatum')
-                                ? normalizeBirthdate(row[index])
-                                : (row[index] ? row[index].toString().trim() : "");
-                        }
-                    });
-                    
-                    
-                    /*
-                    // Klasseninformation aufbereiten
-                    const klassenname = divisRow["Klassenname-DiViS"];
-                    if (!klassenname) {
-                        divisRow["Klasse/Information"] = "NN";
-                    } else if (klassenname.startsWith("11")) {
-                        divisRow["Klasse/Information"] = "11";
-                    } else if (klassenname.startsWith("12")) {
-                        divisRow["Klasse/Information"] = "12";
-                    } else if (klassenname.startsWith("IVK")) {
-                        divisRow["Klasse/Information"] = "IVK";
-                    } else {
-                        divisRow["Klasse/Information"] = klassenname;
-                    }
-                    */
-
-                    divisRow["Klasse/Information"] = divisRow["Klassenname-DiViS"];
-                    
-                    divisRow["Zusammengesetzter-Nachname-DiViS"] = 
-                        (divisRow["Namenszusatz-DiViS"] + " " + divisRow["Nachname-DiViS"]).trim();
-                    
-                    return divisRow;
-                }).filter(row => row["Geburtsdatum-DiViS"]); // Nur Zeilen mit Geburtsdatum
-                
-                resolve(processedData);
-                
-            } catch (error) {
-                reject(new Error(`Fehler beim Lesen der DiViS-Datei: ${error.message}`));
+            });
+            
+            
+            /*
+            // Klasseninformation aufbereiten
+            const klassenname = divisRow["Klassenname-DiViS"];
+            if (!klassenname) {
+                divisRow["Klasse/Information"] = "NN";
+            } else if (klassenname.startsWith("11")) {
+                divisRow["Klasse/Information"] = "11";
+            } else if (klassenname.startsWith("12")) {
+                divisRow["Klasse/Information"] = "12";
+            } else if (klassenname.startsWith("IVK")) {
+                divisRow["Klasse/Information"] = "IVK";
+            } else {
+                divisRow["Klasse/Information"] = klassenname;
             }
-        };
-        reader.onerror = () => reject(new Error('Fehler beim Lesen der DiViS-Datei'));
-        reader.readAsArrayBuffer(file);
-    });
+            */
+
+            divisRow["Klasse/Information"] = divisRow["Klassenname-DiViS"];
+            
+            divisRow["Zusammengesetzter-Nachname-DiViS"] = 
+                (divisRow["Namenszusatz-DiViS"] + " " + divisRow["Nachname-DiViS"]).trim();
+            
+            return divisRow;
+        }).filter(row => row["Geburtsdatum-DiViS"]); // Nur Zeilen mit Geburtsdatum
+        
+        return processedData;
+        
+    } catch (error) {
+        throw new Error(`Fehler beim Lesen der DiViS-Datei: ${error.message}`);
+    }
 }
 
 
@@ -716,179 +657,165 @@ async function readElectiveFiles(fileList) {
 }
 
 async function readElectiveFile(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                
-                if (!workbook.SheetNames.length) {
-                    throw new Error('Keine Arbeitsblätter in der Kurs-Datei gefunden');
+    const workbook = await toolhubReadWorkbook(file);
+    try {
+        const electiveCourses = [];
+        
+        // Durchlaufe alle Tabellenblätter
+        workbook.SheetNames.forEach(sheetName => {
+            const rawData = toolhubSheetRows(workbook.Sheets[sheetName], { header: false });
+            
+            if (rawData.length < 4) {
+                console.warn(`Tabellenblatt "${sheetName}" hat zu wenige Zeilen und wird übersprungen`);
+                return;
+            }
+            
+            // FLEXIBEL: Suche nach der Zeile die mit "Nachname" beginnt
+            let headerRowIndex = -1;
+            for (let i = 0; i < rawData.length; i++) {
+                const row = rawData[i];
+                if (row && row[0] && row[0].toString().trim() === "Nachname") {
+                    headerRowIndex = i;
+                    break;
                 }
-                
-                const electiveCourses = [];
-                
-                // Durchlaufe alle Tabellenblätter
-                workbook.SheetNames.forEach(sheetName => {
-                    const sheet = workbook.Sheets[sheetName];
-                    const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-                    
-                    if (rawData.length < 4) {
-                        console.warn(`Tabellenblatt "${sheetName}" hat zu wenige Zeilen und wird übersprungen`);
-                        return;
+            }
+            
+            if (headerRowIndex === -1) {
+                console.warn(`Tabellenblatt "${sheetName}": Keine Zeile mit "Nachname" als erstem Eintrag gefunden`);
+                return;
+            }
+            
+            // Struktur prüfen - Fach und Lehrer aus den ersten Zeilen extrahieren
+            let fach = '';
+            let lehrer = '';
+            
+            // Suche in den ersten Zeilen vor dem Header nach Fach- und Lehrerinformationen
+            for (let i = 0; i < headerRowIndex; i++) {
+                const row = rawData[i];
+                if (row && row[0]) {
+                    const cellContent = row[0].toString().trim();
+                    // Wenn es wie der Kurstitel aussieht (ohne eckige Klammern), z. B. "11-12 muPr Band"
+                    if (cellContent.length < 40 && !cellContent.includes('[') && !fach) {
+                        fach = cellContent;
                     }
-                    
-                    // FLEXIBEL: Suche nach der Zeile die mit "Nachname" beginnt
-                    let headerRowIndex = -1;
-                    for (let i = 0; i < rawData.length; i++) {
-                        const row = rawData[i];
-                        if (row && row[0] && row[0].toString().trim() === "Nachname") {
-                            headerRowIndex = i;
-                            break;
-                        }
+                    // Wenn es wie ein Lehrer aussieht (mit eckigen Klammern oder "Herr"/"Frau")
+                    else if ((cellContent.includes('[') || cellContent.includes('Herr') || cellContent.includes('Frau')) && !lehrer) {
+                        lehrer = cellContent;
                     }
-                    
-                    if (headerRowIndex === -1) {
-                        console.warn(`Tabellenblatt "${sheetName}": Keine Zeile mit "Nachname" als erstem Eintrag gefunden`);
-                        return;
+                }
+            }
+            
+            const headers = rawData[headerRowIndex] || [];
+            
+            // Validierung der erforderlichen Spalten
+            const missingColumns = CONFIG.REQUIRED_ELECTIVE_COLUMNS.filter(col => 
+                !headers.includes(col)
+            );
+            
+            if (missingColumns.length > 0) {
+                console.warn(`Tabellenblatt "${sheetName}": Fehlende Spalten: ${missingColumns.join(', ')}`);
+                return;
+            }
+            
+            // --- Lehrer-Extraktion aus den Zeilen oberhalb des Headers ---
+            // Jeder Lehrer steht in einer eigenen Zelle in den Zeilen oberhalb des Header.
+            // Beispiel: "[Adva] Herr Advani, Anil"
+            const teachersInSheet = [];
+            for (let i = 0; i < headerRowIndex; i++) {
+                const row = rawData[i];
+                if (!row || !row[0]) continue;
+                const cell = row[0].toString().trim();
+                // Identify teacher pattern by presence of square brackets and comma
+                if (cell.includes('[') && cell.includes(']') && cell.includes(',')) {
+                    const parsed = parseTeacherCell(cell);
+                    if (parsed) teachersInSheet.push(parsed);
+                }
+            }
+
+            // Teilnehmer verarbeiten (ab der Zeile nach dem Header)
+            const participants = rawData.slice(headerRowIndex + 1).map(row => {
+                if (!row || row.length === 0 || !row[0]) return null; // Leere Zeilen überspringen
+
+                const participant = {
+                    originalCourseName: sheetName, // Originaler Name für Debug-Zwecke
+                    fach: fach,
+                    lehrer: lehrer
+                };
+
+                headers.forEach((header, index) => {
+                    if (header) {
+                        participant[header] = header.includes('Geburtsdatum')
+                            ? normalizeBirthdate(row[index])
+                            : (row[index] ? row[index].toString().trim() : "");
                     }
-                    
-                    // Struktur prüfen - Fach und Lehrer aus den ersten Zeilen extrahieren
-                    let fach = '';
-                    let lehrer = '';
-                    
-                    // Suche in den ersten Zeilen vor dem Header nach Fach- und Lehrerinformationen
-                    for (let i = 0; i < headerRowIndex; i++) {
-                        const row = rawData[i];
-                        if (row && row[0]) {
-                            const cellContent = row[0].toString().trim();
-                            // Wenn es wie der Kurstitel aussieht (ohne eckige Klammern), z. B. "11-12 muPr Band"
-                            if (cellContent.length < 40 && !cellContent.includes('[') && !fach) {
-                                fach = cellContent;
-                            }
-                            // Wenn es wie ein Lehrer aussieht (mit eckigen Klammern oder "Herr"/"Frau")
-                            else if ((cellContent.includes('[') || cellContent.includes('Herr') || cellContent.includes('Frau')) && !lehrer) {
-                                lehrer = cellContent;
-                            }
-                        }
-                    }
-                    
-                    const headers = rawData[headerRowIndex] || [];
-                    
-                    // Validierung der erforderlichen Spalten
-                    const missingColumns = CONFIG.REQUIRED_ELECTIVE_COLUMNS.filter(col => 
-                        !headers.includes(col)
-                    );
-                    
-                    if (missingColumns.length > 0) {
-                        console.warn(`Tabellenblatt "${sheetName}": Fehlende Spalten: ${missingColumns.join(', ')}`);
-                        return;
-                    }
-                    
-                    // --- Lehrer-Extraktion aus den Zeilen oberhalb des Headers ---
-                    // Jeder Lehrer steht in einer eigenen Zelle in den Zeilen oberhalb des Header.
-                    // Beispiel: "[Adva] Herr Advani, Anil"
-                    const teachersInSheet = [];
-                    for (let i = 0; i < headerRowIndex; i++) {
-                        const row = rawData[i];
-                        if (!row || !row[0]) continue;
-                        const cell = row[0].toString().trim();
-                        // Identify teacher pattern by presence of square brackets and comma
-                        if (cell.includes('[') && cell.includes(']') && cell.includes(',')) {
-                            const parsed = parseTeacherCell(cell);
-                            if (parsed) teachersInSheet.push(parsed);
-                        }
-                    }
-
-                    // Teilnehmer verarbeiten (ab der Zeile nach dem Header)
-                    const participants = rawData.slice(headerRowIndex + 1).map(row => {
-                        if (!row || row.length === 0 || !row[0]) return null; // Leere Zeilen überspringen
-
-                        const participant = {
-                            originalCourseName: sheetName, // Originaler Name für Debug-Zwecke
-                            fach: fach,
-                            lehrer: lehrer
-                        };
-
-                        headers.forEach((header, index) => {
-                            if (header) {
-                                participant[header] = header.includes('Geburtsdatum')
-                                    ? normalizeBirthdate(row[index])
-                                    : (row[index] ? row[index].toString().trim() : "");
-                            }
-                        });
-
-                        return participant;
-                    }).filter(p => p !== null && p["Geburtsdatum"]); // Nur Teilnehmer mit Geburtsdatum
-
-                    // Kursname normalisieren: Quelle ist der Kurstitel aus der ersten Zeile
-                    // (Fallback: Blattname) plus die Lehrerkürzel aus den [Kürzel]-Zeilen
-                    const formattedCourseName = normalizeCourseName(
-                        fach || sheetName,
-                        teachersInSheet.map(t => t.kuerzel),
-                        participants
-                    );
-                    participants.forEach(p => { p.courseName = formattedCourseName; });
-
-                    // Lehrer registrieren; die Kurs-Gruppen werden erst nach der
-                    // Kollisionsprüfung in readElectiveFiles vergeben (endgültige Namen)
-                    teachersInSheet.forEach(t => {
-                        const existing = teacherList.find(e => e.importId === t.importId && e.firstName === t.firstName && e.lastName === t.lastName);
-                        if (!existing) {
-                            teacherList.push({ ...t, groups: [] });
-                        }
-                    });
-
-                    // --- NEU: Lehrer-Gruppen für unterrichtete Klassen ---
-                    // Alle unterschiedlichen Klassen der Teilnehmer ermitteln
-                    const klassenSet = new Set();
-                    participants.forEach(p => {
-                        if (p["Klassenname"]) {
-                            const raw = p["Klassenname"].toString().trim();
-                            if (raw === '') return;
-                            // Normalisieren: Jahrgang 11/12 -> Jg 11 / Jg 12
-                            const startMatch = raw.match(/^(11|12)\b/);
-                            if (startMatch) {
-                                klassenSet.add(`Jg ${startMatch[1]}`);
-                            } else {
-                                klassenSet.add(raw);
-                            }
-                        }
-                    });
-                    // Für jeden Lehrer im Kurs: passende Gruppen ergänzen
-                    teachersInSheet.forEach(t => {
-                        const existing = teacherList.find(e => e.importId === t.importId && e.firstName === t.firstName && e.lastName === t.lastName);
-                        if (existing) {
-                            klassenSet.forEach(klasseKey => {
-                                // Wenn klasseKey ist "Jg 11" oder "Jg 12", nutzen wir "Lehrer Jg X"
-                                const lehrerGroup = klasseKey.startsWith('Jg ') ? `Lehrer ${klasseKey}` : `Lehrer ${klasseKey}`;
-                                if (!existing.groups.includes(lehrerGroup)) {
-                                    existing.groups.push(lehrerGroup);
-                                }
-                            });
-                        }
-                    });
-                    
-                    // Kurs-Objekt sammeln; die Kollisionsprüfung über alle Dateien
-                    // und die flache Teilnehmerliste erstellt readElectiveFiles
-                    electiveCourses.push({
-                        courseName: formattedCourseName,
-                        originalCourseName: sheetName,
-                        teachers: teachersInSheet,
-                        participants: participants
-                    });
                 });
 
-                resolve(electiveCourses);
-                
-            } catch (error) {
-                reject(new Error(`Fehler beim Lesen der Kurs-Datei: ${error.message}`));
-            }
-        };
-        reader.onerror = () => reject(new Error('Fehler beim Lesen der Kurs-Datei'));
-        reader.readAsArrayBuffer(file);
-    });
+                return participant;
+            }).filter(p => p !== null && p["Geburtsdatum"]); // Nur Teilnehmer mit Geburtsdatum
+
+            // Kursname normalisieren: Quelle ist der Kurstitel aus der ersten Zeile
+            // (Fallback: Blattname) plus die Lehrerkürzel aus den [Kürzel]-Zeilen
+            const formattedCourseName = normalizeCourseName(
+                fach || sheetName,
+                teachersInSheet.map(t => t.kuerzel),
+                participants
+            );
+            participants.forEach(p => { p.courseName = formattedCourseName; });
+
+            // Lehrer registrieren; die Kurs-Gruppen werden erst nach der
+            // Kollisionsprüfung in readElectiveFiles vergeben (endgültige Namen)
+            teachersInSheet.forEach(t => {
+                const existing = teacherList.find(e => e.importId === t.importId && e.firstName === t.firstName && e.lastName === t.lastName);
+                if (!existing) {
+                    teacherList.push({ ...t, groups: [] });
+                }
+            });
+
+            // --- NEU: Lehrer-Gruppen für unterrichtete Klassen ---
+            // Alle unterschiedlichen Klassen der Teilnehmer ermitteln
+            const klassenSet = new Set();
+            participants.forEach(p => {
+                if (p["Klassenname"]) {
+                    const raw = p["Klassenname"].toString().trim();
+                    if (raw === '') return;
+                    // Normalisieren: Jahrgang 11/12 -> Jg 11 / Jg 12
+                    const startMatch = raw.match(/^(11|12)\b/);
+                    if (startMatch) {
+                        klassenSet.add(`Jg ${startMatch[1]}`);
+                    } else {
+                        klassenSet.add(raw);
+                    }
+                }
+            });
+            // Für jeden Lehrer im Kurs: passende Gruppen ergänzen
+            teachersInSheet.forEach(t => {
+                const existing = teacherList.find(e => e.importId === t.importId && e.firstName === t.firstName && e.lastName === t.lastName);
+                if (existing) {
+                    klassenSet.forEach(klasseKey => {
+                        // Wenn klasseKey ist "Jg 11" oder "Jg 12", nutzen wir "Lehrer Jg X"
+                        const lehrerGroup = klasseKey.startsWith('Jg ') ? `Lehrer ${klasseKey}` : `Lehrer ${klasseKey}`;
+                        if (!existing.groups.includes(lehrerGroup)) {
+                            existing.groups.push(lehrerGroup);
+                        }
+                    });
+                }
+            });
+            
+            // Kurs-Objekt sammeln; die Kollisionsprüfung über alle Dateien
+            // und die flache Teilnehmerliste erstellt readElectiveFiles
+            electiveCourses.push({
+                courseName: formattedCourseName,
+                originalCourseName: sheetName,
+                teachers: teachersInSheet,
+                participants: participants
+            });
+        });
+
+        return electiveCourses;
+        
+    } catch (error) {
+        throw new Error(`Fehler beim Lesen der Kurs-Datei: ${error.message}`);
+    }
 }
 
 // ===== OPTIMIERTE DATEN-ZUSAMMENFÜHRUNG =====
@@ -1542,60 +1469,46 @@ function testTeacherParsing() {
 }
 
 async function readClassTeacherFile(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                
-                if (!workbook.SheetNames.length) {
-                    throw new Error('Keine Arbeitsblätter in der Klassenlehrerdatei gefunden');
-                }
-                
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-                
-                if (rawData.length < 2) { // Mindestens Header + 1 Datenzeile
-                    throw new Error('Klassenlehrerdatei enthält nicht genügend Daten');
-                }
-                
-                // Erste Zeile überspringen, Header ist in zweiter Zeile
-                const headers = rawData[1];
-                const dataRows = rawData.slice(2);
-                
-                const requiredColumns = ['Klasse', 'Schüler', 'Klassenleitung [Kürzel]', 'Stufe', 'Schulform', 'Klassenart'];
-                const columnIndices = {};
-                
-                // Finde die Indizes der benötigten Spalten
-                requiredColumns.forEach(col => {
-                    const index = headers.findIndex(header => header === col);
-                    if (index === -1) {
-                        throw new Error(`Klassenlehrerdatei: Spalte "${col}" nicht gefunden`);
-                    }
-                    columnIndices[col] = index;
-                });
-                
-                // Verarbeite Datenzeilen
-                const processedData = dataRows
-                    .filter(row => row && row.length >= headers.length)
-                    .map(row => {
-                        const record = {};
-                        requiredColumns.forEach(col => {
-                            record[col] = row[columnIndices[col]] ? row[columnIndices[col]].toString().trim() : "";
-                        });
-                        return record;
-                    });
-                
-                resolve(processedData);
-                
-            } catch (error) {
-                reject(new Error(`Fehler beim Lesen der Klassenlehrerdatei: ${error.message}`));
+    const workbook = await toolhubReadWorkbook(file);
+    try {
+        const rawData = toolhubSheetRows(workbook, { header: false });
+        
+        if (rawData.length < 2) { // Mindestens Header + 1 Datenzeile
+            throw new Error('Klassenlehrerdatei enthält nicht genügend Daten');
+        }
+        
+        // Erste Zeile überspringen, Header ist in zweiter Zeile
+        const headers = rawData[1];
+        const dataRows = rawData.slice(2);
+        
+        const requiredColumns = ['Klasse', 'Schüler', 'Klassenleitung [Kürzel]', 'Stufe', 'Schulform', 'Klassenart'];
+        const columnIndices = {};
+        
+        // Finde die Indizes der benötigten Spalten
+        requiredColumns.forEach(col => {
+            const index = headers.findIndex(header => header === col);
+            if (index === -1) {
+                throw new Error(`Klassenlehrerdatei: Spalte "${col}" nicht gefunden`);
             }
-        };
-        reader.onerror = () => reject(new Error('Fehler beim Lesen der Klassenlehrerdatei'));
-        reader.readAsArrayBuffer(file);
-    });
+            columnIndices[col] = index;
+        });
+        
+        // Verarbeite Datenzeilen
+        const processedData = dataRows
+            .filter(row => row && row.length >= headers.length)
+            .map(row => {
+                const record = {};
+                requiredColumns.forEach(col => {
+                    record[col] = row[columnIndices[col]] ? row[columnIndices[col]].toString().trim() : "";
+                });
+                return record;
+            });
+        
+        return processedData;
+        
+    } catch (error) {
+        throw new Error(`Fehler beim Lesen der Klassenlehrerdatei: ${error.message}`);
+    }
 }
 
 function parseTeacherFromClassTeacherCell(cell) {
@@ -1776,7 +1689,7 @@ document.getElementById('processButton').addEventListener('click', async functio
             // Fachkürzel-Zuordnung wird für die Kursnamen-Normalisierung benötigt
             await fachKuerzelLoadPromise;
             if (fachKuerzelLoadError) {
-                showAlert('Fachkürzel.csv konnte nicht geladen werden – Fachkürzel in Kursnamen werden nicht normalisiert.', 'warning');
+                showAlert('fachkuerzel.csv konnte nicht geladen werden – Fachkürzel in Kursnamen werden nicht normalisiert.', 'warning');
             }
             
             const electiveFiles = electiveUpload.files;
@@ -1940,18 +1853,13 @@ window.addEventListener('beforeunload', function() {
 // Fachkürzel-Zuordnung beim Start laden (für die Normalisierung der Kursnamen).
 // Schlägt das Laden fehl (z. B. Aufruf über file:// oder Datei fehlt), wird beim
 // Verarbeiten von Kurse-Dateien eine Warnung angezeigt und ohne Zuordnung gearbeitet.
-const fachKuerzelLoadPromise = fetch('../../assets/Fachk%C3%BCrzel.csv')
-    .then(response => {
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        return response.text();
-    })
-    .then(text => {
-        fachKuerzelMap = parseFachKuerzelCSV(text);
-        console.log(`Fachkürzel.csv geladen: ${fachKuerzelMap.size} Zuordnungen`);
+const fachKuerzelLoadPromise = toolhubLadeFachkuerzel()
+    .then(map => {
+        fachKuerzelMap = map;
     })
     .catch(error => {
         fachKuerzelLoadError = true;
-        console.warn('Fachkürzel.csv konnte nicht geladen werden:', error.message);
+        console.warn(error.message);
     });
 
 document.addEventListener('DOMContentLoaded', function() {
