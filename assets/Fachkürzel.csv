@@ -1,51 +1,51 @@
-﻿Fach;Normalisiertes Kürzel;Zu Ersetzen
-Big Band;BigBand;Bigband;BB
-Bildende Kunst;BK;
-Biologie;Bio;
-Orchester;Orch;
-A-Orchester;A-Orch;
-B-Orchester;B-Orch;B-Orche
-AG Streicher;AG-Strei;
-Chemie;Che;Ch
-Chor Unterstufe;Chor;Chor U-stu
-Deutsch als Zweitsprache;DZw;DAZ
-Deutsch;Deu;D
-Deutsch Förderung;DFö;D Fö
+﻿Fach;Normalisiertes Kürzel;Zu Ersetzen;;;
+A-Orchester;A-Orch;;;;
+AG Streicher;AG-Strei;;;;
+B-Orchester;B-Orch;B-Orche;;;
+Big Band;BigBand;Bigband;BB;;
+Bildende Kunst;BK;;;;
+Biologie;Bio;;;;
 Camb. Certificate;Cambridge;E cam; EC;E Camb;E Camb 2
-Englisch;Eng;E
-Französisch;Frz;F
-Geographie;Geo;
-Geschichte;Ges;Ge
-Geschichte bilingual;GesBili;Ges bili
-Glück;Glü;
-Informatik;Inf;Info
-Journalistisches Schreiben;JourS;
-Klassenrat;Kl-R;
-Kreatives Schreiben;KreaS;
-Kunst-Design-Digital;KuDeDi;
-Latein;Lat;L
-Leseförderung;LFö;Lese Fö
-Mathematik;Mat;Ma
-Medien Gestalten;MeG;
-MedDik;MedDik;
-Mathe Förderung;MFö;M Fö
-Musikpraktischer Kurs;MuP;
-Musik;Mus;Mu
-NaWi;NaWi;
-Naturwissenschaftliches Praktikum;NwP;
-PGW;PGW;
-Philosophie;Phil;
-Physik;Phy;
-Psychologie;Psy;
-Religion;Rel;
-Rechtschreib Förderung;RsFö;RS Fö
-Seminar;Sem;
-SL;SL;
-Social Sciences;SocSc;
-Spanisch;Spa;
-Sport;Spo;
-Sport Theorie;SpoThe;Spothe;SpoTheo
-Theater;The;Thea
-Vorband;VorB;
-Wirtschaft;Wir;Wirt
-Wirtschaftspraktischer Kurs;WirPrax;Wirtprax
+Chemie;Che;Ch;;;
+Chor Unterstufe;Chor_UStu;Chor U-stu;;;
+Deutsch;Deu;D;;;
+Deutsch als Zweitsprache;DZw;DAZ;DAF;;
+Deutsch Förderung;DFö;D Fö;;;
+Englisch;Eng;E;;;
+Französisch;Frz;F;;;
+Geographie;Geo;;;;
+Geschichte;Ges;Ge;;;
+Geschichte bilingual;GesBili;Ges bili;;;
+Glück;Glü;;;;
+Informatik;Inf;Info;;;
+Journalistisches Schreiben;JourS;;;;
+Klassenrat;Kl-R;;;;
+Kreatives Schreiben;KreaS;;;;
+Kunst-Design-Digital;KuDeDi;;;;
+Latein;Lat;L;;;
+Leseförderung;LFö;Lese Fö;;;
+Mathe Förderung;MFö;M Fö;;;
+Mathematik;Mat;Ma;;;
+MedDik;MedDik;;;;
+Medien Gestalten;MeG;;;;
+Musik;Mus;Mu;;;
+Musikpraktischer Kurs;MuP;;;;
+Naturwissenschaftliches Praktikum;NwP;;;;
+NaWi;NaWi;;;;
+Orchester;Orch;;;;
+PGW;PGW;;;;
+Philosophie;Phil;;;;
+Physik;Phy;;;;
+Psychologie;Psy;;;;
+Rechtschreib Förderung;RsFö;RS Fö;;;
+Religion;Rel;;;;
+Seminar;Sem;;;;
+SL;SL;;;;
+Social Sciences;SocSc;;;;
+Spanisch;Spa;;;;
+Sport;Spo;;;;
+Sport Theorie;SpoThe;Spothe;SpoTheo;;
+Theater;The;Thea;;;
+Vorband;VorB;;;;
+Wirtschaft;Wir;Wirt;;;
+Wirtschaftspraktischer Kurs;WirPrax;Wirtprax;;;

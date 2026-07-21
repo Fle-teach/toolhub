@@ -1,0 +1,98 @@
+/* Tool-spezifische Ergänzungen – Grunddesign siehe assets/toolhub.css */
+
+/* Kategorie-Akzentfarbe: Förderkoordination (teal) */
+:root {
+	--accent: #2dd4bf;
+	--accent-text: #06302a;
+}
+
+:root[data-theme="light"] {
+	--accent: #0d9488;
+	--accent-text: #ffffff;
+}
+
+.row {
+	position: relative;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+}
+
+/* Meldung füllt die Status-Karte komplett aus */
+#statusCard > .error,
+#statusCard > .success {
+	margin-bottom: 0;
+}
+
+/* ----- Kopfzeilen-Pills ----- */
+
+.header-list {
+	position: relative;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.pill {
+	background: color-mix(in srgb, var(--accent) 14%, transparent);
+	border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+	border-radius: 999px;
+	padding: 4px 12px;
+	font-size: 0.85rem;
+	font-weight: 600;
+}
+
+/* ----- Sortierung ----- */
+
+.sort-grid {
+	position: relative;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.sort-grid label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.sort-grid input[type="checkbox"] {
+	width: 16px;
+	height: 16px;
+}
+
+.priority-list {
+	position: relative;
+	margin-top: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.priority-item {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	border: 1px solid var(--link-border);
+	border-radius: 10px;
+	background: var(--link-bg);
+	font-size: 0.95rem;
+}
+
+.priority-actions {
+	display: flex;
+	gap: 6px;
+}
+
+.muted {
+	position: relative;
+	color: var(--text-muted);
+	margin: 6px 0 0;
+	font-size: 0.92rem;
+}

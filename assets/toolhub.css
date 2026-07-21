@@ -375,6 +375,13 @@ button {
   cursor: not-allowed;
 }
 
+/* Kleinere Ausführung für Buttons innerhalb von Listen und Tabellen */
+.btn-primary.btn-small,
+.btn-secondary.btn-small {
+  padding: 5px 12px;
+  font-size: 0.85rem;
+}
+
 /* ----- Formularelemente ----- */
 
 select,

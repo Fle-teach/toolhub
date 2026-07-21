@@ -62,7 +62,7 @@ const upload = toolhubUpload({
     extensions: ['.xlsx'],
     onInvalid: (names) => {
         ungueltigGemeldet = true;
-        showMessage(`Bitte nur XLSX-Dateien auswählen. Ungültig: ${names.map(escapeHtml).join(', ')}`, 'error');
+        showMessage(`Bitte nur XLSX-Dateien auswählen. Ungültig: ${names.join(', ')}`, 'error');
     },
     onChange: (files) => {
         analyzeBtn.disabled = files.length === 0;
@@ -77,15 +77,6 @@ const upload = toolhubUpload({
 // --- Auswertung ---
 
 analyzeBtn.addEventListener('click', analyzeFiles);
-
-function readFileAsArrayBuffer(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.onerror = () => reject(new Error(`Datei "${file.name}" konnte nicht gelesen werden.`));
-        reader.readAsArrayBuffer(file);
-    });
-}
 
 async function analyzeFiles() {
     if (upload.files.length === 0) {
@@ -107,8 +98,8 @@ async function analyzeFiles() {
 
     for (const file of upload.files) {
         try {
-            const buffer = await readFileAsArrayBuffer(file);
-            const entries = extractFoerderbedarf(buffer, settings);
+            const workbook = await toolhubReadWorkbook(file);
+            const entries = extractFoerderbedarf(workbook, settings);
             resultEntries.push(...entries);
         } catch (error) {
             errors.push(`${file.name}: ${error.message}`);
@@ -116,7 +107,7 @@ async function analyzeFiles() {
     }
 
     if (errors.length > 0) {
-        showMessage(`Fehler bei der Auswertung:<br>${errors.map(escapeHtml).join('<br>')}`, 'error');
+        showMessage(['Fehler bei der Auswertung:', ...errors], 'error');
         if (resultEntries.length === 0) {
             resultsSection.classList.remove('visible');
             return;
@@ -126,10 +117,8 @@ async function analyzeFiles() {
     displayResults();
 }
 
-function extractFoerderbedarf(buffer, settings) {
-    const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+function extractFoerderbedarf(workbook, settings) {
+    const jsonData = toolhubSheetRows(workbook, { header: false });
 
     // Festes Layout der DIVIS-Notenübersicht:
     // Zeile ab der die Schüler beginnen, Fachkürzel-Zeile und Lehrer-Zeile händisch setzen
@@ -221,7 +210,7 @@ function displayResults() {
         html += `
             <div class="group-section">
                 <div class="group-header">
-                    <h3>Klasse ${escapeHtml(klasse)}</h3>
+                    <h3>Klasse ${toolhubEscapeHtml(klasse)}</h3>
                     <div class="count">${klassenEntries.length} ${klassenEntries.length === 1 ? 'Eintrag' : 'Einträge'}</div>
                 </div>
                 <table class="pairs-table">
@@ -239,10 +228,10 @@ function displayResults() {
         klassenEntries.forEach(entry => {
             html += `
                 <tr>
-                    <td>${escapeHtml(entry.schueler)}</td>
-                    <td>${escapeHtml(entry.fach)}</td>
-                    <td>${escapeHtml(entry.lehrkraft)}</td>
-                    <td><span class="note-badge">${escapeHtml(entry.note)}</span></td>
+                    <td>${toolhubEscapeHtml(entry.schueler)}</td>
+                    <td>${toolhubEscapeHtml(entry.fach)}</td>
+                    <td>${toolhubEscapeHtml(entry.lehrkraft)}</td>
+                    <td><span class="note-badge">${toolhubEscapeHtml(entry.note)}</span></td>
                 </tr>
             `;
         });
@@ -258,15 +247,7 @@ function displayResults() {
 }
 
 function showMessage(text, type) {
-    messageDiv.innerHTML = `<div class="${type}">${text}</div>`;
-}
-
-function escapeHtml(value) {
-    return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+    toolhubMessage(messageDiv, text, type);
 }
 
 // --- Export & Zurücksetzen ---
@@ -282,18 +263,8 @@ exportBtn.addEventListener('click', () => {
         rows.push([entry.klasse, entry.schueler, entry.fach, entry.lehrkraft, entry.note, '']);
     });
 
-    const worksheet = XLSX.utils.aoa_to_sheet(rows);
-
-    // Spaltenbreiten an den längsten Inhalt der jeweiligen Spalte anpassen
-    worksheet['!cols'] = rows[0].map((_, colIndex) => ({
-        wch: Math.max(...rows.map(row => String(row[colIndex] ?? '').length)) + 2
-    }));
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Förderbedarf');
-
     const alleKlassen = [...new Set(resultEntries.map(e => e.klasse))].map(k => `_${k}`).join('');
-    XLSX.writeFile(workbook, `Übersicht_Förderbedarf${alleKlassen}.xlsx`);
+    toolhubWriteXlsx({ 'Förderbedarf': rows }, `Übersicht_Förderbedarf${alleKlassen}.xlsx`);
 });
 
 resetBtn.addEventListener('click', () => {
