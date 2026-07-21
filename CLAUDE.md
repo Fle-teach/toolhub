@@ -76,9 +76,11 @@ Vor eigenen Hilfsfunktionen prüfen, ob es die Aufgabe schon gibt:
 | `assets/toolhub-xlsx.js` | Arbeitsmappen lesen und schreiben, Spaltenbreiten, Blattnamen |
 | `assets/toolhub-kurse.js` | Fachkürzel-Tabelle und Normalisierung von Fach- und Kursbezeichnungen |
 | `assets/vendor/` | PapaParse, SheetJS (`xlsx`), vis-network, JSZip |
+| `assets/fonts/` | Open Sans (woff2); die `@font-face`-Regeln stehen in `toolhub.css` |
 
-Fremdbibliotheken werden **lokal** unter `assets/vendor/` abgelegt, nie aus einem CDN geladen –
-die Tools müssen ohne Internetzugang funktionieren.
+Fremdbibliotheken und Schriften werden **lokal** abgelegt, nie aus einem CDN oder von Google
+Fonts geladen – die Tools müssen ohne Internetzugang funktionieren. Eine Tool-Seite bindet
+deshalb weder `fonts.googleapis.com` noch sonst einen fremden Host ein.
 
 Wird eine Funktion in einem zweiten Tool gebraucht, wandert sie nach `assets/`, statt kopiert zu
 werden.
