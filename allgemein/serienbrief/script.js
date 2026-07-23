@@ -207,12 +207,25 @@ function zeigeFelder() {
   felder.forEach((feld) => {
     const zeile = document.createElement('tr');
 
+    // Word- und Writer-Felder werden in ihrer eigenen Schreibweise gezeigt,
+    // damit sie in der Vorlage wiederzuerkennen sind
+    const ausVorlage = zustand.vorlage.formatFelder.includes(feld);
     const feldZelle = document.createElement('td');
-    feldZelle.innerHTML = `<code>{{${toolhubEscapeHtml(feld)}}}</code>`;
+    feldZelle.innerHTML = ausVorlage
+      ? `<code>«${toolhubEscapeHtml(feld)}»</code>`
+      : `<code>{{${toolhubEscapeHtml(feld)}}}</code>`;
+
+    const hinweise = [];
+    if (ausVorlage) {
+      hinweise.push(zustand.vorlage.format === 'docx' ? 'Word-Seriendruckfeld' : 'Writer-Datenbankfeld');
+    }
     if (zustand.vorlage.kopfFelder.includes(feld) && !zustand.vorlage.felder.includes(feld)) {
+      hinweise.push('nur in Kopf-/Fußzeile');
+    }
+    if (hinweise.length > 0) {
       const hinweis = document.createElement('div');
       hinweis.className = 'feld-hinweis';
-      hinweis.textContent = 'nur in Kopf-/Fußzeile';
+      hinweis.textContent = hinweise.join(' · ');
       feldZelle.appendChild(hinweis);
     }
 

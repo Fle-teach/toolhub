@@ -27,6 +27,11 @@
  * Serienbrieffelder haben die Form {{Feldname}}. Umschließende Leerzeichen im Feld
  * werden ignoriert ({{ Vorname }} == {{Vorname}}).
  *
+ * Zusätzlich werden die formateigenen Seriendruckfelder verstanden, sodass in Word
+ * bzw. Writer eingerichtete Vorlagen unverändert weiterverwendet werden können:
+ *   DOCX  MERGEFIELD, auch in IF-Feldern verschachtelt (siehe Abschnitt weiter unten)
+ *   ODT   <text:database-display> (Einfügen > Feldbefehl > Weitere > Datenbank)
+ *
  * Warum eigener Code statt einer Bibliothek: Die Tools laufen ohne Build-Schritt und
  * ohne Internetzugang; DOCX und ODT sind ZIP-Archive mit XML, das reicht mit JSZip
  * und dem DOMParser des Browsers aus.
@@ -219,6 +224,8 @@ class ToolhubVorlage {
     this.puffer = puffer;
     this.felder = [];
     this.kopfFelder = [];
+    // Namen, die aus einem formateigenen Seriendruckfeld stammen und nicht aus {{…}}
+    this.formatFelder = [];
   }
 
   // Alle Feldnamen der Vorlage (Fließtext zuerst, dann nur in Kopf-/Fußzeilen benutzte)
@@ -226,13 +233,23 @@ class ToolhubVorlage {
     return this.felder.concat(this.kopfFelder.filter((name) => !this.felder.includes(name)));
   }
 
-  // Felder aller Absätze einsammeln (Reihenfolge des ersten Auftretens)
+  /*
+   * Feldnamen aller Absätze einsammeln (Reihenfolge des ersten Auftretens).
+   * Neben den {{…}} zählen die formateigenen Seriendruckfelder mit, die
+   * _formatFelder() der jeweiligen Klasse meldet.
+   */
   _sammleFelder(absaetze) {
     const namen = [];
+    const merke = (name) => {
+      if (name && !namen.includes(name)) namen.push(name);
+    };
+
     absaetze.forEach((absatz) => {
       const text = this._stuecke(absatz).map((stueck) => stueck.lies() || '').join('');
-      toolhubVorlageFelder(text).forEach((name) => {
-        if (!namen.includes(name)) namen.push(name);
+      toolhubVorlageFelder(text).forEach(merke);
+      this._formatFelder(absatz).forEach((name) => {
+        merke(name);
+        if (!this.formatFelder.includes(name)) this.formatFelder.push(name);
       });
     });
     return namen;
@@ -241,8 +258,19 @@ class ToolhubVorlage {
   // Felder in allen Absätzen unterhalb der Wurzeln ersetzen
   _ersetze(wurzeln, werte, optionen) {
     this._absaetze(wurzeln).forEach((absatz) => {
+      // Zuerst die formateigenen Felder – sie hinterlassen gewöhnlichen Text,
+      // der anschließend wie jeder andere auf {{…}} geprüft wird.
+      this._ersetzeFormatFelder(absatz, werte, optionen);
       toolhubVorlageErsetzeStuecke(this._stuecke(absatz), werte, optionen);
     });
+  }
+
+  // Seriendruckfelder des Formats (Word: MERGEFIELD, Writer: Datenbankfeld)
+  _formatFelder() {
+    return [];
+  }
+
+  _ersetzeFormatFelder() {
   }
 
   /*
@@ -266,6 +294,233 @@ class ToolhubVorlage {
   _text(wurzeln) {
     return this._absaetze(wurzeln).map((absatz) => this._absatzText(absatz)).join('\n');
   }
+}
+
+// ---------------------------------------------------------------------------
+// Word-Feldfunktionen (MERGEFIELD, IF …)
+//
+// Word speichert ein Feld als Folge von Runs im selben Absatz:
+//
+//   fldChar begin | instrText " MERGEFIELD Note " | fldChar separate
+//                 | Ergebnis der letzten Zusammenführung | fldChar end
+//
+// Die Anweisung kann über mehrere instrText verteilt sein und selbst Felder
+// enthalten – so entstehen die verschachtelten IF-Konstruktionen, mit denen in
+// Word-Vorlagen üblicherweise Ankreuzfelder gebaut werden:
+//
+//   IF { MERGEFIELD Note } = "5+" "X" { IF { MERGEFIELD Note } = "5" "X" "" }
+//
+// Deshalb wird der Feldbaum aufgebaut und rekursiv ausgewertet. Felder, die
+// nicht zum Seriendruck gehören (DATE, PAGE …), bleiben unangetastet; Word
+// aktualisiert sie beim Öffnen selbst.
+// ---------------------------------------------------------------------------
+
+// Runs eines Absatzes, ohne die tiefer liegender Absätze (Textfelder, Tabellen)
+function toolhubVorlageDocxRuns(absatz) {
+  return Array.from(absatz.getElementsByTagNameNS(TOOLHUB_NS.w, 'r'))
+    .filter((run) => toolhubVorlageVorfahre(run.parentNode, TOOLHUB_NS.w, ['p']) === absatz);
+}
+
+function toolhubVorlageDocxFldChar(run) {
+  const fldChar = run.getElementsByTagNameNS(TOOLHUB_NS.w, 'fldChar')[0];
+  return fldChar ? fldChar.getAttributeNS(TOOLHUB_NS.w, 'fldCharType') : null;
+}
+
+// Text eines Runs – Anweisungstext und sichtbarer Text zählen gleichermaßen
+function toolhubVorlageDocxRunText(run) {
+  let text = '';
+  ['instrText', 't'].forEach((name) => {
+    Array.from(run.getElementsByTagNameNS(TOOLHUB_NS.w, name)).forEach((el) => {
+      text += el.textContent || '';
+    });
+  });
+  return text;
+}
+
+/*
+ * Baut den Feldbaum eines Absatzes.
+ *
+ * Ein Feld ist { von, bis, anweisung, ergebnis }; `von`/`bis` sind Indizes in
+ * `runs`, `anweisung` und `ergebnis` enthalten Teile der Form
+ * { art: 'text', wert } bzw. { art: 'feld', feld } (verschachteltes Feld).
+ *
+ * Zurückgegeben werden nur die Felder der obersten Ebene. Felder ohne
+ * passendes Ende (in Word möglich, wenn sie über Absätze reichen) entfallen.
+ */
+function toolhubVorlageDocxFeldbaum(runs) {
+  const stapel = [];
+  const oben = [];
+
+  const ziel = (feld) => (feld.trenner < 0 ? feld.anweisung : feld.ergebnis);
+
+  runs.forEach((run, index) => {
+    const typ = toolhubVorlageDocxFldChar(run);
+    const aktuell = stapel[stapel.length - 1];
+
+    if (typ === 'begin') {
+      const feld = { von: index, bis: -1, trenner: -1, anweisung: [], ergebnis: [] };
+      if (aktuell) ziel(aktuell).push({ art: 'feld', feld });
+      else oben.push(feld);
+      stapel.push(feld);
+      return;
+    }
+    if (typ === 'separate') {
+      if (aktuell) aktuell.trenner = index;
+      return;
+    }
+    if (typ === 'end') {
+      const feld = stapel.pop();
+      if (feld) feld.bis = index;
+      return;
+    }
+    // Gewöhnlicher Run: nur innerhalb eines Feldes von Belang
+    if (aktuell) ziel(aktuell).push({ art: 'text', wert: toolhubVorlageDocxRunText(run), run });
+  });
+
+  return oben.filter((feld) => feld.bis >= 0);
+}
+
+/*
+ * Zerlegt eine Feldanweisung in Wörter. Anführungszeichen fassen zusammen,
+ * verschachtelte Felder steuern ihr Ergebnis als Wort bei – so wird aus
+ * `{ MERGEFIELD Note } = "5+" "X"` die Folge ['5+', '=', '5+', 'X'].
+ */
+function toolhubVorlageDocxWoerter(teile, werte, optionen) {
+  const woerter = [];
+  let aktuell = null;
+  let inAnfuehrung = false;
+
+  const anhaengen = (text) => { aktuell = (aktuell === null ? '' : aktuell) + text; };
+  const abschliessen = () => {
+    if (aktuell !== null) woerter.push(aktuell);
+    aktuell = null;
+  };
+
+  teile.forEach((teil) => {
+    if (teil.art === 'feld') {
+      const wert = toolhubVorlageDocxFeldwert(teil.feld, werte, optionen);
+      anhaengen(wert === null ? '' : wert);
+      return;
+    }
+    for (const zeichen of teil.wert) {
+      if (inAnfuehrung) {
+        if (zeichen === '"') inAnfuehrung = false;
+        else anhaengen(zeichen);
+      } else if (zeichen === '"') {
+        inAnfuehrung = true;
+        anhaengen('');
+      } else if (/\s/.test(zeichen)) {
+        abschliessen();
+      } else {
+        anhaengen(zeichen);
+      }
+    }
+  });
+
+  abschliessen();
+  return woerter;
+}
+
+// Zahl oder null – "5+" ist bewusst keine Zahl, sonst verglichen IF-Felder falsch
+function toolhubVorlageZahl(wert) {
+  const text = String(wert).trim().replace(',', '.');
+  return /^[+-]?\d+(\.\d+)?$/.test(text) ? parseFloat(text) : null;
+}
+
+/*
+ * Vergleich einer IF-Bedingung. Zwei Zahlen werden numerisch verglichen, sonst
+ * wird die Zeichenkette ohne Rücksicht auf Groß- und Kleinschreibung geprüft;
+ * bei = und <> sind die Platzhalter * und ? erlaubt (wie in Word).
+ * null bedeutet: nicht auswertbar.
+ */
+function toolhubVorlageVergleich(links, operator, rechts) {
+  const a = toolhubVorlageZahl(links);
+  const b = toolhubVorlageZahl(rechts);
+
+  if (a !== null && b !== null) {
+    switch (operator) {
+      case '=': return a === b;
+      case '<>': return a !== b;
+      case '>': return a > b;
+      case '<': return a < b;
+      case '>=': return a >= b;
+      case '<=': return a <= b;
+      default: return null;
+    }
+  }
+
+  const x = String(links).trim().toLowerCase();
+  const y = String(rechts).trim().toLowerCase();
+
+  if (operator === '=' || operator === '<>') {
+    let gleich;
+    if (/[*?]/.test(y)) {
+      const muster = new RegExp('^' + y.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '.*').replace(/\?/g, '.') + '$');
+      gleich = muster.test(x);
+    } else {
+      gleich = x === y;
+    }
+    return operator === '=' ? gleich : !gleich;
+  }
+
+  switch (operator) {
+    case '>': return x > y;
+    case '<': return x < y;
+    case '>=': return x >= y;
+    case '<=': return x <= y;
+    default: return null;
+  }
+}
+
+/*
+ * Wert eines Feldes; null heißt "nicht zuständig" – das Feld bleibt dann
+ * unverändert im Dokument stehen.
+ */
+function toolhubVorlageDocxFeldwert(feld, werte, optionen) {
+  const woerter = toolhubVorlageDocxWoerter(feld.anweisung, werte, optionen);
+  if (woerter.length === 0) return null;
+  const art = woerter[0].toUpperCase();
+
+  if (art === 'MERGEFIELD') {
+    const name = woerter[1];
+    if (!name) return null;
+    if (Object.prototype.hasOwnProperty.call(werte, name)) return toolhubVorlageWert(werte[name]);
+    return optionen && optionen.behaltUnbekannte ? `{{${name}}}` : '';
+  }
+
+  if (art === 'IF') {
+    const ergebnis = toolhubVorlageVergleich(woerter[1] ?? '', woerter[2], woerter[3] ?? '');
+    if (ergebnis === null) return null;
+    return (ergebnis ? woerter[4] : woerter[5]) ?? '';
+  }
+
+  return null;
+}
+
+// Feldnamen eines Feldbaums (auch aus verschachtelten Feldern), für die Zuordnung
+function toolhubVorlageDocxFeldnamen(felder, namen = []) {
+  felder.forEach((feld) => {
+    const text = feld.anweisung
+      .map((teil) => (teil.art === 'text' ? teil.wert : ' '))
+      .join('');
+    const treffer = text.match(/^\s*MERGEFIELD\s+(?:"([^"]+)"|(\S+))/i);
+    if (treffer) {
+      const name = treffer[1] || treffer[2];
+      if (!namen.includes(name)) namen.push(name);
+    }
+    feld.anweisung.concat(feld.ergebnis).forEach((teil) => {
+      if (teil.art === 'feld') toolhubVorlageDocxFeldnamen([teil.feld], namen);
+    });
+  });
+  return namen;
+}
+
+// Name eines einfachen Feldes <w:fldSimple w:instr=" MERGEFIELD Name ">
+function toolhubVorlageDocxEinfachName(element) {
+  const anweisung = element.getAttributeNS(TOOLHUB_NS.w, 'instr') || '';
+  const treffer = anweisung.match(/^\s*MERGEFIELD\s+(?:"([^"]+)"|(\S+))/i);
+  return treffer ? (treffer[1] || treffer[2]) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -373,6 +628,78 @@ class ToolhubVorlageDocx extends ToolhubVorlage {
     return p;
   }
 
+  // ----- Word-eigene Seriendruckfelder -----
+
+  // Feldnamen aus MERGEFIELD-Feldern eines Absatzes (auch in IF-Bedingungen)
+  _formatFelder(absatz) {
+    const namen = toolhubVorlageDocxFeldnamen(
+      toolhubVorlageDocxFeldbaum(toolhubVorlageDocxRuns(absatz)));
+
+    Array.from(absatz.getElementsByTagNameNS(TOOLHUB_NS.w, 'fldSimple')).forEach((element) => {
+      if (toolhubVorlageVorfahre(element.parentNode, TOOLHUB_NS.w, ['p']) !== absatz) return;
+      const name = toolhubVorlageDocxEinfachName(element);
+      if (name && !namen.includes(name)) namen.push(name);
+    });
+
+    return namen;
+  }
+
+  /*
+   * Ersetzt die Word-Felder eines Absatzes durch ihr Ergebnis. Die
+   * Runs eines ausgewerteten Feldes verschwinden dabei samt Anweisung;
+   * an ihre Stelle tritt ein einzelner Run mit dem Wert.
+   */
+  _ersetzeFormatFelder(absatz, werte, optionen) {
+    // Einfache Felder zuerst – sie können keine anderen Felder enthalten
+    Array.from(absatz.getElementsByTagNameNS(TOOLHUB_NS.w, 'fldSimple')).forEach((element) => {
+      if (toolhubVorlageVorfahre(element.parentNode, TOOLHUB_NS.w, ['p']) !== absatz) return;
+      const name = toolhubVorlageDocxEinfachName(element);
+      if (!name) return;
+
+      const vorhanden = Object.prototype.hasOwnProperty.call(werte, name);
+      const wert = vorhanden
+        ? toolhubVorlageWert(werte[name])
+        : (optionen && optionen.behaltUnbekannte ? `{{${name}}}` : '');
+
+      const quelle = element.getElementsByTagNameNS(TOOLHUB_NS.w, 'r')[0];
+      element.parentNode.replaceChild(ToolhubVorlageDocx._wertRun(element.ownerDocument, wert, quelle), element);
+    });
+
+    const runs = toolhubVorlageDocxRuns(absatz);
+    const felder = toolhubVorlageDocxFeldbaum(runs);
+
+    // Von hinten nach vorn, damit die Indizes der übrigen Felder gültig bleiben
+    felder.slice().reverse().forEach((feld) => {
+      const wert = toolhubVorlageDocxFeldwert(feld, werte, optionen);
+      if (wert === null) return; // fremdes Feld (DATE, PAGE …) unangetastet lassen
+
+      const betroffen = runs.slice(feld.von, feld.bis + 1);
+      // Formatierung des zuletzt angezeigten Ergebnisses übernehmen, sonst die des Feldanfangs
+      const quelle = (feld.trenner >= 0 ? runs.slice(feld.trenner + 1, feld.bis) : [])
+        .find((run) => run.getElementsByTagNameNS(TOOLHUB_NS.w, 'rPr')[0]) || betroffen[0];
+
+      const neu = ToolhubVorlageDocx._wertRun(absatz.ownerDocument, wert, quelle);
+      betroffen[0].parentNode.insertBefore(neu, betroffen[0]);
+      betroffen.forEach((run) => run.parentNode.removeChild(run));
+    });
+  }
+
+  // Run mit dem Feldwert, formatiert wie der Run, den er ersetzt
+  static _wertRun(doc, wert, quelle) {
+    const run = doc.createElementNS(TOOLHUB_NS.w, 'w:r');
+
+    const rPr = quelle && quelle.getElementsByTagNameNS(TOOLHUB_NS.w, 'rPr')[0];
+    if (rPr) run.appendChild(rPr.cloneNode(true));
+
+    const t = doc.createElementNS(TOOLHUB_NS.w, 'w:t');
+    t.setAttributeNS(TOOLHUB_NS.xml, 'xml:space', 'preserve');
+    t.textContent = wert;
+    run.appendChild(t);
+    ToolhubVorlageDocx._zeilenumbrueche(t);
+
+    return run;
+  }
+
   /*
    * Baut den Inhalt des Dokuments: je Datensatz eine Kopie der Vorlage, dazwischen ein
    * Seitenumbruch. Das abschließende <w:sectPr> (Seitenformat) muss das letzte Element
@@ -415,7 +742,31 @@ class ToolhubVorlageDocx extends ToolhubVorlage {
       toolhubVorlageXmlSchreiben(zip, pfad, kopfDoc);
     }
 
+    await ToolhubVorlageDocx._loeseDatenquelle(zip);
     return zip.generateAsync({ type: 'blob', mimeType: this.mimetyp });
+  }
+
+  /*
+   * Trennt das Ergebnis von der Datenquelle der Vorlage. Eine in Word
+   * eingerichtete Serienbriefvorlage merkt sich in settings.xml die Datei, aus
+   * der zusammengeführt wurde; ohne diesen Schritt fragt Word beim Öffnen jedes
+   * erzeugten Dokuments danach – und der Pfad zur Quelldatei bliebe darin stehen.
+   */
+  static async _loeseDatenquelle(zip) {
+    const einstellungen = await toolhubVorlageXmlLesen(zip, 'word/settings.xml');
+    if (!einstellungen) return;
+
+    const mailMerge = einstellungen.getElementsByTagNameNS(TOOLHUB_NS.w, 'mailMerge')[0];
+    if (!mailMerge) return;
+    mailMerge.parentNode.removeChild(mailMerge);
+    toolhubVorlageXmlSchreiben(zip, 'word/settings.xml', einstellungen);
+
+    const bezuege = await toolhubVorlageXmlLesen(zip, 'word/_rels/settings.xml.rels');
+    if (!bezuege) return;
+    Array.from(bezuege.getElementsByTagName('Relationship'))
+      .filter((bezug) => (bezug.getAttribute('Type') || '').endsWith('/mailMergeSource'))
+      .forEach((bezug) => bezug.parentNode.removeChild(bezug));
+    toolhubVorlageXmlSchreiben(zip, 'word/_rels/settings.xml.rels', bezuege);
   }
 
   async vorschauText(satz, optionen = {}) {
@@ -499,6 +850,36 @@ class ToolhubVorlageOdt extends ToolhubVorlage {
     };
     sammle(absatz);
     return stuecke;
+  }
+
+  // ----- Writer-eigene Seriendruckfelder -----
+
+  // Datenbankfelder eines Absatzes: <text:database-display text:column-name="Note"/>
+  _datenbankFelder(absatz) {
+    return Array.from(absatz.getElementsByTagNameNS(TOOLHUB_NS.text, 'database-display'))
+      .filter((el) => toolhubVorlageVorfahre(el.parentNode, TOOLHUB_NS.text, ['p', 'h']) === absatz);
+  }
+
+  _formatFelder(absatz) {
+    return this._datenbankFelder(absatz)
+      .map((el) => el.getAttributeNS(TOOLHUB_NS.text, 'column-name'))
+      .filter(Boolean);
+  }
+
+  _ersetzeFormatFelder(absatz, werte, optionen) {
+    this._datenbankFelder(absatz).forEach((el) => {
+      const name = el.getAttributeNS(TOOLHUB_NS.text, 'column-name');
+      if (!name) return;
+
+      const vorhanden = Object.prototype.hasOwnProperty.call(werte, name);
+      const wert = vorhanden
+        ? toolhubVorlageWert(werte[name])
+        : (optionen && optionen.behaltUnbekannte ? `{{${name}}}` : '');
+
+      const knoten = el.ownerDocument.createTextNode(wert);
+      el.parentNode.replaceChild(knoten, el);
+      ToolhubVorlageOdt._zeilenumbrueche(knoten);
+    });
   }
 
   // Zeilenumbrüche im Wert werden zu <text:line-break/>

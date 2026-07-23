@@ -6,8 +6,13 @@ nichts hochgeladen.
 
 ## Vorlage vorbereiten
 
-Die Vorlage ist ein gewöhnliches Dokument. An jeder Stelle, die später ersetzt werden soll,
-steht der Feldname in doppelten geschweiften Klammern:
+Es gibt zwei Wege, und sie lassen sich mischen: eigene `{{Felder}}` oder die
+Seriendruckfelder, die Word bzw. Writer selbst mitbringen.
+
+### Eigene Felder
+
+An jeder Stelle, die später ersetzt werden soll, steht der Feldname in doppelten
+geschweiften Klammern:
 
 ```
 {{Anrede}} {{Nachname}},
@@ -22,7 +27,34 @@ für {{Vorname}} aus der Klasse {{Klasse}} findet das Gespräch am {{Termin}} st
   Ersetzung arbeitet auf dem ganzen Absatz.
 * Felder in Kopf- und Fußzeilen funktionieren ebenfalls. Sie gelten allerdings für das ganze
   Dokument: Enthält ein Dokument mehrere Datensätze, wird dort der erste eingesetzt.
-* Word-eigene Seriendruckfelder (`«Nachname»`) werden **nicht** gelesen – nur `{{…}}`.
+
+### Vorhandene Word- und Writer-Vorlagen
+
+Eine in Word eingerichtete Serienbriefvorlage kann unverändert verwendet werden. Gelesen
+werden die Seriendruckfelder (`«Nachname»`, in Word als `MERGEFIELD` gespeichert) und die
+Bedingungsfelder „Wenn-Dann-Sonst" (`IF`) – auch ineinander verschachtelt, wie sie beim
+Aufbau von Ankreuzfeldern entstehen:
+
+```
+{ IF { MERGEFIELD Note } = "5+" "X" { IF { MERGEFIELD Note } = "5" "X" "" } }
+```
+
+Verglichen wird wie in Word: zwei Zahlen numerisch, sonst als Text ohne Rücksicht auf Groß-
+und Kleinschreibung; bei `=` und `<>` sind die Platzhalter `*` und `?` erlaubt. Beachte, dass
+`5+` keine Zahl ist und deshalb als Text verglichen wird. Unterstützte Vergleiche:
+`=`, `<>`, `<`, `>`, `<=`, `>=`.
+
+In Writer sind es die Datenbankfelder (Einfügen ▸ Feldbefehl ▸ Weitere ▸ Datenbank); die
+Spaltennamen dienen als Feldnamen. Bedingungsfelder wertet das Tool in ODT **nicht** aus.
+
+Andere Feldarten (Datum, Seitenzahl, Inhaltsverzeichnis …) bleiben unangetastet und werden
+weiterhin von Word bzw. Writer selbst aktualisiert. In der Vorschau steht bei ihnen noch der
+Wert, der zuletzt im Dokument gespeichert wurde.
+
+War an der Vorlage eine Datenquelle angemeldet (der übliche Fall, wenn schon einmal mit Word
+zusammengeführt wurde), wird diese Verknüpfung aus den erzeugten Dokumenten entfernt.
+Andernfalls würde Word beim Öffnen jedes Serienbriefs nach der Datenbank fragen und der Pfad
+zur Quelldatei bliebe in der Datei stehen.
 
 ## Datensätze
 
@@ -54,9 +86,14 @@ heruntergeladen, mehrere gesammelt als ZIP-Datei.
 
 ## Beispieldateien
 
-`beispiele/` enthält denselben Elternbrief einmal als `.docx` und einmal als `.odt` sowie die
-zugehörigen Datensätze als `.csv` und `.xlsx` (dort auf zwei Tabellenblättern, um die
-Blattauswahl auszuprobieren). Die Daten sind frei erfunden.
+| Datei | Zweck |
+| --- | --- |
+| `Elternbrief-Vorlage.docx` / `.odt` | derselbe Brief mit `{{Feldern}}`, einmal je Format |
+| `datensaetze.csv` / `.xlsx` | die zugehörigen Datensätze; die XLSX hat zwei Blätter, um die Blattauswahl auszuprobieren |
+| `Vorlage_2.docx` | echte Word-Serienbriefvorlage (Lern- und Fördervereinbarung) mit `MERGEFIELD`, verschachtelten `IF`-Feldern für die Ankreuzkästchen und einem `DATE`-Feld |
+| `datensaetze_2.xlsx` | Datensätze zu `Vorlage_2.docx` |
+
+Die Daten in den Beispielen sind frei erfunden.
 
 ## Technik
 
@@ -65,3 +102,9 @@ anderen Tools zur Verfügung. DOCX und ODT sind ZIP-Archive mit XML; bearbeitet 
 `word/document.xml` bzw. `content.xml` (samt Kopf-/Fußzeilen in `word/header*.xml`,
 `word/footer*.xml` bzw. `styles.xml`). Für den Seitenumbruch zwischen zwei Datensätzen setzt
 DOCX ein `<w:br w:type="page"/>`, ODT eine Absatzvorlage mit `fo:break-before="page"`.
+
+Word speichert ein Feld nicht als Element, sondern als Folge von Runs (`fldChar begin`,
+`instrText`, `fldChar separate`, zwischengespeichertes Ergebnis, `fldChar end`), die sich
+ineinander schachteln lassen. Deshalb baut das Modul daraus einen Feldbaum und wertet ihn
+rekursiv aus; ausgewertete Felder verschwinden samt Anweisung und werden durch einen Run mit
+dem Ergebnis ersetzt, der die Formatierung des bisherigen Ergebnisses übernimmt.

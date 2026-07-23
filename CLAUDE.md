@@ -74,7 +74,7 @@ Vor eigenen Hilfsfunktionen prüfen, ob es die Aufgabe schon gibt:
 | `assets/tools.js` | Verzeichnis aller Kategorien und Tools, Icon-Vorrat, Kacheln der Startseite |
 | `assets/toolhub-io.js` | Dateien lesen, Kodierung erkennen, CSV lesen/schreiben, Downloads, Meldungen, `toolhubEscapeHtml()` |
 | `assets/toolhub-xlsx.js` | Arbeitsmappen lesen und schreiben, Spaltenbreiten, Blattnamen |
-| `assets/toolhub-vorlagen.js` | Serienbrief-Vorlagen (DOCX/ODT): Felder `{{…}}` finden und ersetzen |
+| `assets/toolhub-vorlagen.js` | Serienbrief-Vorlagen (DOCX/ODT): Felder `{{…}}` sowie Word- und Writer-Seriendruckfelder auswerten |
 | `assets/toolhub-kurse.js` | Fachkürzel-Tabelle und Normalisierung von Fach- und Kursbezeichnungen |
 | `assets/vendor/` | PapaParse, SheetJS (`xlsx`), vis-network, JSZip |
 | `assets/fonts/` | Open Sans (woff2); die `@font-face`-Regeln stehen in `toolhub.css` |
