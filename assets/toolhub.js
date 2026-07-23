@@ -51,6 +51,17 @@ const TOOLHUB_ICONS = {
   gespraech:
     '<path d="M14 4H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2v3l4-3h3a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>' +
     '<path d="M18 9h1a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1v3l-3.5-3"/>',
+  // Schieberegler (Einstellungen, Optionen, Regeln)
+  einstellungen:
+    '<path d="M4 6h9"/>' +
+    '<path d="M17 6h3"/>' +
+    '<circle cx="15" cy="6" r="2"/>' +
+    '<path d="M4 12h3"/>' +
+    '<path d="M11 12h9"/>' +
+    '<circle cx="9" cy="12" r="2"/>' +
+    '<path d="M4 18h9"/>' +
+    '<path d="M17 18h3"/>' +
+    '<circle cx="15" cy="18" r="2"/>',
   // Verbundene Knoten (Gruppenzusammensetzung)
   knoten:
     '<circle cx="5.5" cy="6" r="2.5"/>' +

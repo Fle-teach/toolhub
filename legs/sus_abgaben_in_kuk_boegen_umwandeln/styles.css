@@ -219,14 +219,15 @@ input[type="number"]:disabled {
     overflow: hidden;
 }
 
-/* Panel-Inhalte über das dekorative Ecken-Icon legen */
+/* Das Icon sitzt im <summary> (sonst wäre es eingeklappt nicht sichtbar) und
+ * verankert sich dort; der Inhalt darunter legt sich darüber. */
 .advanced-panel > summary,
 .advanced-panel > .advanced-content {
     position: relative;
 }
 
 .advanced-panel > summary {
-    padding: 20px 24px;
+    padding: 20px 70px 20px 24px;
     cursor: pointer;
     font-weight: 700;
     font-size: 1.25rem;
