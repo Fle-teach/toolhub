@@ -93,18 +93,39 @@ Text der Vorlage.
 | --- | --- |
 | Wie im Feld (Standard) | Der Wert übernimmt die Schriftgröße der Stelle, an der das Feld steht. |
 | Feste Schriftgröße | Alle eingesetzten Werte erhalten die angegebene Punktgröße. |
+| Automatisch verkleinern | Lange Werte werden kleiner gesetzt, um zusätzliche Seitenumbrüche zu vermeiden. |
 
-Die feste Größe wirkt genau auf den Wert: Steht ein Feld mitten im Satz (`für {{Vorname}} aus
+Die Größe wirkt genau auf den Wert: Steht ein Feld mitten im Satz (`für {{Vorname}} aus
 der Klasse …`), wird nur der Name kleiner gesetzt, der umgebende Satz behält seine Größe. Eine
 vorhandene Auszeichnung des Feldes (fett, kursiv, Farbe) bleibt erhalten. In der Textvorschau
 ist die Größe nicht sichtbar – sie zeigt nur den Inhalt, nicht die Formatierung; erst das
 erzeugte Dokument gibt sie wieder.
 
-Eine automatische Anpassung „so, dass die Seitenzahl gleich bleibt" gibt es bewusst **nicht**:
-Ob Inhalt auf eine weitere Seite rutscht, entscheidet erst die Layout-Engine von Word bzw.
-Writer beim Öffnen. Ohne dieses Rendering – das Tool läuft rein im Browser, ohne Office –
-ließe sich das nicht verlässlich vorausberechnen, sondern nur schätzen. Statt einer trügerischen
-Automatik gibt es deshalb nur die feste Größe, die man selbst passend wählt.
+### Automatisch verkleinern
+
+Für jeden Feldwert wird geschätzt, wie viel vertikalen Platz er braucht, und daraus eine
+kleinere Schrift abgeleitet. Die Schätzung berücksichtigt **Zeichenanzahl und manuelle
+Zeilenumbrüche**: Der Wert wird an den Umbrüchen zerlegt und jeder Abschnitt über „Zeichen pro
+Zeile" in geschätzte Zeilen umgerechnet, wobei jeder Abschnitt mindestens eine Zeile zählt. So
+kostet auch ein kurzer Text mit vielen Umbrüchen viele Zeilen und damit eine kleinere Schrift.
+
+Einstellungen:
+
+| Feld | Bedeutung |
+| --- | --- |
+| Startgröße | größte automatisch vergebene Größe (für Werte knapp über der Schwelle) |
+| Mindestgröße | Untergrenze, unter die nicht verkleinert wird |
+| Anpassen ab Zeichen / Umbrüchen | erst wenn ein Wert **so viele Zeichen oder so viele Umbrüche** hat, wird überhaupt verkleinert – kürzere Werte behalten die Größe ihrer Fundstelle |
+| Zeichen pro Zeile | wie viele Zeichen als eine Zeile gelten (steuert das Gewicht der Umbrüche gegenüber der Zeichenzahl) |
+| Manuelle Zeilenumbrüche in Leerzeichen umwandeln | ersetzt harte Umbrüche im Wert durch ein Leerzeichen; der Text fließt dann und braucht vertikal weniger Platz |
+
+**Wichtig – es ist eine Näherung, keine Garantie.** Ob ein Inhalt wirklich auf eine weitere
+Seite rutscht, entscheidet erst die Layout-Engine von Word bzw. Writer beim Öffnen. Das Tool
+läuft rein im Browser, ohne Office, und kann die Seitenaufteilung nicht exakt vorausberechnen –
+es schätzt sie. Die Automatik senkt die Wahrscheinlichkeit zusätzlicher Seiten deutlich, kann
+sie aber weder garantieren noch in jedem Fall ausschließen. Für ein verlässliches Ergebnis die
+erzeugten Dokumente kurz durchsehen und die Werte (Start-/Mindestgröße, Schwellen) bei Bedarf
+nachjustieren.
 
 ## Beispieldateien
 
@@ -114,6 +135,7 @@ Automatik gibt es deshalb nur die feste Größe, die man selbst passend wählt.
 | `datensaetze.csv` / `.xlsx` | die zugehörigen Datensätze; die XLSX hat zwei Blätter, um die Blattauswahl auszuprobieren |
 | `Vorlage_2.docx` | echte Word-Serienbriefvorlage (Lern- und Fördervereinbarung) mit `MERGEFIELD`, verschachtelten `IF`-Feldern für die Ankreuzkästchen und einem `DATE`-Feld |
 | `datensaetze_2.xlsx` | Datensätze zu `Vorlage_2.docx` |
+| `LEG-Vorlage Oberstufe_JS_Serienbrief.odt` | mehrseitiger LEG-Bogen (Writer) mit `{{Feldern}}`; geeignet, um die automatische Verkleinerung langer Kommentare auszuprobieren |
 
 Die Daten in den Beispielen sind frei erfunden.
 

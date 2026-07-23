@@ -21,6 +21,13 @@ const dateinameZeile = document.getElementById('dateinameZeile');
 const dateiname = document.getElementById('dateiname');
 const schriftGroesseZeile = document.getElementById('schriftGroesseZeile');
 const schriftGroesse = document.getElementById('schriftGroesse');
+const autoSchriftZeile = document.getElementById('autoSchriftZeile');
+const autoStart = document.getElementById('autoStart');
+const autoMin = document.getElementById('autoMin');
+const autoAbZeichen = document.getElementById('autoAbZeichen');
+const autoAbUmbrueche = document.getElementById('autoAbUmbrueche');
+const autoZeichenProZeile = document.getElementById('autoZeichenProZeile');
+const umbruecheZuLeerzeichen = document.getElementById('umbruecheZuLeerzeichen');
 const behaltUnbekannte = document.getElementById('behaltUnbekannte');
 const vorschauBtn = document.getElementById('vorschauBtn');
 const erzeugenBtn = document.getElementById('erzeugenBtn');
@@ -42,17 +49,36 @@ const zustand = {
 const einstellungen = {
   modus: 'einzeln',       // 'einzeln' | 'gruppiert' | 'proDatensatz'
   gruppenSpalte: '',
-  schriftModus: 'feld',   // 'feld' (Größe der Fundstelle) | 'fest'
+  schriftModus: 'feld',   // 'feld' (Größe der Fundstelle) | 'fest' | 'auto'
   schriftGroesse: 11,     // Punkt; nur bei schriftModus 'fest'
+  // Automatik-Modus (schriftModus 'auto')
+  auto: {
+    startGroesse: 11,
+    mindestGroesse: 7,
+    abZeichen: 400,
+    abUmbrueche: 6,
+    zeichenProZeile: 60,
+    umbruecheZuLeerzeichen: false
+  },
   behaltUnbekannte: false
 };
 
 // Optionen für die Vorlage (Schriftgröße, unbekannte Felder) – für erzeuge/vorschauText
 function vorlagenOptionen() {
-  return {
-    behaltUnbekannte: einstellungen.behaltUnbekannte,
-    schriftgroesse: einstellungen.schriftModus === 'fest' ? einstellungen.schriftGroesse : null
-  };
+  const o = { behaltUnbekannte: einstellungen.behaltUnbekannte, schriftgroesse: null, autoSchrift: null };
+  if (einstellungen.schriftModus === 'fest') {
+    o.schriftgroesse = einstellungen.schriftGroesse;
+  } else if (einstellungen.schriftModus === 'auto') {
+    o.autoSchrift = {
+      startGroesse: einstellungen.auto.startGroesse,
+      mindestGroesse: einstellungen.auto.mindestGroesse,
+      abZeichen: einstellungen.auto.abZeichen,
+      abUmbrueche: einstellungen.auto.abUmbrueche,
+      zeichenProZeile: einstellungen.auto.zeichenProZeile
+    };
+    o.umbruecheZuLeerzeichen = einstellungen.auto.umbruecheZuLeerzeichen;
+  }
+  return o;
 }
 
 // ---------------------------------------------------------------------------
@@ -353,6 +379,26 @@ schriftGroesse.addEventListener('change', () => {
   ergebnisLeeren();
 });
 
+// Zahleneingaben der Automatik: an das jeweilige Feld des auto-Objekts binden
+[
+  [autoStart, 'startGroesse'],
+  [autoMin, 'mindestGroesse'],
+  [autoAbZeichen, 'abZeichen'],
+  [autoAbUmbrueche, 'abUmbrueche'],
+  [autoZeichenProZeile, 'zeichenProZeile']
+].forEach(([feld, schluessel]) => {
+  feld.addEventListener('change', () => {
+    const wert = parseFloat(feld.value);
+    if (!Number.isNaN(wert) && wert >= 0) einstellungen.auto[schluessel] = wert;
+    ergebnisLeeren();
+  });
+});
+
+umbruecheZuLeerzeichen.addEventListener('change', () => {
+  einstellungen.auto.umbruecheZuLeerzeichen = umbruecheZuLeerzeichen.checked;
+  ergebnisLeeren();
+});
+
 behaltUnbekannte.addEventListener('change', () => {
   einstellungen.behaltUnbekannte = behaltUnbekannte.checked;
   ergebnisLeeren();
@@ -364,8 +410,14 @@ function aktualisiereEinstellungen() {
   gruppenSpalte.disabled = einstellungen.modus !== 'gruppiert';
   dateinameZeile.classList.toggle('disabled', einstellungen.modus !== 'proDatensatz');
   dateiname.disabled = einstellungen.modus !== 'proDatensatz';
-  schriftGroesseZeile.classList.toggle('disabled', einstellungen.schriftModus !== 'fest');
-  schriftGroesse.disabled = einstellungen.schriftModus !== 'fest';
+
+  const fest = einstellungen.schriftModus === 'fest';
+  const auto = einstellungen.schriftModus === 'auto';
+  schriftGroesseZeile.classList.toggle('disabled', !fest);
+  schriftGroesse.disabled = !fest;
+  autoSchriftZeile.classList.toggle('disabled', !auto);
+  [autoStart, autoMin, autoAbZeichen, autoAbUmbrueche, autoZeichenProZeile, umbruecheZuLeerzeichen]
+    .forEach((feld) => { feld.disabled = !auto; });
 }
 
 // Danach wird im Schulalltag am ehesten gruppiert
@@ -454,10 +506,14 @@ vorschauBtn.addEventListener('click', async () => {
     const satz = zustand.datensaetze[0];
     const text = await zustand.vorlage.vorschauText(werteFuer(satz), vorlagenOptionen());
     vorschauText.textContent = text.replace(/\n{3,}/g, '\n\n').trim() || '(Die Vorlage enthält keinen Text.)';
-    // Die Textvorschau zeigt keine Schriftgrößen – darauf bei fester Größe hinweisen
-    meldung('erzeugenMeldung', einstellungen.schriftModus === 'fest'
-      ? `Hinweis: Die feste Schriftgröße (${einstellungen.schriftGroesse} pt) ist erst im erzeugten Dokument sichtbar, nicht in dieser Textvorschau.`
-      : '', 'info');
+    // Die Textvorschau zeigt keine Schriftgrößen – darauf bei fester/automatischer Größe hinweisen
+    let hinweis = '';
+    if (einstellungen.schriftModus === 'fest') {
+      hinweis = `Hinweis: Die feste Schriftgröße (${einstellungen.schriftGroesse} pt) ist erst im erzeugten Dokument sichtbar, nicht in dieser Textvorschau.`;
+    } else if (einstellungen.schriftModus === 'auto') {
+      hinweis = 'Hinweis: Die automatisch angepasste Schriftgröße ist erst im erzeugten Dokument sichtbar, nicht in dieser Textvorschau.';
+    }
+    meldung('erzeugenMeldung', hinweis, 'info');
     vorschau.classList.remove('hidden');
   } catch (fehler) {
     meldung('erzeugenMeldung', fehler.message, 'error');

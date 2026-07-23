@@ -105,8 +105,15 @@ function toolhubVorlageFuelleText(text, werte) {
  *
  * Jedes Stück erhält beim Zurückschreiben eine Folge von Abschnitten
  *   { text, istFeld }
- * istFeld markiert den Teil, der aus einem Feld stammt – nur dieser bekommt die
- * feste Schriftgröße (optionen.schriftgroesse), der umgebende Text behält seine.
+ * istFeld markiert den Teil, der aus einem Feld stammt – nur dieser bekommt eine
+ * abweichende Schriftgröße (siehe toolhubVorlageGroesseFn), der umgebende Text
+ * behält seine.
+ *
+ * Optionen (alle optional):
+ *   behaltUnbekannte      nicht zugeordnete Felder als {{Feld}} stehen lassen
+ *   schriftgroesse        feste Punktgröße für alle Feldwerte
+ *   autoSchrift           Objekt für die automatische Verkleinerung langer Werte
+ *   umbruecheZuLeerzeichen manuelle Zeilenumbrüche im Feldwert zu Leerzeichen machen
  *
  * stuecke: [{ lies(): string, schreibe(abschnitte, optionen): void }]
  * Rückgabe: true, wenn etwas ersetzt wurde.
@@ -157,7 +164,9 @@ function toolhubVorlageErsetzeStuecke(stuecke, werte, optionen = {}) {
     uebernimm(gelesen, treffer.index);
 
     const bekannt = Object.prototype.hasOwnProperty.call(werte, name);
-    const wert = bekannt ? toolhubVorlageWert(werte[name]) : (behalten ? treffer[0] : '');
+    const wert = bekannt
+      ? toolhubVorlageUmbrueche(toolhubVorlageWert(werte[name]), optionen)
+      : (behalten ? treffer[0] : '');
 
     // Der Wert übernimmt die Formatierung der Stelle, an der das Feld beginnt
     ausgabe[stueckAn(treffer.index)].push({ text: wert, istFeld: bekannt });
@@ -172,10 +181,58 @@ function toolhubVorlageErsetzeStuecke(stuecke, werte, optionen = {}) {
   return true;
 }
 
-// Punktgröße aus den Optionen oder null (= Schriftgröße der Fundstelle behalten)
-function toolhubVorlageGroesse(optionen) {
-  const wert = optionen && optionen.schriftgroesse;
-  return typeof wert === 'number' && wert > 0 ? wert : null;
+// Manuelle Zeilenumbrüche im Feldwert bei Bedarf zu einfachen Leerzeichen machen
+function toolhubVorlageUmbrueche(text, optionen) {
+  if (!optionen || !optionen.umbruecheZuLeerzeichen) return text;
+  return text.replace(/\s*\n\s*/g, ' ');
+}
+
+/*
+ * Liefert eine Funktion, die zu einem Feldwert die Schriftgröße (in Punkt) bestimmt –
+ * oder null, wenn der Wert die Größe seiner Fundstelle behalten soll.
+ *   feste Größe:   optionen.schriftgroesse (Zahl)
+ *   automatisch:   optionen.autoSchrift (Objekt, siehe toolhubVorlageAutoGroesse)
+ *   sonst:         null (Größe der Fundstelle)
+ */
+function toolhubVorlageGroesseFn(optionen) {
+  if (optionen && optionen.autoSchrift) {
+    return (text) => toolhubVorlageAutoGroesse(text, optionen.autoSchrift);
+  }
+  const fest = optionen && optionen.schriftgroesse;
+  if (typeof fest === 'number' && fest > 0) return () => fest;
+  return () => null;
+}
+
+/*
+ * Schätzt heuristisch, wie viel vertikalen Platz ein Feldwert braucht, und leitet
+ * daraus eine kleinere Schriftgröße ab – mit dem Ziel, zusätzliche Seitenumbrüche
+ * zu vermeiden. Das ist eine Näherung: Ob der Inhalt tatsächlich auf eine weitere
+ * Seite rutscht, entscheidet erst Word bzw. Writer beim Setzen.
+ *
+ * Berücksichtigt Zeichenanzahl UND manuelle Zeilenumbrüche: Der Wert wird an den
+ * Umbrüchen zerlegt und jeder Abschnitt über zeichenProZeile in geschätzte Zeilen
+ * umgerechnet; ein kurzer Abschnitt zählt trotzdem als eine Zeile. So kostet auch
+ * ein kurzer Text mit vielen Umbrüchen viele Zeilen und damit eine kleinere Schrift.
+ *
+ * auto = { startGroesse, mindestGroesse, zeichenProZeile, abZeichen, abUmbrueche }
+ * Rückgabe: Punktgröße oder null (keine Anpassung, wenn unter beiden Schwellen).
+ */
+function toolhubVorlageAutoGroesse(text, auto) {
+  const zeichen = text.length;
+  const umbrueche = (text.match(/\n/g) || []).length;
+
+  // Erst ab abZeichen Zeichen ODER abUmbrueche Umbrüchen anpassen
+  if (zeichen < auto.abZeichen && umbrueche < auto.abUmbrueche) return null;
+
+  const zpz = auto.zeichenProZeile > 0 ? auto.zeichenProZeile : 60;
+  const zeilen = text.split('\n')
+    .reduce((summe, teil) => summe + Math.max(1, Math.ceil(teil.length / zpz)), 0);
+
+  // Bis zu dieser Zeilenzahl bleibt die Startgröße, darüber wird proportional verkleinert
+  const referenz = Math.max(1, auto.abUmbrueche + 1, Math.ceil(auto.abZeichen / zpz));
+  const roh = auto.startGroesse * referenz / zeilen;
+  const begrenzt = Math.min(auto.startGroesse, Math.max(auto.mindestGroesse, roh));
+  return Math.round(begrenzt * 2) / 2; // auf halbe Punkte runden
 }
 
 // ---------------------------------------------------------------------------
@@ -615,8 +672,9 @@ class ToolhubVorlageDocx extends ToolhubVorlage {
    * trägt der ganze Run die Größe, was praktisch nur Feldtext betrifft).
    */
   static _schreibeStueck(t, abschnitte, optionen) {
-    const punkt = toolhubVorlageGroesse(optionen);
-    const hatFeldText = abschnitte.some((a) => a.istFeld && a.text !== '');
+    const groesseFn = toolhubVorlageGroesseFn(optionen);
+    // Größe je Feld-Abschnitt (null = Größe der Fundstelle behalten)
+    const groessen = abschnitte.map((a) => (a.istFeld && a.text !== '') ? groesseFn(a.text) : null);
     const gesamt = abschnitte.map((a) => a.text).join('');
 
     const schlicht = () => {
@@ -626,7 +684,7 @@ class ToolhubVorlageDocx extends ToolhubVorlage {
       ToolhubVorlageDocx._zeilenumbrueche(t);
     };
 
-    if (!punkt || !hatFeldText) {
+    if (!groessen.some((g) => g != null)) {
       schlicht();
       return;
     }
@@ -638,17 +696,19 @@ class ToolhubVorlageDocx extends ToolhubVorlage {
     const einfacherRun = andereKinder.length === 1 && andereKinder[0] === t;
 
     if (!einfacherRun) {
-      // Zusammengesetzter Run (mehrere w:t, Umbrüche …): ganzen Run skalieren
+      // Zusammengesetzter Run (mehrere w:t, Umbrüche …): ganzen Run auf die
+      // kleinste geforderte Größe skalieren – betrifft praktisch nur Feldtext
       schlicht();
-      ToolhubVorlageDocx._setzeGroesse(ToolhubVorlageDocx._sichereRPr(run), punkt);
+      const kleinste = Math.min(...groessen.filter((g) => g != null));
+      ToolhubVorlageDocx._setzeGroesse(ToolhubVorlageDocx._sichereRPr(run), kleinste);
       return;
     }
 
     const doc = t.ownerDocument;
     const eltern = run.parentNode;
-    abschnitte.forEach((a) => {
+    abschnitte.forEach((a, i) => {
       if (a.text === '') return;
-      const neu = ToolhubVorlageDocx._wertRunAusRPr(doc, rPr, a.text, a.istFeld ? punkt : null);
+      const neu = ToolhubVorlageDocx._wertRunAusRPr(doc, rPr, a.text, groessen[i]);
       eltern.insertBefore(neu, run);
     });
     eltern.removeChild(run);
@@ -749,7 +809,7 @@ class ToolhubVorlageDocx extends ToolhubVorlage {
    * an ihre Stelle tritt ein einzelner Run mit dem Wert.
    */
   _ersetzeFormatFelder(absatz, werte, optionen) {
-    const punkt = toolhubVorlageGroesse(optionen);
+    const groesseFn = toolhubVorlageGroesseFn(optionen);
 
     // Einfache Felder zuerst – sie können keine anderen Felder enthalten
     Array.from(absatz.getElementsByTagNameNS(TOOLHUB_NS.w, 'fldSimple')).forEach((element) => {
@@ -759,14 +819,14 @@ class ToolhubVorlageDocx extends ToolhubVorlage {
 
       const vorhanden = Object.prototype.hasOwnProperty.call(werte, name);
       const wert = vorhanden
-        ? toolhubVorlageWert(werte[name])
+        ? toolhubVorlageUmbrueche(toolhubVorlageWert(werte[name]), optionen)
         : (optionen && optionen.behaltUnbekannte ? `{{${name}}}` : '');
 
       const quelle = element.getElementsByTagNameNS(TOOLHUB_NS.w, 'r')[0];
       const rPr = quelle && ToolhubVorlageDocx._direktesRPr(quelle);
-      // Wert nur einfärben, wenn er wirklich aus dem Datensatz kommt
+      // Größe nur bestimmen, wenn der Wert wirklich aus dem Datensatz kommt
       element.parentNode.replaceChild(
-        ToolhubVorlageDocx._wertRunAusRPr(element.ownerDocument, rPr, wert, vorhanden ? punkt : null),
+        ToolhubVorlageDocx._wertRunAusRPr(element.ownerDocument, rPr, wert, vorhanden ? groesseFn(wert) : null),
         element);
     });
 
@@ -775,8 +835,9 @@ class ToolhubVorlageDocx extends ToolhubVorlage {
 
     // Von hinten nach vorn, damit die Indizes der übrigen Felder gültig bleiben
     felder.slice().reverse().forEach((feld) => {
-      const wert = toolhubVorlageDocxFeldwert(feld, werte, optionen);
+      let wert = toolhubVorlageDocxFeldwert(feld, werte, optionen);
       if (wert === null) return; // fremdes Feld (DATE, PAGE …) unangetastet lassen
+      wert = toolhubVorlageUmbrueche(wert, optionen);
 
       const betroffen = runs.slice(feld.von, feld.bis + 1);
       // Formatierung des zuletzt angezeigten Ergebnisses übernehmen, sonst die des Feldanfangs
@@ -784,7 +845,7 @@ class ToolhubVorlageDocx extends ToolhubVorlage {
         .find((run) => ToolhubVorlageDocx._direktesRPr(run)) || betroffen[0];
       const rPr = ToolhubVorlageDocx._direktesRPr(quelle);
 
-      const neu = ToolhubVorlageDocx._wertRunAusRPr(absatz.ownerDocument, rPr, wert, wert === '' ? null : punkt);
+      const neu = ToolhubVorlageDocx._wertRunAusRPr(absatz.ownerDocument, rPr, wert, wert === '' ? null : groesseFn(wert));
       betroffen[0].parentNode.insertBefore(neu, betroffen[0]);
       betroffen.forEach((run) => run.parentNode.removeChild(run));
     });
@@ -946,10 +1007,10 @@ class ToolhubVorlageOdt extends ToolhubVorlage {
    * Text bleibt gewöhnlicher Text mit seiner ursprünglichen Formatierung.
    */
   static _schreibeStueck(knoten, abschnitte, optionen) {
-    const punkt = toolhubVorlageGroesse(optionen);
-    const hatFeldText = abschnitte.some((a) => a.istFeld && a.text !== '');
+    const groesseFn = toolhubVorlageGroesseFn(optionen);
+    const groessen = abschnitte.map((a) => (a.istFeld && a.text !== '') ? groesseFn(a.text) : null);
 
-    if (!punkt || !hatFeldText) {
+    if (!groessen.some((g) => g != null)) {
       knoten.nodeValue = abschnitte.map((a) => a.text).join('');
       ToolhubVorlageOdt._zeilenumbrueche(knoten);
       return;
@@ -958,10 +1019,10 @@ class ToolhubVorlageOdt extends ToolhubVorlage {
     const doc = knoten.ownerDocument;
     const eltern = knoten.parentNode;
     const dahinter = knoten.nextSibling;
-    abschnitte.forEach((a) => {
+    abschnitte.forEach((a, i) => {
       if (a.text === '') return;
-      if (a.istFeld) {
-        eltern.insertBefore(ToolhubVorlageOdt._schriftSpan(doc, a.text, punkt), dahinter);
+      if (groessen[i] != null) {
+        eltern.insertBefore(ToolhubVorlageOdt._schriftSpan(doc, a.text, groessen[i]), dahinter);
       } else {
         const textKnoten = doc.createTextNode(a.text);
         eltern.insertBefore(textKnoten, dahinter);
@@ -986,17 +1047,18 @@ class ToolhubVorlageOdt extends ToolhubVorlage {
   }
 
   _ersetzeFormatFelder(absatz, werte, optionen) {
-    const punkt = toolhubVorlageGroesse(optionen);
+    const groesseFn = toolhubVorlageGroesseFn(optionen);
     this._datenbankFelder(absatz).forEach((el) => {
       const name = el.getAttributeNS(TOOLHUB_NS.text, 'column-name');
       if (!name) return;
 
       const vorhanden = Object.prototype.hasOwnProperty.call(werte, name);
       const wert = vorhanden
-        ? toolhubVorlageWert(werte[name])
+        ? toolhubVorlageUmbrueche(toolhubVorlageWert(werte[name]), optionen)
         : (optionen && optionen.behaltUnbekannte ? `{{${name}}}` : '');
+      const punkt = vorhanden ? groesseFn(wert) : null;
 
-      if (vorhanden && punkt) {
+      if (punkt != null) {
         el.parentNode.replaceChild(ToolhubVorlageOdt._schriftSpan(el.ownerDocument, wert, punkt), el);
       } else {
         const knoten = el.ownerDocument.createTextNode(wert);
@@ -1029,15 +1091,19 @@ class ToolhubVorlageOdt extends ToolhubVorlage {
     return auto;
   }
 
-  // Zeichenvorlage mit fester Schriftgröße (einmal je Dokument), gibt den Namen zurück
+  /*
+   * Zeichenvorlage mit einer bestimmten Schriftgröße; je Größe eine eigene Vorlage
+   * (im Automatik-Modus kommen mehrere Größen vor). Gibt den Vorlagennamen zurück.
+   */
   static _schriftStilAnlegen(doc, punkt) {
     const auto = ToolhubVorlageOdt._automatischeStile(doc);
+    const name = TOOLHUB_ODT_SCHRIFT_STIL + '_' + String(punkt).replace('.', '_');
     const vorhanden = Array.from(auto.getElementsByTagNameNS(TOOLHUB_NS.style, 'style'))
-      .some((stil) => stil.getAttributeNS(TOOLHUB_NS.style, 'name') === TOOLHUB_ODT_SCHRIFT_STIL);
-    if (vorhanden) return TOOLHUB_ODT_SCHRIFT_STIL;
+      .some((stil) => stil.getAttributeNS(TOOLHUB_NS.style, 'name') === name);
+    if (vorhanden) return name;
 
     const stil = doc.createElementNS(TOOLHUB_NS.style, 'style:style');
-    stil.setAttributeNS(TOOLHUB_NS.style, 'style:name', TOOLHUB_ODT_SCHRIFT_STIL);
+    stil.setAttributeNS(TOOLHUB_NS.style, 'style:name', name);
     stil.setAttributeNS(TOOLHUB_NS.style, 'style:family', 'text');
     const eigenschaften = doc.createElementNS(TOOLHUB_NS.style, 'style:text-properties');
     const groesse = punkt + 'pt';
@@ -1046,7 +1112,7 @@ class ToolhubVorlageOdt extends ToolhubVorlage {
     eigenschaften.setAttributeNS(TOOLHUB_NS.style, 'style:font-size-complex', groesse);
     stil.appendChild(eigenschaften);
     auto.appendChild(stil);
-    return TOOLHUB_ODT_SCHRIFT_STIL;
+    return name;
   }
 
   // Zeilenumbrüche im Wert werden zu <text:line-break/>

@@ -100,3 +100,43 @@
   font-size: 0.85rem;
   color: var(--text-muted);
 }
+
+/* ----- Automatische Schriftgröße ----- */
+
+/* Unterzeile, die mehrere Reihen enthält (nicht in einer Flex-Zeile) */
+.setting-sub-block {
+  display: block;
+}
+
+.auto-hinweis {
+  margin: 0 0 12px;
+  max-width: 640px;
+}
+
+/* Zweispaltig: Beschriftung + Zahleneingabe; auf schmalen Displays einspaltig */
+.auto-gitter {
+  display: grid;
+  grid-template-columns: auto 90px;
+  gap: 8px 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.auto-gitter label {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.auto-gitter input {
+  width: 90px;
+}
+
+@media (max-width: 520px) {
+  .auto-gitter {
+    grid-template-columns: 1fr;
+    gap: 4px 0;
+  }
+  .auto-gitter input {
+    margin-bottom: 8px;
+  }
+}

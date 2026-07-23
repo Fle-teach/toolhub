@@ -147,6 +147,39 @@
             <span class="hinweis-klein">Betrifft nur die eingesetzten Feldwerte, nicht den &uuml;brigen Text der
             Vorlage.</span>
           </div>
+
+          <label class="radio-row">
+            <input type="radio" name="schriftModus" value="auto">
+            <span>Automatisch verkleinern bei langen Werten</span>
+          </label>
+          <div class="setting-sub setting-sub-block" id="autoSchriftZeile">
+            <p class="hinweis-klein auto-hinweis">Lange Feldwerte werden kleiner gesetzt, um zus&auml;tzliche
+            Seitenumbr&uuml;che zu vermeiden. Die Sch&auml;tzung ber&uuml;cksichtigt Zeichenanzahl <em>und</em> manuelle
+            Zeilenumbr&uuml;che. Das ist eine N&auml;herung &ndash; ob der Inhalt wirklich auf eine weitere Seite rutscht,
+            entscheidet erst Word bzw. Writer.</p>
+
+            <div class="auto-gitter">
+              <label for="autoStart">Startgr&ouml;&szlig;e (pt):</label>
+              <input type="number" id="autoStart" value="11" min="4" max="96" step="0.5">
+
+              <label for="autoMin">Mindestgr&ouml;&szlig;e (pt):</label>
+              <input type="number" id="autoMin" value="7" min="4" max="96" step="0.5">
+
+              <label for="autoAbZeichen">Anpassen ab Zeichen:</label>
+              <input type="number" id="autoAbZeichen" value="400" min="0" max="100000" step="10">
+
+              <label for="autoAbUmbrueche">oder ab Umbr&uuml;chen:</label>
+              <input type="number" id="autoAbUmbrueche" value="6" min="0" max="1000" step="1">
+
+              <label for="autoZeichenProZeile">Zeichen pro Zeile (Sch&auml;tzung):</label>
+              <input type="number" id="autoZeichenProZeile" value="60" min="1" max="1000" step="1">
+            </div>
+
+            <label class="radio-row">
+              <input type="checkbox" id="umbruecheZuLeerzeichen">
+              <span>Manuelle Zeilenumbr&uuml;che in Leerzeichen umwandeln</span>
+            </label>
+          </div>
         </div>
 
         <div class="setting-group">
