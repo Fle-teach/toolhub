@@ -142,6 +142,7 @@
  * Der Name entspricht dem Kategorie-Ordner.
  */
 
+.cat-allgemein               { --accent: #22d3ee; --accent-text: #06303a; }
 .cat-foerderkoordination     { --accent: #2dd4bf; --accent-text: #06302a; }
 .cat-iserv_benutzerverwaltung { --accent: #60a5fa; --accent-text: #0f2b4d; }
 .cat-iserv_formulare         { --accent: #facc15; --accent-text: #1f2937; }
@@ -150,6 +151,7 @@
 .cat-legs                    { --accent: #f472b6; --accent-text: #3d0a26; }
 .cat-klassenzusammensetzung  { --accent: #a78bfa; --accent-text: #241250; }
 
+:root[data-theme="light"] .cat-allgemein                { --accent: #0e7490; --accent-text: #ffffff; }
 :root[data-theme="light"] .cat-foerderkoordination      { --accent: #0d9488; --accent-text: #ffffff; }
 :root[data-theme="light"] .cat-iserv_benutzerverwaltung { --accent: #2b6cb0; --accent-text: #ffffff; }
 :root[data-theme="light"] .cat-iserv_formulare          { --accent: #d69e2e; --accent-text: #1f2937; }
@@ -322,6 +324,130 @@ main {
 /* Panel-Inhalte über das dekorative Icon legen */
 .panel > *:not(.panel-icon) {
   position: relative;
+}
+
+/* Inline-Code in Texten, z. B. Serienbrieffelder oder Spaltennamen */
+.panel code,
+.advanced-panel code,
+.subtitle code {
+  background: var(--link-bg);
+  border: 1px solid var(--link-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.85em;
+}
+
+/* ----- Erweiterte Einstellungen (einklappbares Panel) -----
+ *
+ *   <details class="advanced-panel">
+ *     <summary><span data-icon="einstellungen" class="panel-icon"></span>Erweiterte Einstellungen</summary>
+ *     <div class="advanced-content">…</div>
+ *   </details>
+ */
+
+.advanced-panel {
+  position: relative;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-left: 4px solid var(--accent);
+  border-radius: 16px;
+  margin-bottom: 20px;
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(6px);
+  overflow: hidden;
+}
+
+/* Das Icon sitzt im <summary> (sonst wäre es eingeklappt nicht sichtbar) und
+ * verankert sich dort; der Inhalt darunter legt sich darüber. */
+.advanced-panel > summary,
+.advanced-panel > .advanced-content {
+  position: relative;
+}
+
+.advanced-panel > summary {
+  padding: 20px 70px 20px 24px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1.25rem;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.advanced-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-panel > summary::before {
+  content: '▸';
+  color: var(--accent);
+  font-size: 0.9em;
+  transition: transform 0.2s ease;
+}
+
+.advanced-panel[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.advanced-panel > summary:hover {
+  background: var(--link-bg);
+}
+
+.advanced-content {
+  padding: 4px 24px 24px;
+}
+
+.advanced-content .hint {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  margin: 0 0 18px;
+  max-width: 720px;
+}
+
+/* ----- Einstellungs-Gruppen (Optionen mit Unterzeile) ----- */
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setting-group + .setting-group {
+  margin-top: 22px;
+}
+
+.setting-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.radio-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+/* Zusatzangabe zu einer Option rückt unter diese ein */
+.setting-sub {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -2px 0 6px 30px;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.setting-sub.disabled {
+  opacity: 0.5;
 }
 
 /* ----- Schritt-Abschnitte (per JS ein-/ausgeblendet) -----
@@ -524,6 +650,20 @@ input[type="radio"] {
   height: 1px;
   opacity: 0;
   overflow: hidden;
+}
+
+/* Zwei Upload-Bereiche nebeneinander (auf schmalen Displays untereinander) */
+.upload-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 720px) {
+  .upload-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .upload-box {

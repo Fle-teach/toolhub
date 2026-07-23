@@ -14,6 +14,12 @@ document.documentElement.dataset.theme =
 // Icon-Motive, die an mehr als einer Stelle vorkommen (Kachel + Tool-Seiten).
 // Einbindung im Markup über <span data-icon="setzling" class="panel-icon"></span>.
 const TOOLHUB_ICONS = {
+  // Vier Kacheln (Allgemeines, Verschiedenes)
+  raster:
+    '<rect x="3.5" y="3.5" width="7" height="7" rx="1.8"/>' +
+    '<rect x="13.5" y="3.5" width="7" height="7" rx="1.8"/>' +
+    '<rect x="3.5" y="13.5" width="7" height="7" rx="1.8"/>' +
+    '<rect x="13.5" y="13.5" width="7" height="7" rx="1.8"/>',
   // Setzling / Wachstum
   setzling:
     '<path d="M12 22V12"/>' +

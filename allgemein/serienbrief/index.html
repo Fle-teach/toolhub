@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Serienbrief &ndash; toolhub</title>
+  <link rel="stylesheet" href="../../assets/toolhub.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="../../assets/toolhub.js"></script>
+  <!-- Bibliotheken lokal eingebunden -> Tool funktioniert auch offline -->
+  <script src="../../assets/vendor/papaparse.min.js" defer></script>
+  <script src="../../assets/vendor/xlsx.full.min.js" defer></script>
+  <script src="../../assets/vendor/jszip.min.js" defer></script>
+  <script src="../../assets/toolhub-io.js" defer></script>
+  <script src="../../assets/toolhub-xlsx.js" defer></script>
+  <script src="../../assets/toolhub-vorlagen.js" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body class="cat-allgemein">
+
+  <header>
+    <h1>&#9993;&#65039; Serienbrief</h1>
+    <p class="subtitle">Vorlage mit <code>{{Feldern}}</code> und Datens&auml;tze aus Tabelle zu fertigen Dokumenten verbinden</p>
+  </header>
+
+  <main>
+
+    <section class="panel">
+      <span data-icon="raster" class="panel-icon"></span>
+      <h2>Vorlage &amp; Datens&auml;tze ausw&auml;hlen</h2>
+      <p class="hint">Die Vorlage ist ein gew&ouml;hnliches Word- oder Writer-Dokument, in dem die sp&auml;ter
+      einzusetzenden Stellen als <code>{{Feldname}}</code> geschrieben sind. Die Datens&auml;tze kommen aus einer
+      Tabelle, deren erste Zeile die Spaltennamen enth&auml;lt. Alles wird lokal im Browser verarbeitet.</p>
+
+      <div class="upload-grid">
+        <div>
+          <input type="file" id="vorlageInput" class="file-input" accept=".docx,.odt">
+          <div class="upload-box" id="vorlageZone">
+            <div class="upload-text">&#128196; <strong>Vorlage hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
+            <div class="upload-hint">Formate: .docx (Word) und .odt (Writer)</div>
+          </div>
+          <div class="file-list" id="vorlageListe"></div>
+        </div>
+        <div>
+          <input type="file" id="datenInput" class="file-input" accept=".csv,.xlsx,.xls,.xlsm">
+          <div class="upload-box" id="datenZone">
+            <div class="upload-text">&#128202; <strong>Datens&auml;tze hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
+            <div class="upload-hint">Formate: .csv (Trennzeichen wird erkannt), .xlsx, .xls, .xlsm</div>
+          </div>
+          <div class="file-list" id="datenListe"></div>
+          <div class="blatt-zeile hidden" id="blattZeile">
+            <label for="blattAuswahl">Tabellenblatt:</label>
+            <select id="blattAuswahl"></select>
+          </div>
+        </div>
+      </div>
+
+      <div id="ladeMeldung"></div>
+    </section>
+
+    <section class="panel hidden" id="felderPanel">
+      <!-- Motiv: Etikett mit Feldmarke -->
+      <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 7a2 2 0 0 1 2-2h9l6 7-6 7H5a2 2 0 0 1-2-2z"/>
+        <path d="M7 10h5"/>
+        <path d="M7 14h3"/>
+      </svg>
+      <h2>Felder zuordnen</h2>
+      <p class="hint">Jedes Feld der Vorlage wird einer Spalte der Tabelle zugeordnet. Gleichnamige Spalten
+      werden automatisch erkannt (Gro&szlig;- und Kleinschreibung sowie Leerzeichen spielen dabei keine Rolle);
+      abweichende Zuordnungen lassen sich hier &auml;ndern.</p>
+
+      <div class="stats" id="statistik"></div>
+      <div id="felderMeldung"></div>
+      <div class="table-wrap">
+        <table id="felderTabelle">
+          <thead>
+            <tr>
+              <th>Feld in der Vorlage</th>
+              <th>Spalte der Tabelle</th>
+              <th>Wert im 1. Datensatz</th>
+            </tr>
+          </thead>
+          <tbody id="felderKoerper"></tbody>
+        </table>
+      </div>
+      <p class="hint" id="unbenutzteSpalten"></p>
+    </section>
+
+    <details class="advanced-panel hidden" id="einstellungenPanel">
+      <!-- Icon liegt im <summary>, damit es auch im eingeklappten Zustand sichtbar bleibt -->
+      <summary>
+        <span data-icon="einstellungen" class="panel-icon"></span>
+        Erweiterte Einstellungen
+      </summary>
+      <div class="advanced-content">
+        <p class="hint">Standardm&auml;&szlig;ig entsteht ein einziges Dokument, in dem die Datens&auml;tze durch
+        Seitenumbr&uuml;che getrennt hintereinander stehen &ndash; praktisch zum Drucken. Alternativ l&auml;sst sich
+        je Datensatz oder je Gruppe (z. B. je Klasse) ein eigenes Dokument erzeugen.</p>
+
+        <div class="setting-group">
+          <div class="setting-label">Ausgabe</div>
+
+          <label class="radio-row">
+            <input type="radio" name="ausgabeModus" value="einzeln" checked>
+            <span>Alles in ein Dokument &ndash; ein Seitenumbruch je Datensatz</span>
+          </label>
+
+          <label class="radio-row">
+            <input type="radio" name="ausgabeModus" value="gruppiert">
+            <span>Nach Spalte gruppieren &ndash; ein Dokument je Gruppe</span>
+          </label>
+          <div class="setting-sub" id="gruppenZeile">
+            <label for="gruppenSpalte">Gruppieren nach:</label>
+            <select id="gruppenSpalte"></select>
+          </div>
+
+          <label class="radio-row">
+            <input type="radio" name="ausgabeModus" value="proDatensatz">
+            <span>Ein Dokument je Datensatz</span>
+          </label>
+          <div class="setting-sub" id="dateinameZeile">
+            <label for="dateiname">Dateiname:</label>
+            <input type="text" id="dateiname" value="Serienbrief_{{Nr}}" size="30">
+            <span class="hinweis-klein">Spalten der Tabelle in doppelten geschweiften Klammern, z. B.
+            <code>{{Nachname}}_{{Vorname}}</code>; <code>{{Nr}}</code> ist die laufende Nummer.</span>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <div class="setting-label">Sonstiges</div>
+          <label class="radio-row">
+            <input type="checkbox" id="behaltUnbekannte">
+            <span>Nicht zugeordnete Felder als <code>{{Feld}}</code> im Dokument stehen lassen</span>
+          </label>
+        </div>
+      </div>
+    </details>
+
+    <section class="panel hidden" id="erzeugenPanel">
+      <!-- Motiv: Dokumentstapel (Erzeugen & Download) -->
+      <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M8 3h8l4 4v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/>
+        <path d="M16 3v4h4"/>
+        <path d="M6 7H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h9"/>
+      </svg>
+      <h2>Serienbriefe erzeugen</h2>
+      <p class="hint">Die fertigen Dokumente behalten das Format der Vorlage. Mehrere Dokumente werden als
+      ZIP-Datei gesammelt.</p>
+
+      <div class="button-group">
+        <button type="button" id="vorschauBtn" class="btn-secondary">&#128065;&#65039; Vorschau (1. Datensatz)</button>
+        <button type="button" id="erzeugenBtn" class="btn-primary">&#128196; Serienbriefe erzeugen</button>
+        <button type="button" id="downloadBtn" class="btn-secondary" disabled>&#128190; Herunterladen</button>
+      </div>
+
+      <div id="erzeugenMeldung"></div>
+
+      <div class="vorschau hidden" id="vorschau">
+        <h3>Vorschau &ndash; so wird der erste Datensatz ausgef&uuml;llt</h3>
+        <pre id="vorschauText"></pre>
+      </div>
+
+      <div class="table-wrap hidden" id="ergebnisWrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Dokument</th>
+              <th>Datens&auml;tze</th>
+              <th>Gr&ouml;&szlig;e</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="ergebnisKoerper"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+</body>
+</html>

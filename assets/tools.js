@@ -23,6 +23,14 @@
  */
 const TOOLHUB_KATEGORIEN = [
   {
+    id: 'allgemein',
+    name: 'Allgemein',
+    icon: 'raster',
+    tools: [
+      { name: 'Serienbriefe aus Vorlage (DOCX/ODT) und Datensätzen (CSV/XLSX) erstellen', ordner: 'serienbrief' }
+    ]
+  },
+  {
     id: 'foerderkoordination',
     name: 'Förderkoordination',
     icon: 'setzling',

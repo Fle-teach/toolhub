@@ -1,0 +1,102 @@
+/*
+ * Serienbrief – tool-spezifische Stile.
+ * Grunddesign (Panels, Upload, Tabellen, Einstellungen) kommt aus ../../assets/toolhub.css.
+ */
+
+/* Auswahl des Tabellenblatts, erscheint nur bei mehrblättrigen Excel-Dateien */
+.blatt-zeile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* muss .blatt-zeile schlagen, sonst bliebe die Zeile trotz .hidden sichtbar */
+.blatt-zeile.hidden {
+  display: none;
+}
+
+/* ----- Feldzuordnung ----- */
+
+#felderTabelle td:first-child {
+  width: 30%;
+  white-space: nowrap;
+}
+
+#felderTabelle select {
+  width: 100%;
+  max-width: 320px;
+}
+
+.feld-hinweis {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* Ein Feld ohne Spalte bleibt im Dokument leer – das soll auffallen */
+#felderTabelle td.fehlt {
+  color: var(--warn-col);
+  font-weight: 600;
+}
+
+#felderTabelle td.leer {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+#unbenutzteSpalten:empty {
+  display: none;
+}
+
+#unbenutzteSpalten {
+  margin: 14px 0 0;
+}
+
+/* ----- Vorschau ----- */
+
+.vorschau {
+  position: relative;
+  margin-top: 20px;
+}
+
+.vorschau h3 {
+  font-size: 1.05rem;
+  margin: 0 0 8px;
+}
+
+.vorschau pre {
+  margin: 0;
+  padding: 16px;
+  max-height: 420px;
+  overflow: auto;
+  background: var(--link-bg);
+  border: 1px solid var(--link-border);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ----- Ergebnisliste ----- */
+
+#ergebnisWrap {
+  margin-top: 20px;
+}
+
+#ergebnisWrap td:nth-child(2),
+#ergebnisWrap td:nth-child(3) {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.hinweis-klein {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}

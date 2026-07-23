@@ -40,13 +40,16 @@ async function toolhubReadWorkbook(file) {
  *   header: false  Zeilen als Arrays – nötig, wenn die Kopfzeile nicht in Zeile 1 steht
  *                  oder Spaltennamen doppelt vorkommen
  *   defval         Ersatzwert für leere Zellen; ohne Angabe fehlen leere Zellen ganz
+ *   raw: false     Werte so übernehmen, wie Excel sie anzeigt (Datum und Zahlen als
+ *                  formatierter Text) statt als Zahl – nötig, wenn die Werte
+ *                  unverändert in eine Ausgabe übernommen werden
  *
  * sheet ist ein Arbeitsblatt oder eine Arbeitsmappe (dann wird das erste Blatt genommen).
  */
 function toolhubSheetRows(sheet, options = {}) {
-  const { header = true, defval } = options;
+  const { header = true, defval, raw } = options;
   const ws = sheet.SheetNames ? sheet.Sheets[sheet.SheetNames[0]] : sheet;
-  return XLSX.utils.sheet_to_json(ws, header ? { defval } : { header: 1, defval });
+  return XLSX.utils.sheet_to_json(ws, header ? { defval, raw } : { header: 1, defval, raw });
 }
 
 // Spaltenbreiten am längsten Inhalt der jeweiligen Spalte ausrichten

@@ -16,29 +16,6 @@ main {
     max-width: 1300px;
 }
 
-.panel .hint code {
-    background: var(--link-bg);
-    border: 1px solid var(--link-border);
-    border-radius: 4px;
-    padding: 1px 5px;
-    font-size: 0.85em;
-}
-
-/* ----- Datei-Auswahl: zwei Upload-Bereiche nebeneinander ----- */
-
-.upload-grid {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-}
-
-@media (max-width: 720px) {
-    .upload-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
 /* ----- Schriftgrößen-Einstellungen pro Seite ----- */
 
 .font-tier-container {
@@ -203,107 +180,6 @@ input[type="number"]:disabled {
     height: 20px;
     border-radius: 5px;
     border: 1px solid var(--link-border);
-}
-
-/* ----- Erweiterte Einstellungen (einklappbares Panel) ----- */
-
-.advanced-panel {
-    position: relative;
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-left: 4px solid var(--accent);
-    border-radius: 16px;
-    margin-bottom: 20px;
-    box-shadow: var(--card-shadow);
-    backdrop-filter: blur(6px);
-    overflow: hidden;
-}
-
-/* Das Icon sitzt im <summary> (sonst wäre es eingeklappt nicht sichtbar) und
- * verankert sich dort; der Inhalt darunter legt sich darüber. */
-.advanced-panel > summary,
-.advanced-panel > .advanced-content {
-    position: relative;
-}
-
-.advanced-panel > summary {
-    padding: 20px 70px 20px 24px;
-    cursor: pointer;
-    font-weight: 700;
-    font-size: 1.25rem;
-    user-select: none;
-    list-style: none;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.advanced-panel > summary::-webkit-details-marker {
-    display: none;
-}
-
-.advanced-panel > summary::before {
-    content: '▸';
-    color: var(--accent);
-    font-size: 0.9em;
-    transition: transform 0.2s ease;
-}
-
-.advanced-panel[open] > summary::before {
-    transform: rotate(90deg);
-}
-
-.advanced-panel > summary:hover {
-    background: var(--link-bg);
-}
-
-.advanced-content {
-    padding: 4px 24px 24px;
-}
-
-.advanced-content .hint {
-    color: var(--text-muted);
-    font-size: 0.92rem;
-    margin: 0 0 18px;
-    max-width: 720px;
-}
-
-.setting-group {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.setting-label {
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    font-weight: 700;
-    color: var(--text-muted);
-    margin-bottom: 2px;
-}
-
-.radio-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    font-size: 0.95rem;
-}
-
-/* Auswahl der Gruppierungsspalte rückt unter die passende Option ein */
-.setting-sub {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: -2px 0 6px 30px;
-    flex-wrap: wrap;
-    font-size: 0.9rem;
-    color: var(--text-muted);
-}
-
-.setting-sub.disabled {
-    opacity: 0.5;
 }
 
 /* ----- Generieren, Status, Vorschau & Download ----- */
