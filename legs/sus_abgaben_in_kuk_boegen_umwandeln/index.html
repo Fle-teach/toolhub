@@ -91,6 +91,51 @@
             </div>
         </section>
 
+        <details class="advanced-panel" id="advancedPanel">
+            <!-- Motiv: Schieberegler (Einstellungen) -->
+            <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 6h9"/>
+                <path d="M17 6h3"/>
+                <circle cx="15" cy="6" r="2"/>
+                <path d="M4 12h3"/>
+                <path d="M11 12h9"/>
+                <circle cx="9" cy="12" r="2"/>
+                <path d="M4 18h9"/>
+                <path d="M17 18h3"/>
+                <circle cx="15" cy="18" r="2"/>
+            </svg>
+            <summary>Erweiterte Einstellungen</summary>
+            <div class="advanced-content">
+                <p class="hint">Standardm&auml;&szlig;ig wird pro Klasse bzw. Profil ein Dokument erstellt. Hier l&auml;sst sich
+                festlegen, nach welcher Spalte gruppiert wird und wie viele Ausgabedokumente entstehen.</p>
+
+                <div class="setting-group">
+                    <div class="setting-label">Ausgabe</div>
+
+                    <label class="radio-row">
+                        <input type="radio" name="outputMode" value="grouped" checked>
+                        <span>Nach Spalte gruppieren &ndash; ein Dokument je Gruppe</span>
+                    </label>
+                    <div class="setting-sub" id="groupColumnRow">
+                        <label for="groupColumnSelect">Gruppieren nach:</label>
+                        <select id="groupColumnSelect">
+                            <option value="">Automatisch (Klasse/Profil)</option>
+                        </select>
+                    </div>
+
+                    <label class="radio-row">
+                        <input type="radio" name="outputMode" value="single">
+                        <span>Alles in ein Dokument</span>
+                    </label>
+
+                    <label class="radio-row">
+                        <input type="radio" name="outputMode" value="perRecord">
+                        <span>Ein Dokument je Datensatz</span>
+                    </label>
+                </div>
+            </div>
+        </details>
+
         <section class="panel">
             <!-- Motiv: Dokumentstapel (Generieren & Download) -->
             <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -99,8 +144,8 @@
                 <path d="M6 7H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h9"/>
             </svg>
             <h2>Generieren &amp; Download</h2>
-            <p class="hint">Erstellt pro Klasse bzw. Profil ein DOCX-Dokument mit allen B&ouml;gen und bietet
-            anschlie&szlig;end alles gesammelt als ZIP-Datei zum Download an.</p>
+            <p class="hint">Erstellt die DOCX-Dokumente gem&auml;&szlig; den Einstellungen (standardm&auml;&szlig;ig pro Klasse
+            bzw. Profil ein Dokument) und bietet anschlie&szlig;end alles gesammelt als ZIP-Datei zum Download an.</p>
 
             <div class="actions-row">
                 <button id="processBtn" class="btn-primary" type="button" disabled>📄 Serienbriefe generieren</button>

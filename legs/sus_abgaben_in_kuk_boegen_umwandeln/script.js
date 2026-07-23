@@ -15,6 +15,17 @@ class SerienriefApp {
         this.settings = {
             pageFontSizeThresholds: []  // Wird dynamisch basierend auf Seitenanzahl gefüllt
         };
+
+        // Ausgabe-Einstellungen (Panel "Erweiterte Einstellungen")
+        //   mode: 'grouped'   -> ein Dokument je Gruppe (Standard)
+        //         'single'    -> alles in ein Dokument
+        //         'perRecord' -> ein Dokument je Datensatz
+        //   groupColumn: '' = automatisch (Klasse/Profil), sonst Spaltenname
+        this.outputSettings = {
+            mode: 'grouped',
+            groupColumn: ''
+        };
+
         this._initializeEventListeners();
     }
 
@@ -50,6 +61,66 @@ class SerienriefApp {
         document.getElementById('updateDataOverviewBtn').addEventListener('change', () => this._showDataOverview());
         document.getElementById('updateDataOverviewBtn').addEventListener('click', () => this._showDataOverview());
         document.getElementById('longContentThreshold').addEventListener('change', () => this._showDataOverview());
+
+        // Erweiterte Einstellungen: Ausgabe-Modus und Gruppierungsspalte
+        document.querySelectorAll('input[name="outputMode"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                this.outputSettings.mode = e.target.value;
+                this._updateGroupColumnState();
+            });
+        });
+        document.getElementById('groupColumnSelect').addEventListener('change', (e) => {
+            this.outputSettings.groupColumn = e.target.value;
+        });
+    }
+
+    /**
+     * Aktiviert bzw. deaktiviert die Auswahl der Gruppierungsspalte –
+     * sie ist nur im Modus "gruppiert" relevant.
+     */
+    _updateGroupColumnState() {
+        const row = document.getElementById('groupColumnRow');
+        const select = document.getElementById('groupColumnSelect');
+        const active = this.outputSettings.mode === 'grouped';
+        select.disabled = !active;
+        row.classList.toggle('disabled', !active);
+    }
+
+    /**
+     * Füllt die Auswahl der Gruppierungsspalte mit den CSV-Spalten.
+     * Die aktuelle Auswahl bleibt erhalten, sofern die Spalte weiter existiert.
+     */
+    _populateGroupColumnSelect() {
+        const select = document.getElementById('groupColumnSelect');
+
+        // Alle vorkommenden Spaltennamen sammeln (Reihenfolge des ersten Auftretens)
+        const columns = [];
+        const seen = new Set();
+        this.csvData.forEach(record => {
+            Object.keys(record).forEach(key => {
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    columns.push(key);
+                }
+            });
+        });
+
+        const previous = this.outputSettings.groupColumn;
+        select.innerHTML = '<option value="">Automatisch (Klasse/Profil)</option>';
+        columns.forEach(col => {
+            const option = document.createElement('option');
+            option.value = col;
+            option.textContent = col;
+            select.appendChild(option);
+        });
+
+        // Vorherige Auswahl wiederherstellen, falls die Spalte noch existiert
+        if (previous && seen.has(previous)) {
+            select.value = previous;
+        } else {
+            select.value = '';
+            this.outputSettings.groupColumn = '';
+        }
     }
 
     /**
@@ -223,6 +294,7 @@ class SerienriefApp {
             document.getElementById('dataOverviewSection').style.display = 'none';
             document.getElementById('preview').style.display = 'none';
             document.getElementById('downloadSection').style.display = 'none';
+            this._populateGroupColumnSelect();
             this._updateProcessButton();
             return;
         }
@@ -234,6 +306,7 @@ class SerienriefApp {
                 throw new Error('CSV enthält keine Datensätze');
             }
 
+            this._populateGroupColumnSelect();
             this._updateProcessButton();
             this._showStatus(`✓ CSV erfolgreich geladen: ${this.csvData.length} Datensätze`, 'success');
         }).catch(error => {
@@ -555,6 +628,119 @@ class SerienriefApp {
     }
 
     /**
+     * Bestimmt die Spalte, nach der gruppiert wird.
+     * Leere Auswahl ('') bedeutet automatisch: bevorzugt 'Klasse', sonst 'Profil'.
+     * Gibt null zurück, wenn keine passende Spalte gefunden wird.
+     */
+    _resolveGroupingColumn() {
+        const chosen = this.outputSettings.groupColumn;
+        if (chosen) return chosen;
+
+        const hasClassColumn = this.csvData.some(r => Object.prototype.hasOwnProperty.call(r, 'Klasse'));
+        const hasProfileColumn = this.csvData.some(r => Object.prototype.hasOwnProperty.call(r, 'Profil'));
+        return hasClassColumn ? 'Klasse' : (hasProfileColumn ? 'Profil' : null);
+    }
+
+    /**
+     * Stellt die Ausgabedokumente als Liste { name, label, records } zusammen –
+     * abhängig vom gewählten Ausgabe-Modus. Die Reihenfolge der (bereits sortierten)
+     * Datensätze bleibt innerhalb der Gruppen erhalten.
+     */
+    _buildOutputUnits() {
+        const mode = this.outputSettings.mode;
+
+        // Ein Dokument je Datensatz
+        if (mode === 'perRecord') {
+            return this.csvData.map((record, i) => ({
+                name: `Serienbrief_${i + 1}.docx`,
+                label: `Datensatz ${i + 1}`,
+                records: [record]
+            }));
+        }
+
+        // Alles in ein Dokument
+        if (mode === 'single') {
+            return [{
+                name: 'Serienbriefe_gesamt.docx',
+                label: '(alle)',
+                records: this.csvData.slice()
+            }];
+        }
+
+        // Gruppiert (Standard) – nach automatisch erkannter oder gewählter Spalte
+        const col = this._resolveGroupingColumn();
+        if (!col) {
+            // Keine Gruppierungsspalte vorhanden -> alles in ein Dokument
+            return [{
+                name: 'Serienbriefe_gesamt.docx',
+                label: '(alle)',
+                records: this.csvData.slice()
+            }];
+        }
+
+        const groups = {};
+        const order = [];
+        this.csvData.forEach(record => {
+            const key = (record[col] || 'UNCLASSIFIED').toString();
+            if (!groups[key]) {
+                groups[key] = [];
+                order.push(key);
+            }
+            groups[key].push(record);
+        });
+
+        return order.map(key => {
+            const safeKey = key.replace(/[^a-z0-9\-_\.]/gi, '_');
+            return {
+                name: `Serienbrief_${col}_${safeKey}.docx`,
+                label: key,
+                records: groups[key]
+            };
+        });
+    }
+
+    /**
+     * Baut aus einer Liste von Datensätzen ein einzelnes DOCX: Für jeden Datensatz
+     * wird das Template mit ausgefüllten Feldern angehängt, dazwischen ein
+     * Seitenumbruch. Bei nur einem Datensatz entsteht ein einseitiger Bogen.
+     */
+    async _buildCombinedDoc(xmlDoc, records, originalBuffer) {
+        const ns = { w: 'http://schemas.openxmlformats.org/wordprocessingml/2006/main' };
+
+        const newZip = await JSZip.loadAsync(originalBuffer);
+        const mainXml = await DOCXHandler.getDocumentXML(newZip);
+
+        // Body leeren, danach die Datensätze nacheinander einfügen
+        const mainBody = mainXml.getElementsByTagNameNS(ns.w, 'body')[0];
+        while (mainBody.firstChild) mainBody.removeChild(mainBody.firstChild);
+
+        for (let i = 0; i < records.length; i++) {
+            // Template klonen und Serienbrieffelder ersetzen
+            const xmlClone = xmlDoc.cloneNode(true);
+            DOCXHandler.replaceMailMergeFields(xmlClone, records[i], this.settings);
+
+            const cloneBody = xmlClone.getElementsByTagNameNS(ns.w, 'body')[0];
+            for (const child of Array.from(cloneBody.childNodes)) {
+                mainBody.appendChild(mainXml.importNode(child, true));
+            }
+
+            // Seitenumbruch zwischen Datensätzen (nicht nach dem letzten)
+            if (i < records.length - 1) {
+                const p = mainXml.createElementNS(ns.w, 'w:p');
+                const r = mainXml.createElementNS(ns.w, 'w:r');
+                const br = mainXml.createElementNS(ns.w, 'w:br');
+                br.setAttributeNS(ns.w, 'w:type', 'page');
+                r.appendChild(br);
+                p.appendChild(r);
+                mainBody.appendChild(p);
+            }
+        }
+
+        await DOCXHandler.saveDocumentXML(newZip, mainXml);
+        return newZip.generateAsync({ type: 'blob' });
+    }
+
+    /**
      * Verarbeitet die Serienbriefe
      */
     async _processSerienbrief() {
@@ -593,107 +779,26 @@ class SerienriefApp {
             // Speichere generierte Dokumente
             this.generatedDocs = [];
 
-            // Prüfe, ob die CSV eine Spalte 'Klasse' oder 'Profil' enthält
-            const hasClassColumn = this.csvData.some(r => Object.prototype.hasOwnProperty.call(r, 'Klasse'));
-            const hasProfileColumn = this.csvData.some(r => Object.prototype.hasOwnProperty.call(r, 'Profil'));
-            const groupingColumn = hasClassColumn ? 'Klasse' : (hasProfileColumn ? 'Profil' : null);
+            // Ausgabedokumente je nach Einstellung bestimmen (gruppiert, alles in
+            // einem Dokument oder ein Dokument je Datensatz)
+            const units = this._buildOutputUnits();
 
             // Rohdaten-Buffer der Original-DOCX (wird zur Erzeugung neuer ZIPs verwendet)
             const originalBuffer = await this.docxFile.arrayBuffer();
 
-            if (groupingColumn) {
-                // Gruppiere Datensätze nach Gruppierungsspalte (Klasse oder Profil)
-                const groups = {};
-                this.csvData.forEach((record, idx) => {
-                    const key = (record[groupingColumn] || 'UNCLASSIFIED').toString();
-                    if (!groups[key]) groups[key] = [];
-                    groups[key].push({ record, idx });
+            for (let u = 0; u < units.length; u++) {
+                const unit = units[u];
+                const finalBlob = await this._buildCombinedDoc(xmlDoc, unit.records, originalBuffer);
+                this.generatedDocs.push({
+                    name: unit.name,
+                    blob: finalBlob,
+                    group: unit.label,
+                    count: unit.records.length
                 });
 
-                const groupKeys = Object.keys(groups);
-                for (let g = 0; g < groupKeys.length; g++) {
-                    const key = groupKeys[g];
-                    const items = groups[key];
-
-                    // Neues ZIP aus Original
-                    const newZip = await JSZip.loadAsync(originalBuffer);
-                    const mainXml = await DOCXHandler.getDocumentXML(newZip);
-
-                    // Namespace
-                    const ns = { w: 'http://schemas.openxmlformats.org/wordprocessingml/2006/main' };
-
-                    // Leere den Body im mainXml
-                    const mainBody = mainXml.getElementsByTagNameNS(ns.w, 'body')[0];
-                    while (mainBody.firstChild) mainBody.removeChild(mainBody.firstChild);
-
-                    // Für jeden Datensatz in der Gruppe: erzeugen, ersetzen, und anhängen
-                    for (let i = 0; i < items.length; i++) {
-                        const record = items[i].record;
-
-                        // Klone das Template XML und ersetze Felder
-                        const xmlClone = xmlDoc.cloneNode(true);
-                        DOCXHandler.replaceMailMergeFields(xmlClone, record, this.settings);
-
-                        // Hole body-Kinder aus dem Klon
-                        const cloneBody = xmlClone.getElementsByTagNameNS(ns.w, 'body')[0];
-                        const children = Array.from(cloneBody.childNodes);
-
-                        // Importiere und hänge Kinder an das mainBody an
-                        for (const child of children) {
-                            const imported = mainXml.importNode(child, true);
-                            mainBody.appendChild(imported);
-                        }
-
-                        // Füge Seitenumbruch zwischen Dokumenten (außer nach letztem)
-                        if (i < items.length - 1) {
-                            const p = mainXml.createElementNS(ns.w, 'w:p');
-                            const r = mainXml.createElementNS(ns.w, 'w:r');
-                            const br = mainXml.createElementNS(ns.w, 'w:br');
-                            br.setAttributeNS(ns.w, 'w:type', 'page');
-                            r.appendChild(br);
-                            p.appendChild(r);
-                            mainBody.appendChild(p);
-                        }
-                    }
-
-                    // Speichere mainXml zurück in ZIP
-                    await DOCXHandler.saveDocumentXML(newZip, mainXml);
-                    const finalBlob = await newZip.generateAsync({ type: 'blob' });
-
-                    // Dateiname sauber machen
-                    const safeKey = key.replace(/[^a-z0-9\-_\.]/gi, '_');
-                    this.generatedDocs.push({ name: `Serienbrief_Klasse_${safeKey}.docx`, blob: finalBlob, group: key, count: items.length });
-
-                    // Update Progress
-                    const progress = Math.round((g + 1) / groupKeys.length * 100);
-                    this._showStatus(`Verarbeitet Gruppen: ${progress}%`, 'info');
-                }
-            } else {
-                // Fallback: Einzelne Dokumente pro Datensatz
-                for (let i = 0; i < this.csvData.length; i++) {
-                    const record = this.csvData[i];
-                    
-                    // Erstelle Kopie des XMLs für diesen Datensatz
-                    const xmlClone = xmlDoc.cloneNode(true);
-
-                    // Ersetze Serienbrieffelder
-                    DOCXHandler.replaceMailMergeFields(xmlClone, record, this.settings);
-
-                    // Erstelle neue ZIP für dieses Dokument
-                    const newZip = await JSZip.loadAsync(originalBuffer);
-                    await DOCXHandler.saveDocumentXML(newZip, xmlClone);
-                    const finalBlob = await newZip.generateAsync({ type: 'blob' });
-
-                    this.generatedDocs.push({
-                        name: `Serienbrief_${i + 1}.docx`,
-                        blob: finalBlob,
-                        record: record
-                    });
-
-                    // Update Progress
-                    const progress = Math.round((i + 1) / this.csvData.length * 100);
-                    this._showStatus(`Verarbeitet: ${progress}%`, 'info');
-                }
+                // Update Progress
+                const progress = Math.round((u + 1) / units.length * 100);
+                this._showStatus(`Verarbeitet: ${progress}%`, 'info');
             }
 
             // Zeige Download-Section
@@ -720,15 +825,15 @@ class SerienriefApp {
         // Schätze die Seitenzahl des Template-DOCX
         const templatePages = DOCXHandler.estimatePageCount(xmlDoc);
 
-        // Prüfe, ob die CSV eine Spalte 'Klasse' oder 'Profil' enthält
-        const hasClassColumn = this.csvData.some(r => Object.prototype.hasOwnProperty.call(r, 'Klasse'));
-        const hasProfileColumn = this.csvData.some(r => Object.prototype.hasOwnProperty.call(r, 'Profil'));
-        const groupingColumn = hasClassColumn ? 'Klasse' : (hasProfileColumn ? 'Profil' : null);
+        // Die Übersicht orientiert sich an der aktuell aufgelösten Gruppierungsspalte
+        // (gewählt oder automatisch Klasse/Profil) – unabhängig vom Ausgabe-Modus.
+        const groupingColumn = this._resolveGroupingColumn();
+        const groupHeader = groupingColumn || 'Gruppe';
 
         let stats = [];
 
         if (groupingColumn) {
-            // Gruppiere Datensätze nach Gruppierungsspalte (Klasse oder Profil)
+            // Gruppiere Datensätze nach Gruppierungsspalte
             const groups = {};
             this.csvData.forEach((record) => {
                 const key = (record[groupingColumn] || 'UNCLASSIFIED').toString();
@@ -761,7 +866,7 @@ class SerienriefApp {
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
         headerRow.innerHTML = `
-            <th>Klasse</th>
+            <th>${toolhubEscapeHtml(groupHeader)}</th>
             <th>Abgaben</th>
             <th>Seitenzahl (Vorlage)</th>
             <th>Erwartete Seiten</th>
@@ -804,13 +909,25 @@ class SerienriefApp {
         tableWrap.appendChild(table);
         previewContent.appendChild(tableWrap);
 
+        // Beschreibe den gewählten Ausgabe-Modus und die Anzahl der Dokumente
+        const units = this._buildOutputUnits();
+        let modeText;
+        if (this.outputSettings.mode === 'single') {
+            modeText = 'Alles in ein Dokument';
+        } else if (this.outputSettings.mode === 'perRecord') {
+            modeText = 'Ein Dokument je Datensatz';
+        } else {
+            modeText = `Gruppiert nach „${groupHeader}“ – ein Dokument je Gruppe`;
+        }
+
         // Zeige Info-Text
         const infoDiv = document.createElement('div');
         infoDiv.className = 'statistics-info';
         infoDiv.innerHTML = `
-            <p>Vorlage: ${templatePages} Seite(n) | 
-               Gesamt Datensätze: ${totalRecords} | 
+            <p>Vorlage: ${templatePages} Seite(n) |
+               Gesamt Datensätze: ${totalRecords} |
                Erwartete Gesamtseiten: ${totalPages}</p>
+            <p>Ausgabe: ${toolhubEscapeHtml(modeText)} → ${units.length} Dokument(e)</p>
         `;
         previewContent.appendChild(infoDiv);
 
