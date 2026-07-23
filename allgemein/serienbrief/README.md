@@ -84,6 +84,28 @@ Dokument.
 Das Ausgabeformat entspricht dem der Vorlage. Ein einzelnes Dokument wird direkt
 heruntergeladen, mehrere gesammelt als ZIP-Datei.
 
+## Schriftgröße der eingesetzten Werte
+
+Betrifft ausschließlich die Werte, die in die Felder eingesetzt werden – nicht den übrigen
+Text der Vorlage.
+
+| Einstellung | Wirkung |
+| --- | --- |
+| Wie im Feld (Standard) | Der Wert übernimmt die Schriftgröße der Stelle, an der das Feld steht. |
+| Feste Schriftgröße | Alle eingesetzten Werte erhalten die angegebene Punktgröße. |
+
+Die feste Größe wirkt genau auf den Wert: Steht ein Feld mitten im Satz (`für {{Vorname}} aus
+der Klasse …`), wird nur der Name kleiner gesetzt, der umgebende Satz behält seine Größe. Eine
+vorhandene Auszeichnung des Feldes (fett, kursiv, Farbe) bleibt erhalten. In der Textvorschau
+ist die Größe nicht sichtbar – sie zeigt nur den Inhalt, nicht die Formatierung; erst das
+erzeugte Dokument gibt sie wieder.
+
+Eine automatische Anpassung „so, dass die Seitenzahl gleich bleibt" gibt es bewusst **nicht**:
+Ob Inhalt auf eine weitere Seite rutscht, entscheidet erst die Layout-Engine von Word bzw.
+Writer beim Öffnen. Ohne dieses Rendering – das Tool läuft rein im Browser, ohne Office –
+ließe sich das nicht verlässlich vorausberechnen, sondern nur schätzen. Statt einer trügerischen
+Automatik gibt es deshalb nur die feste Größe, die man selbst passend wählt.
+
 ## Beispieldateien
 
 | Datei | Zweck |

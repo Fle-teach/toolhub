@@ -19,6 +19,8 @@ const gruppenZeile = document.getElementById('gruppenZeile');
 const gruppenSpalte = document.getElementById('gruppenSpalte');
 const dateinameZeile = document.getElementById('dateinameZeile');
 const dateiname = document.getElementById('dateiname');
+const schriftGroesseZeile = document.getElementById('schriftGroesseZeile');
+const schriftGroesse = document.getElementById('schriftGroesse');
 const behaltUnbekannte = document.getElementById('behaltUnbekannte');
 const vorschauBtn = document.getElementById('vorschauBtn');
 const erzeugenBtn = document.getElementById('erzeugenBtn');
@@ -38,10 +40,20 @@ const zustand = {
 };
 
 const einstellungen = {
-  modus: 'einzeln',   // 'einzeln' | 'gruppiert' | 'proDatensatz'
+  modus: 'einzeln',       // 'einzeln' | 'gruppiert' | 'proDatensatz'
   gruppenSpalte: '',
+  schriftModus: 'feld',   // 'feld' (Größe der Fundstelle) | 'fest'
+  schriftGroesse: 11,     // Punkt; nur bei schriftModus 'fest'
   behaltUnbekannte: false
 };
+
+// Optionen für die Vorlage (Schriftgröße, unbekannte Felder) – für erzeuge/vorschauText
+function vorlagenOptionen() {
+  return {
+    behaltUnbekannte: einstellungen.behaltUnbekannte,
+    schriftgroesse: einstellungen.schriftModus === 'fest' ? einstellungen.schriftGroesse : null
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Dateien einlesen
@@ -327,6 +339,20 @@ gruppenSpalte.addEventListener('change', () => {
 
 dateiname.addEventListener('input', () => ergebnisLeeren());
 
+document.querySelectorAll('input[name="schriftModus"]').forEach((radio) => {
+  radio.addEventListener('change', () => {
+    einstellungen.schriftModus = radio.value;
+    ergebnisLeeren();
+    aktualisiereEinstellungen();
+  });
+});
+
+schriftGroesse.addEventListener('change', () => {
+  const wert = parseFloat(schriftGroesse.value);
+  if (wert > 0) einstellungen.schriftGroesse = wert;
+  ergebnisLeeren();
+});
+
 behaltUnbekannte.addEventListener('change', () => {
   einstellungen.behaltUnbekannte = behaltUnbekannte.checked;
   ergebnisLeeren();
@@ -338,6 +364,8 @@ function aktualisiereEinstellungen() {
   gruppenSpalte.disabled = einstellungen.modus !== 'gruppiert';
   dateinameZeile.classList.toggle('disabled', einstellungen.modus !== 'proDatensatz');
   dateiname.disabled = einstellungen.modus !== 'proDatensatz';
+  schriftGroesseZeile.classList.toggle('disabled', einstellungen.schriftModus !== 'fest');
+  schriftGroesse.disabled = einstellungen.schriftModus !== 'fest';
 }
 
 // Danach wird im Schulalltag am ehesten gruppiert
@@ -424,12 +452,13 @@ function baueEinheiten() {
 vorschauBtn.addEventListener('click', async () => {
   try {
     const satz = zustand.datensaetze[0];
-    const text = await zustand.vorlage.vorschauText(werteFuer(satz), {
-      behaltUnbekannte: einstellungen.behaltUnbekannte
-    });
+    const text = await zustand.vorlage.vorschauText(werteFuer(satz), vorlagenOptionen());
     vorschauText.textContent = text.replace(/\n{3,}/g, '\n\n').trim() || '(Die Vorlage enthält keinen Text.)';
+    // Die Textvorschau zeigt keine Schriftgrößen – darauf bei fester Größe hinweisen
+    meldung('erzeugenMeldung', einstellungen.schriftModus === 'fest'
+      ? `Hinweis: Die feste Schriftgröße (${einstellungen.schriftGroesse} pt) ist erst im erzeugten Dokument sichtbar, nicht in dieser Textvorschau.`
+      : '', 'info');
     vorschau.classList.remove('hidden');
-    meldung('erzeugenMeldung', '');
   } catch (fehler) {
     meldung('erzeugenMeldung', fehler.message, 'error');
   }
@@ -448,9 +477,7 @@ erzeugenBtn.addEventListener('click', async () => {
       // Kurz an den Browser abgeben, damit die Meldung sichtbar wird
       await new Promise((fertig) => setTimeout(fertig, 0));
 
-      const blob = await zustand.vorlage.erzeuge(einheit.saetze.map(werteFuer), {
-        behaltUnbekannte: einstellungen.behaltUnbekannte
-      });
+      const blob = await zustand.vorlage.erzeuge(einheit.saetze.map(werteFuer), vorlagenOptionen());
       zustand.dokumente.push({
         name: einheit.name + zustand.vorlage.endung,
         blob,

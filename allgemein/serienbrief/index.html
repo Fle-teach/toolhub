@@ -130,6 +130,26 @@
         </div>
 
         <div class="setting-group">
+          <div class="setting-label">Schriftgr&ouml;&szlig;e der eingesetzten Werte</div>
+
+          <label class="radio-row">
+            <input type="radio" name="schriftModus" value="feld" checked>
+            <span>Wie im Feld &ndash; der Wert &uuml;bernimmt die Schriftgr&ouml;&szlig;e der Fundstelle</span>
+          </label>
+
+          <label class="radio-row">
+            <input type="radio" name="schriftModus" value="fest">
+            <span>Feste Schriftgr&ouml;&szlig;e f&uuml;r alle eingesetzten Werte</span>
+          </label>
+          <div class="setting-sub" id="schriftGroesseZeile">
+            <label for="schriftGroesse">Gr&ouml;&szlig;e (pt):</label>
+            <input type="number" id="schriftGroesse" value="11" min="4" max="96" step="0.5">
+            <span class="hinweis-klein">Betrifft nur die eingesetzten Feldwerte, nicht den &uuml;brigen Text der
+            Vorlage.</span>
+          </div>
+        </div>
+
+        <div class="setting-group">
           <div class="setting-label">Sonstiges</div>
           <label class="radio-row">
             <input type="checkbox" id="behaltUnbekannte">
