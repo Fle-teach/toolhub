@@ -52,8 +52,12 @@ main {
     margin-top: 20px;
 }
 
+/* Schrumpfbar halten (flex-shrink > 0 und min-width: 0): Der Button-Text nennt
+ * die noch fehlenden Dateien und wird dadurch lang – auf schmalen Displays soll
+ * er umbrechen, statt die Seite breiter als den Bildschirm zu machen. */
 .toolbar-left {
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+    min-width: 0;
 }
 
 .toolbar-right {
@@ -62,6 +66,11 @@ main {
     align-items: center;
     flex-wrap: wrap;
     justify-content: flex-end;
+    min-width: 0;
+}
+
+.toolbar button {
+    max-width: 100%;
 }
 
 /* Download-Buttons (grün, da Export-Aktionen) */

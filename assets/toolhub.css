@@ -247,6 +247,11 @@ h1 {
   font-size: 2.1rem;
   letter-spacing: -1px;
   margin: 0;
+  /* Lange Komposita ("Klassenzusammensetzung") passen auf schmalen Displays
+   * nicht in eine Zeile; ohne Umbruch wird die ganze Seite breiter als der
+   * Bildschirm. hyphens nutzt lang="de" der Seite für saubere Trennstellen. */
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 #h1a { color: var(--h1a); }

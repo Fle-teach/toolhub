@@ -91,9 +91,11 @@ h3.block-title {
 }
 
 /* ===== Daten einlesen ===== */
+/* min(…, 100%) statt einer festen Untergrenze: Auf schmalen Displays (iPhone)
+ * darf die Spalte unter den Wunschwert schrumpfen, statt die Seite zu sprengen. */
 .upload-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
     gap: 8px 20px;
 }
 
@@ -104,13 +106,13 @@ h3.block-title {
 /* ===== Optionen & Regeln ===== */
 .display-options-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
     gap: 10px 16px;
 }
 
 .rules-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 1fr));
     gap: 10px 16px;
     align-items: start;
 }
@@ -218,7 +220,7 @@ h3.block-title {
 
 .legend-items {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
     gap: 10px 16px;
     margin-top: 16px;
 }
@@ -480,7 +482,7 @@ h3.block-title {
 /* ===== Schülerliste ===== */
 .students-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
     gap: 10px;
     flex: 1;
     padding: 4px;
