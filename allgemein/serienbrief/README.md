@@ -103,29 +103,38 @@ erzeugte Dokument gibt sie wieder.
 
 ### Automatisch verkleinern
 
-Für jeden Feldwert wird geschätzt, wie viel vertikalen Platz er braucht, und daraus eine
-kleinere Schrift abgeleitet. Die Schätzung berücksichtigt **Zeichenanzahl und manuelle
-Zeilenumbrüche**: Der Wert wird an den Umbrüchen zerlegt und jeder Abschnitt über „Zeichen pro
-Zeile" in geschätzte Zeilen umgerechnet, wobei jeder Abschnitt mindestens eine Zeile zählt. So
-kostet auch ein kurzer Text mit vielen Umbrüchen viele Zeilen und damit eine kleinere Schrift.
+Die Anpassung erfolgt **pro Seite einheitlich**: Alle (langen) Felder einer Seite erhalten
+dieselbe Größe. Diese ergibt sich daraus, wie voll die Seite wird – aus dem festen
+Vorlagentext, der ohnehin auf der Seite steht, und dem durch die Felder hinzukommenden Text.
+Je mehr zusammenkommt, desto kleiner die Schrift; passt alles bequem, bleibt es bei der
+Startgröße.
+
+Als „Seite" gelten die in der Vorlage **fest gesetzten** Seitenumbrüche. Die tatsächliche, erst
+beim Öffnen entstehende Seitenaufteilung kann das Tool nicht sehen (es läuft ohne Word/Writer im
+Browser) – es schätzt sie. Text in Tabellenzellen zählt nicht zum „vollen" festen Text, weil
+Zellen eine weitgehend feste Höhe haben; Feldwerte zählen dagegen überall, auch in Zellen.
 
 Einstellungen:
 
 | Feld | Bedeutung |
 | --- | --- |
-| Startgröße | größte automatisch vergebene Größe (für Werte knapp über der Schwelle) |
-| Mindestgröße | Untergrenze, unter die nicht verkleinert wird |
-| Anpassen ab Zeichen / Umbrüchen | erst wenn ein Wert **so viele Zeichen oder so viele Umbrüche** hat, wird überhaupt verkleinert – kürzere Werte behalten die Größe ihrer Fundstelle |
-| Zeichen pro Zeile | wie viele Zeichen als eine Zeile gelten (steuert das Gewicht der Umbrüche gegenüber der Zeichenzahl) |
-| Manuelle Zeilenumbrüche in Leerzeichen umwandeln | ersetzt harte Umbrüche im Wert durch ein Leerzeichen; der Text fließt dann und braucht vertikal weniger Platz |
+| Startgröße | größte Größe; wird verwendet, wenn die Seite noch nicht voll ist |
+| Mindestgröße | Untergrenze; darunter wird nicht verkleinert, auch wenn es dann noch nicht passt |
+| Zeichen pro Zeile | wie viele Zeichen als eine Zeile gelten (steuert, wie stark manuelle Umbrüche zählen) |
+| Manuelle Zeilenumbrüche in Leerzeichen umwandeln | ersetzt harte Umbrüche im Wert durch ein Leerzeichen; der Text fließt dann und braucht weniger Platz |
+| Nur Felder ab einer Mindestlänge anpassen | Schalter (standardmäßig aus). Ist er an, werden nur Felder ab *n* Zeichen **oder** *m* Umbrüchen verkleinert; kürzere Felder behalten die Größe ihrer Fundstelle oder erhalten eine feste Größe. Bei „Umbrüche → Leerzeichen" ist die Umbruch-Schwelle deaktiviert. |
+
+Steht der Schalter aus (Standard), bekommen alle Felder einer Seite die berechnete Größe.
 
 **Wichtig – es ist eine Näherung, keine Garantie.** Ob ein Inhalt wirklich auf eine weitere
-Seite rutscht, entscheidet erst die Layout-Engine von Word bzw. Writer beim Öffnen. Das Tool
-läuft rein im Browser, ohne Office, und kann die Seitenaufteilung nicht exakt vorausberechnen –
-es schätzt sie. Die Automatik senkt die Wahrscheinlichkeit zusätzlicher Seiten deutlich, kann
-sie aber weder garantieren noch in jedem Fall ausschließen. Für ein verlässliches Ergebnis die
-erzeugten Dokumente kurz durchsehen und die Werte (Start-/Mindestgröße, Schwellen) bei Bedarf
-nachjustieren.
+Seite rutscht, entscheidet erst Word bzw. Writer. Die Automatik senkt die Wahrscheinlichkeit
+zusätzlicher Seiten deutlich; bei sehr vollen Seiten kann es sein, dass selbst die Mindestgröße
+nicht ausreicht. Für ein verlässliches Ergebnis die erzeugten Dokumente kurz durchsehen und die
+Werte (Start-/Mindestgröße, ggf. Schwellen) bei Bedarf nachjustieren.
+
+Die Standardwerte sind an mehreren echten LEG-Bögen kalibriert (Startgröße 11 pt, Mindestgröße
+6 pt). Damit halten typische Bögen ihre Seitenzahl; nur außergewöhnlich lange Datensätze
+brauchen dann noch eine Seite mehr.
 
 ## Beispieldateien
 
@@ -133,11 +142,10 @@ nachjustieren.
 | --- | --- |
 | `Elternbrief-Vorlage.docx` / `.odt` | derselbe Brief mit `{{Feldern}}`, einmal je Format |
 | `datensaetze.csv` / `.xlsx` | die zugehörigen Datensätze; die XLSX hat zwei Blätter, um die Blattauswahl auszuprobieren |
-| `Vorlage_2.docx` | echte Word-Serienbriefvorlage (Lern- und Fördervereinbarung) mit `MERGEFIELD`, verschachtelten `IF`-Feldern für die Ankreuzkästchen und einem `DATE`-Feld |
-| `datensaetze_2.xlsx` | Datensätze zu `Vorlage_2.docx` |
-| `LEG-Vorlage Oberstufe_JS_Serienbrief.odt` | mehrseitiger LEG-Bogen (Writer) mit `{{Feldern}}`; geeignet, um die automatische Verkleinerung langer Kommentare auszuprobieren |
 
-Die Daten in den Beispielen sind frei erfunden.
+Frei erfundene Beispieldaten. Weitere Vorlagen mit echten Testdatensätzen (Ordner `LEGs/` und
+`LFV/`) liegen nur lokal zum Ausprobieren und sind über `.gitignore` vom Repository
+ausgeschlossen, weil sie Personendaten enthalten.
 
 ## Technik
 
@@ -152,3 +160,10 @@ Word speichert ein Feld nicht als Element, sondern als Folge von Runs (`fldChar 
 ineinander schachteln lassen. Deshalb baut das Modul daraus einen Feldbaum und wertet ihn
 rekursiv aus; ausgewertete Felder verschwinden samt Anweisung und werden durch einen Run mit
 dem Ergebnis ersetzt, der die Formatierung des bisherigen Ergebnisses übernimmt.
+
+Für die automatische Verkleinerung werden die Blöcke eines Datensatzes an den festen
+Seitenumbrüchen in Seiten zerlegt. Je Seite schätzt `toolhubVorlageSeitengroesse` aus der festen
+Textlast (ohne dicht gepackte Tabellen) und der Feldtextlast eine gemeinsame Größe: Der
+vertikale Platzbedarf wächst etwa mit `Zeichen · Größe²`, gesucht ist die größte Größe, mit der
+die Seite noch in ihre Kapazität passt (Konstante `TOOLHUB_SEITEN_KAPAZITAET`, an den LEG-Bögen
+kalibriert). Diese Größe bekommen alle Felder der Seite.

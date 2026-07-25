@@ -150,12 +150,13 @@
 
           <label class="radio-row">
             <input type="radio" name="schriftModus" value="auto">
-            <span>Automatisch verkleinern bei langen Werten</span>
+            <span>Automatisch verkleinern, um zus&auml;tzliche Seiten zu vermeiden</span>
           </label>
           <div class="setting-sub setting-sub-block" id="autoSchriftZeile">
-            <p class="hinweis-klein auto-hinweis">Lange Feldwerte werden kleiner gesetzt, um zus&auml;tzliche
-            Seitenumbr&uuml;che zu vermeiden. Die Sch&auml;tzung ber&uuml;cksichtigt Zeichenanzahl <em>und</em> manuelle
-            Zeilenumbr&uuml;che. Das ist eine N&auml;herung &ndash; ob der Inhalt wirklich auf eine weitere Seite rutscht,
+            <p class="hinweis-klein auto-hinweis">Pro Seite wird eine gemeinsame Schriftgr&ouml;&szlig;e f&uuml;r die
+            eingesetzten Werte gew&auml;hlt &ndash; abh&auml;ngig davon, wie viel Text (fester Vorlagentext plus
+            Feldwerte) auf der Seite zusammenkommt. Als &bdquo;Seite&ldquo; gelten die in der Vorlage fest gesetzten
+            Seitenumbr&uuml;che. Das ist eine N&auml;herung &ndash; ob der Inhalt wirklich auf eine weitere Seite rutscht,
             entscheidet erst Word bzw. Writer.</p>
 
             <div class="auto-gitter">
@@ -163,13 +164,7 @@
               <input type="number" id="autoStart" value="11" min="4" max="96" step="0.5">
 
               <label for="autoMin">Mindestgr&ouml;&szlig;e (pt):</label>
-              <input type="number" id="autoMin" value="7" min="4" max="96" step="0.5">
-
-              <label for="autoAbZeichen">Anpassen ab Zeichen:</label>
-              <input type="number" id="autoAbZeichen" value="400" min="0" max="100000" step="10">
-
-              <label for="autoAbUmbrueche">oder ab Umbr&uuml;chen:</label>
-              <input type="number" id="autoAbUmbrueche" value="6" min="0" max="1000" step="1">
+              <input type="number" id="autoMin" value="6" min="4" max="96" step="0.5">
 
               <label for="autoZeichenProZeile">Zeichen pro Zeile (Sch&auml;tzung):</label>
               <input type="number" id="autoZeichenProZeile" value="60" min="1" max="1000" step="1">
@@ -179,6 +174,31 @@
               <input type="checkbox" id="umbruecheZuLeerzeichen">
               <span>Manuelle Zeilenumbr&uuml;che in Leerzeichen umwandeln</span>
             </label>
+
+            <label class="radio-row">
+              <input type="checkbox" id="schwellenAktiv">
+              <span>Nur Felder ab einer Mindestl&auml;nge anpassen</span>
+            </label>
+            <div class="setting-sub setting-sub-block" id="schwellenZeile">
+              <div class="auto-gitter">
+                <label for="autoAbZeichen">Anpassen ab Zeichen:</label>
+                <input type="number" id="autoAbZeichen" value="100" min="0" max="100000" step="10">
+
+                <label for="autoAbUmbrueche">oder ab Umbr&uuml;chen:</label>
+                <input type="number" id="autoAbUmbrueche" value="2" min="0" max="1000" step="1">
+              </div>
+
+              <div class="setting-label">F&uuml;r k&uuml;rzere Felder</div>
+              <label class="radio-row">
+                <input type="radio" name="kurzModus" value="fundstelle" checked>
+                <span>Schriftgr&ouml;&szlig;e der Fundstelle &uuml;bernehmen</span>
+              </label>
+              <label class="radio-row">
+                <input type="radio" name="kurzModus" value="fest">
+                <span>feste Schriftgr&ouml;&szlig;e:
+                  <input type="number" id="autoKurzGroesse" value="11" min="4" max="96" step="0.5"> pt</span>
+              </label>
+            </div>
           </div>
         </div>
 

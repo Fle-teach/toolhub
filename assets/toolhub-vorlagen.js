@@ -48,6 +48,7 @@ const TOOLHUB_NS = {
   office: 'urn:oasis:names:tc:opendocument:xmlns:office:1.0',
   text: 'urn:oasis:names:tc:opendocument:xmlns:text:1.0',
   style: 'urn:oasis:names:tc:opendocument:xmlns:style:1.0',
+  table: 'urn:oasis:names:tc:opendocument:xmlns:table:1.0',
   fo: 'urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0'
 };
 
@@ -188,51 +189,85 @@ function toolhubVorlageUmbrueche(text, optionen) {
 }
 
 /*
+ * Kapazität einer Seite in „Zeichen · Punkt²" (siehe toolhubVorlageSeitengroesse):
+ * Wie viel durch Felder hinzukommender Text auf eine Seite passt, bevor unter die
+ * Startgröße verkleinert wird. KAP / Größe² ≈ Feld-Zeichen pro Seite bei dieser Größe
+ * (hier ~740 Zeichen bei 11 pt). An den drei LEG-Beispielen kalibriert: Bei diesem
+ * Wert bleiben Seiten mit wenig Feldtext bei der Startgröße, während die vollen
+ * Kommentar-Seiten so weit verkleinert werden, dass sie ihre Seitenzahl halten.
+ */
+const TOOLHUB_SEITEN_KAPAZITAET = 90000;
+
+// Effektive Zeichenlast: sichtbare Zeichen plus je Umbruch eine volle Zeile
+function toolhubVorlageLast(text, zpz) {
+  const zeichen = text.length;
+  const umbrueche = (text.match(/\n/g) || []).length;
+  return zeichen + umbrueche * zpz;
+}
+
+/*
+ * Ob ein Wert die Schwellen für die automatische Anpassung erreicht.
+ * Ohne aktive Schwellen gilt jeder (nicht leere) Wert als „lang".
+ */
+function toolhubVorlageUeberSchwelle(text, auto) {
+  if (!auto.schwellenAktiv) return true;
+  const umbrueche = (text.match(/\n/g) || []).length;
+  return text.length >= auto.abZeichen || umbrueche >= auto.abUmbrueche;
+}
+
+/*
+ * Bestimmt die einheitliche Schriftgröße einer Seite aus der bereits vorhandenen
+ * statischen Textlast und der durch Felder hinzukommenden Last.
+ *
+ * Modell: Der vertikale Platzbedarf von Text wächst ungefähr mit Zeichenzahl · Größe²
+ * (kleinere Schrift ⇒ mehr Zeichen je Zeile UND kleinere Zeilen). Eine Seite fasst
+ * KAP „Zeichen·Punkt²". Der feste Text belegt davon `cStat · start²`; für die Felder
+ * bleibt der Rest. Gesucht ist die größte Größe S mit
+ *     cStat · start² + cFeld · S² ≤ KAP
+ * begrenzt auf [Mindestgröße, Startgröße]. „Aggressiv einpassen" heißt: notfalls bis
+ * zur Mindestgröße verkleinern, auch wenn es dann immer noch nicht ganz passt.
+ *
+ * Das bleibt eine Näherung – die echte Seitenaufteilung entsteht erst in Word/Writer.
+ */
+function toolhubVorlageSeitengroesse(cStat, cFeld, auto) {
+  const start = auto.startGroesse;
+  if (cFeld <= 0) return start; // keine (langen) Felder auf der Seite
+
+  const frei = TOOLHUB_SEITEN_KAPAZITAET - cStat * start * start;
+  if (frei <= 0) return auto.mindestGroesse;
+
+  const roh = Math.sqrt(frei / cFeld);
+  const begrenzt = Math.min(start, Math.max(auto.mindestGroesse, roh));
+  return Math.round(begrenzt * 2) / 2; // auf halbe Punkte runden
+}
+
+/*
  * Liefert eine Funktion, die zu einem Feldwert die Schriftgröße (in Punkt) bestimmt –
  * oder null, wenn der Wert die Größe seiner Fundstelle behalten soll.
  *   feste Größe:   optionen.schriftgroesse (Zahl)
- *   automatisch:   optionen.autoSchrift (Objekt, siehe toolhubVorlageAutoGroesse)
+ *   automatisch:   optionen.autoSchrift + optionen.seitengroesse (je Seite gesetzt)
  *   sonst:         null (Größe der Fundstelle)
+ *
+ * Im Automatik-Modus bekommen alle (langen) Felder einer Seite dieselbe Größe
+ * (optionen.seitengroesse). Werte unter den Schwellen behalten die Fundstellen-Größe
+ * oder erhalten eine feste Größe (auto.kurzModus). Ohne gesetzte Seitengröße – etwa in
+ * Kopf-/Fußzeilen – wird nicht angepasst.
  */
 function toolhubVorlageGroesseFn(optionen) {
   if (optionen && optionen.autoSchrift) {
-    return (text) => toolhubVorlageAutoGroesse(text, optionen.autoSchrift);
+    const auto = optionen.autoSchrift;
+    const seite = optionen.seitengroesse;
+    return (text) => {
+      if (seite == null) return null;
+      if (!toolhubVorlageUeberSchwelle(text, auto)) {
+        return auto.kurzModus === 'fest' ? auto.kurzGroesse : null;
+      }
+      return seite;
+    };
   }
   const fest = optionen && optionen.schriftgroesse;
   if (typeof fest === 'number' && fest > 0) return () => fest;
   return () => null;
-}
-
-/*
- * Schätzt heuristisch, wie viel vertikalen Platz ein Feldwert braucht, und leitet
- * daraus eine kleinere Schriftgröße ab – mit dem Ziel, zusätzliche Seitenumbrüche
- * zu vermeiden. Das ist eine Näherung: Ob der Inhalt tatsächlich auf eine weitere
- * Seite rutscht, entscheidet erst Word bzw. Writer beim Setzen.
- *
- * Berücksichtigt Zeichenanzahl UND manuelle Zeilenumbrüche: Der Wert wird an den
- * Umbrüchen zerlegt und jeder Abschnitt über zeichenProZeile in geschätzte Zeilen
- * umgerechnet; ein kurzer Abschnitt zählt trotzdem als eine Zeile. So kostet auch
- * ein kurzer Text mit vielen Umbrüchen viele Zeilen und damit eine kleinere Schrift.
- *
- * auto = { startGroesse, mindestGroesse, zeichenProZeile, abZeichen, abUmbrueche }
- * Rückgabe: Punktgröße oder null (keine Anpassung, wenn unter beiden Schwellen).
- */
-function toolhubVorlageAutoGroesse(text, auto) {
-  const zeichen = text.length;
-  const umbrueche = (text.match(/\n/g) || []).length;
-
-  // Erst ab abZeichen Zeichen ODER abUmbrueche Umbrüchen anpassen
-  if (zeichen < auto.abZeichen && umbrueche < auto.abUmbrueche) return null;
-
-  const zpz = auto.zeichenProZeile > 0 ? auto.zeichenProZeile : 60;
-  const zeilen = text.split('\n')
-    .reduce((summe, teil) => summe + Math.max(1, Math.ceil(teil.length / zpz)), 0);
-
-  // Bis zu dieser Zeilenzahl bleibt die Startgröße, darüber wird proportional verkleinert
-  const referenz = Math.max(1, auto.abUmbrueche + 1, Math.ceil(auto.abZeichen / zpz));
-  const roh = auto.startGroesse * referenz / zeilen;
-  const begrenzt = Math.min(auto.startGroesse, Math.max(auto.mindestGroesse, roh));
-  return Math.round(begrenzt * 2) / 2; // auf halbe Punkte runden
 }
 
 // ---------------------------------------------------------------------------
@@ -365,6 +400,90 @@ class ToolhubVorlage {
   _text(wurzeln) {
     return this._absaetze(wurzeln).map((absatz) => this._absatzText(absatz)).join('\n');
   }
+
+  // ----- Automatik: einheitliche Schriftgröße je Seite -----
+
+  /*
+   * Ersetzt die Felder seitenweise: Für jede Seite (Bereich zwischen den fest
+   * gesetzten Seitenumbrüchen der Vorlage) wird aus dem vorhandenen Text und dem
+   * hinzukommenden Feldtext eine gemeinsame Schriftgröße bestimmt und beim Ersetzen
+   * gesetzt. So bekommen alle (langen) Felder einer Seite dieselbe Größe.
+   */
+  _ersetzeProSeite(wurzeln, werte, optionen) {
+    this._seitenGruppen(wurzeln).forEach((gruppe) => {
+      const seitengroesse = this._seitenGroesse(gruppe, werte, optionen.autoSchrift, optionen);
+      this._ersetze(gruppe, werte, Object.assign({}, optionen, { seitengroesse }));
+    });
+  }
+
+  /*
+   * Bestimmt die Schriftgröße einer Seite. Sammelt die statische Textlast (fester
+   * Vorlagentext) und die durch Felder hinzukommende Last der Seite und reicht sie an
+   * toolhubVorlageSeitengroesse weiter. Nur Felder über der Schwelle zählen als „lang"
+   * und werden verkleinert; kurze Felder tragen mit ihrer vollen Größe zur Belegung bei.
+   */
+  _seitenGroesse(wurzeln, werte, auto, optionen) {
+    const zpz = auto.zeichenProZeile > 0 ? auto.zeichenProZeile : 60;
+    let cStat = 0;   // fließender fester Text (in Zeichen-Last)
+    let cLang = 0;   // Felder über der Schwelle (werden verkleinert)
+    let cKurz = 0;   // Felder unter der Schwelle (bleiben groß)
+
+    this._absaetze(wurzeln).forEach((absatz) => {
+      const text = this._stuecke(absatz).map((stueck) => stueck.lies() || '').join('');
+      let statisch = '';
+      let letzte = 0;
+      for (const treffer of text.matchAll(toolhubVorlageMuster())) {
+        statisch += text.slice(letzte, treffer.index);
+        letzte = treffer.index + treffer[0].length;
+        const name = treffer[1];
+        if (!name || !Object.prototype.hasOwnProperty.call(werte, name)) continue;
+        const wert = toolhubVorlageUmbrueche(toolhubVorlageWert(werte[name]), optionen);
+        const last = toolhubVorlageLast(wert, zpz);
+        if (toolhubVorlageUeberSchwelle(wert, auto)) cLang += last;
+        else cKurz += last;
+      }
+      statisch += text.slice(letzte);
+      // Fester Text in Tabellenzellen bleibt außen vor: Zellen haben eine weitgehend
+      // feste Höhe und packen den Text dicht, während fließender Text die Seite füllt.
+      // Feldtext wird dagegen überall gezählt – auch Felder in Zellen wachsen mit.
+      if (!this._istInTabelle(absatz)) {
+        cStat += Math.max(zpz, toolhubVorlageLast(statisch, zpz));
+      }
+    });
+
+    // Kurze Felder behalten ihre Größe -> ihre Last zählt wie fester Text zur Belegung
+    return toolhubVorlageSeitengroesse(cStat + cKurz, cLang, auto);
+  }
+
+  // Ob ein Absatz in einer Tabelle steckt (Unterklassen überschreiben)
+  _istInTabelle() { return false; }
+
+  /*
+   * Seiten einer Knotenmenge: Array von Knoten-Arrays, getrennt an den fest
+   * gesetzten Seitenumbrüchen der Vorlage. Die Unterklassen liefern die Erkennung
+   * über _umbruchVor()/_umbruchNach() für einen Block (Absatz/Tabelle).
+   */
+  _seitenGruppen(wurzeln) {
+    const gruppen = [];
+    let aktuell = [];
+    wurzeln.forEach((knoten) => {
+      if (knoten.nodeType === 1 && this._umbruchVor(knoten) && aktuell.length > 0) {
+        gruppen.push(aktuell);
+        aktuell = [];
+      }
+      aktuell.push(knoten);
+      if (knoten.nodeType === 1 && this._umbruchNach(knoten)) {
+        gruppen.push(aktuell);
+        aktuell = [];
+      }
+    });
+    if (aktuell.length > 0) gruppen.push(aktuell);
+    return gruppen;
+  }
+
+  // Standard: keine Seitenumbrüche erkannt (Unterklassen überschreiben)
+  _umbruchVor() { return false; }
+  _umbruchNach() { return false; }
 }
 
 // ---------------------------------------------------------------------------
@@ -787,6 +906,23 @@ class ToolhubVorlageDocx extends ToolhubVorlage {
     return p;
   }
 
+  // Absatz mit w:pageBreakBefore -> beginnt eine neue Seite
+  _umbruchVor(block) {
+    if (!(block.namespaceURI === TOOLHUB_NS.w && block.localName === 'p')) return false;
+    const pPr = block.getElementsByTagNameNS(TOOLHUB_NS.w, 'pPr')[0];
+    return !!(pPr && pPr.getElementsByTagNameNS(TOOLHUB_NS.w, 'pageBreakBefore')[0]);
+  }
+
+  // Block enthält einen w:br w:type="page" -> danach beginnt eine neue Seite
+  _umbruchNach(block) {
+    return Array.from(block.getElementsByTagNameNS(TOOLHUB_NS.w, 'br'))
+      .some((br) => br.getAttributeNS(TOOLHUB_NS.w, 'type') === 'page');
+  }
+
+  _istInTabelle(absatz) {
+    return !!toolhubVorlageVorfahre(absatz.parentNode, TOOLHUB_NS.w, ['tbl']);
+  }
+
   // ----- Word-eigene Seriendruckfelder -----
 
   // Feldnamen aus MERGEFIELD-Feldern eines Absatzes (auch in IF-Bedingungen)
@@ -872,7 +1008,8 @@ class ToolhubVorlageDocx extends ToolhubVorlage {
       if (index > 0) body.appendChild(ToolhubVorlageDocx._seitenumbruch(doc));
       const kopien = vorlageKnoten.map((knoten) => knoten.cloneNode(true));
       kopien.forEach((knoten) => body.appendChild(knoten));
-      this._ersetze(kopien, werte, optionen);
+      if (optionen.autoSchrift) this._ersetzeProSeite(kopien, werte, optionen);
+      else this._ersetze(kopien, werte, optionen);
     });
 
     if (sectPr) body.appendChild(sectPr);
@@ -1182,10 +1319,57 @@ class ToolhubVorlageOdt extends ToolhubVorlage {
       if (index > 0) text.appendChild(ToolhubVorlageOdt._seitenumbruch(doc));
       const kopien = vorlageKnoten.map((knoten) => knoten.cloneNode(true));
       kopien.forEach((knoten) => text.appendChild(knoten));
-      this._ersetze(kopien, werte, optionen);
+      if (optionen.autoSchrift) this._ersetzeProSeite(kopien, werte, optionen);
+      else this._ersetze(kopien, werte, optionen);
     });
 
     return text;
+  }
+
+  /*
+   * Absatzvorlagen-Namen, deren Absatz einen fest gesetzten Seitenumbruch davor bzw.
+   * danach erzwingt (fo:break-before / fo:break-after = "page"). Wird einmal je Dokument
+   * aus den automatischen und den gemeinsamen Vorlagen gesammelt und gemerkt.
+   */
+  _umbruchStile(doc) {
+    if (this._umbruchStileCache && this._umbruchStileCache.doc === doc) return this._umbruchStileCache;
+    const vor = new Set();
+    const nach = new Set();
+    Array.from(doc.getElementsByTagNameNS(TOOLHUB_NS.style, 'style')).forEach((stil) => {
+      const name = stil.getAttributeNS(TOOLHUB_NS.style, 'name');
+      if (!name) return;
+      // Seitenumbruch kann an Absatz- oder Tabellenvorlagen hängen
+      const props = stil.getElementsByTagNameNS(TOOLHUB_NS.style, 'paragraph-properties')[0] ||
+        stil.getElementsByTagNameNS(TOOLHUB_NS.style, 'table-properties')[0];
+      if (!props) return;
+      if (props.getAttributeNS(TOOLHUB_NS.fo, 'break-before') === 'page') vor.add(name);
+      if (props.getAttributeNS(TOOLHUB_NS.fo, 'break-after') === 'page') nach.add(name);
+    });
+    this._umbruchStileCache = { doc, vor, nach };
+    return this._umbruchStileCache;
+  }
+
+  _umbruchVor(block) {
+    if (!this._istBlock(block)) return false;
+    const name = block.getAttributeNS(TOOLHUB_NS.text, 'style-name') ||
+      block.getAttributeNS(TOOLHUB_NS.table, 'style-name');
+    return name ? this._umbruchStile(block.ownerDocument).vor.has(name) : false;
+  }
+
+  _umbruchNach(block) {
+    if (!this._istBlock(block)) return false;
+    const name = block.getAttributeNS(TOOLHUB_NS.text, 'style-name') ||
+      block.getAttributeNS(TOOLHUB_NS.table, 'style-name');
+    return name ? this._umbruchStile(block.ownerDocument).nach.has(name) : false;
+  }
+
+  _istBlock(el) {
+    if (el.namespaceURI === TOOLHUB_NS.text && (el.localName === 'p' || el.localName === 'h')) return true;
+    return el.namespaceURI === TOOLHUB_NS.table && el.localName === 'table';
+  }
+
+  _istInTabelle(absatz) {
+    return !!toolhubVorlageVorfahre(absatz.parentNode, TOOLHUB_NS.table, ['table']);
   }
 
   async erzeuge(saetze, optionen = {}) {

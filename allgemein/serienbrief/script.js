@@ -24,10 +24,13 @@ const schriftGroesse = document.getElementById('schriftGroesse');
 const autoSchriftZeile = document.getElementById('autoSchriftZeile');
 const autoStart = document.getElementById('autoStart');
 const autoMin = document.getElementById('autoMin');
-const autoAbZeichen = document.getElementById('autoAbZeichen');
-const autoAbUmbrueche = document.getElementById('autoAbUmbrueche');
 const autoZeichenProZeile = document.getElementById('autoZeichenProZeile');
 const umbruecheZuLeerzeichen = document.getElementById('umbruecheZuLeerzeichen');
+const schwellenAktiv = document.getElementById('schwellenAktiv');
+const schwellenZeile = document.getElementById('schwellenZeile');
+const autoAbZeichen = document.getElementById('autoAbZeichen');
+const autoAbUmbrueche = document.getElementById('autoAbUmbrueche');
+const autoKurzGroesse = document.getElementById('autoKurzGroesse');
 const behaltUnbekannte = document.getElementById('behaltUnbekannte');
 const vorschauBtn = document.getElementById('vorschauBtn');
 const erzeugenBtn = document.getElementById('erzeugenBtn');
@@ -54,11 +57,14 @@ const einstellungen = {
   // Automatik-Modus (schriftModus 'auto')
   auto: {
     startGroesse: 11,
-    mindestGroesse: 7,
-    abZeichen: 400,
-    abUmbrueche: 6,
+    mindestGroesse: 6,
     zeichenProZeile: 60,
-    umbruecheZuLeerzeichen: false
+    umbruecheZuLeerzeichen: false,
+    schwellenAktiv: false,       // Schwellen standardmäßig aus -> alle Felder anpassen
+    abZeichen: 100,
+    abUmbrueche: 2,
+    kurzModus: 'fundstelle',     // kürzere Felder: 'fundstelle' | 'fest'
+    kurzGroesse: 11
   },
   behaltUnbekannte: false
 };
@@ -69,14 +75,18 @@ function vorlagenOptionen() {
   if (einstellungen.schriftModus === 'fest') {
     o.schriftgroesse = einstellungen.schriftGroesse;
   } else if (einstellungen.schriftModus === 'auto') {
+    const a = einstellungen.auto;
     o.autoSchrift = {
-      startGroesse: einstellungen.auto.startGroesse,
-      mindestGroesse: einstellungen.auto.mindestGroesse,
-      abZeichen: einstellungen.auto.abZeichen,
-      abUmbrueche: einstellungen.auto.abUmbrueche,
-      zeichenProZeile: einstellungen.auto.zeichenProZeile
+      startGroesse: a.startGroesse,
+      mindestGroesse: a.mindestGroesse,
+      zeichenProZeile: a.zeichenProZeile,
+      schwellenAktiv: a.schwellenAktiv,
+      abZeichen: a.abZeichen,
+      abUmbrueche: a.abUmbrueche,
+      kurzModus: a.kurzModus,
+      kurzGroesse: a.kurzGroesse
     };
-    o.umbruecheZuLeerzeichen = einstellungen.auto.umbruecheZuLeerzeichen;
+    o.umbruecheZuLeerzeichen = a.umbruecheZuLeerzeichen;
   }
   return o;
 }
@@ -383,9 +393,10 @@ schriftGroesse.addEventListener('change', () => {
 [
   [autoStart, 'startGroesse'],
   [autoMin, 'mindestGroesse'],
+  [autoZeichenProZeile, 'zeichenProZeile'],
   [autoAbZeichen, 'abZeichen'],
   [autoAbUmbrueche, 'abUmbrueche'],
-  [autoZeichenProZeile, 'zeichenProZeile']
+  [autoKurzGroesse, 'kurzGroesse']
 ].forEach(([feld, schluessel]) => {
   feld.addEventListener('change', () => {
     const wert = parseFloat(feld.value);
@@ -397,6 +408,21 @@ schriftGroesse.addEventListener('change', () => {
 umbruecheZuLeerzeichen.addEventListener('change', () => {
   einstellungen.auto.umbruecheZuLeerzeichen = umbruecheZuLeerzeichen.checked;
   ergebnisLeeren();
+  aktualisiereEinstellungen();
+});
+
+schwellenAktiv.addEventListener('change', () => {
+  einstellungen.auto.schwellenAktiv = schwellenAktiv.checked;
+  ergebnisLeeren();
+  aktualisiereEinstellungen();
+});
+
+document.querySelectorAll('input[name="kurzModus"]').forEach((radio) => {
+  radio.addEventListener('change', () => {
+    einstellungen.auto.kurzModus = radio.value;
+    ergebnisLeeren();
+    aktualisiereEinstellungen();
+  });
 });
 
 behaltUnbekannte.addEventListener('change', () => {
@@ -415,9 +441,19 @@ function aktualisiereEinstellungen() {
   const auto = einstellungen.schriftModus === 'auto';
   schriftGroesseZeile.classList.toggle('disabled', !fest);
   schriftGroesse.disabled = !fest;
+
   autoSchriftZeile.classList.toggle('disabled', !auto);
-  [autoStart, autoMin, autoAbZeichen, autoAbUmbrueche, autoZeichenProZeile, umbruecheZuLeerzeichen]
+  [autoStart, autoMin, autoZeichenProZeile, umbruecheZuLeerzeichen, schwellenAktiv]
     .forEach((feld) => { feld.disabled = !auto; });
+
+  // Schwellen-Unterbereich nur bei aktiver Schwelle
+  const schwellen = auto && einstellungen.auto.schwellenAktiv;
+  schwellenZeile.classList.toggle('disabled', !schwellen);
+  autoAbZeichen.disabled = !schwellen;
+  // "ab Umbrüchen" ist sinnlos, wenn Umbrüche vorher zu Leerzeichen werden
+  autoAbUmbrueche.disabled = !schwellen || einstellungen.auto.umbruecheZuLeerzeichen;
+  document.querySelectorAll('input[name="kurzModus"]').forEach((r) => { r.disabled = !schwellen; });
+  autoKurzGroesse.disabled = !schwellen || einstellungen.auto.kurzModus !== 'fest';
 }
 
 // Danach wird im Schulalltag am ehesten gruppiert

@@ -1,2 +1,6 @@
 # macOS-Ordnermetadaten
 .DS_Store
+
+# Serienbrief-Testdaten mit echten Personendaten – gehören nicht ins Repository
+allgemein/serienbrief/beispiele/LEGs/
+allgemein/serienbrief/beispiele/LFV/
