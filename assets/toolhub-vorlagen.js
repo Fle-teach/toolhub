@@ -189,14 +189,18 @@ function toolhubVorlageUmbrueche(text, optionen) {
 }
 
 /*
- * Kapazität einer Seite in „Zeichen · Punkt²" (siehe toolhubVorlageSeitengroesse):
- * Wie viel durch Felder hinzukommender Text auf eine Seite passt, bevor unter die
- * Startgröße verkleinert wird. KAP / Größe² ≈ Feld-Zeichen pro Seite bei dieser Größe
- * (hier ~740 Zeichen bei 11 pt). An den drei LEG-Beispielen kalibriert: Bei diesem
- * Wert bleiben Seiten mit wenig Feldtext bei der Startgröße, während die vollen
- * Kommentar-Seiten so weit verkleinert werden, dass sie ihre Seitenzahl halten.
+ * Kapazität einer Seite als „Textlast pro Seite bei Startgröße" (siehe
+ * toolhubVorlageSeitengroesse): Wie viel Text-Last (fester Text + Feldtext, grob in
+ * Zeichen, ein Umbruch zählt wie eine Zeile) auf eine Seite passt, ohne dass unter die
+ * Startgröße verkleinert werden muss. An den drei LEG-Beispielen mit korrigierten Daten
+ * kalibriert. Größerer Wert = weniger Verkleinern (größere Schrift), kleinerer Wert =
+ * frühere, stärkere Verkleinerung. Über die Oberfläche einstellbar.
+ *
+ * Der Standard hält die (geräumigeren) Beispiele Jg. 9 und Jg. 5 & 6 auf ihrer Seitenzahl.
+ * Sehr enge mehrseitige Formulare (z. B. der Oberstufen-Bogen) brauchen einen kleineren
+ * Wert, um die Seitenzahl zu halten – daher die Einstellmöglichkeit.
  */
-const TOOLHUB_SEITEN_KAPAZITAET = 90000;
+const TOOLHUB_SEITEN_KAPAZITAET = 1100;
 
 // Effektive Zeichenlast: sichtbare Zeichen plus je Umbruch eine volle Zeile
 function toolhubVorlageLast(text, zpz) {
@@ -220,23 +224,27 @@ function toolhubVorlageUeberSchwelle(text, auto) {
  * statischen Textlast und der durch Felder hinzukommenden Last.
  *
  * Modell: Der vertikale Platzbedarf von Text wächst ungefähr mit Zeichenzahl · Größe²
- * (kleinere Schrift ⇒ mehr Zeichen je Zeile UND kleinere Zeilen). Eine Seite fasst
- * KAP „Zeichen·Punkt²". Der feste Text belegt davon `cStat · start²`; für die Felder
- * bleibt der Rest. Gesucht ist die größte Größe S mit
- *     cStat · start² + cFeld · S² ≤ KAP
- * begrenzt auf [Mindestgröße, Startgröße]. „Aggressiv einpassen" heißt: notfalls bis
- * zur Mindestgröße verkleinern, auch wenn es dann immer noch nicht ganz passt.
+ * (kleinere Schrift ⇒ mehr Zeichen je Zeile UND kleinere Zeilen). Eine Seite fasst K0
+ * Textlast bei Startgröße. Der feste Text belegt davon `cStat`; für die Felder bei
+ * Größe S bleibt der Rest, wobei ihr Platzbedarf mit (S/start)² skaliert:
+ *     cStat + cFeld · (S/start)² ≤ K0
+ * Aufgelöst nach der größten Größe:
+ *     S = start · √((K0 − cStat) / cFeld),  begrenzt auf [Mindestgröße, Startgröße].
+ * „Aggressiv einpassen" heißt: notfalls bis zur Mindestgröße verkleinern, auch wenn es
+ * dann immer noch nicht ganz passt.
  *
+ * K0 kommt aus auto.kapazitaet (vom Nutzer einstellbar) oder der kalibrierten Konstante.
  * Das bleibt eine Näherung – die echte Seitenaufteilung entsteht erst in Word/Writer.
  */
 function toolhubVorlageSeitengroesse(cStat, cFeld, auto) {
   const start = auto.startGroesse;
   if (cFeld <= 0) return start; // keine (langen) Felder auf der Seite
 
-  const frei = TOOLHUB_SEITEN_KAPAZITAET - cStat * start * start;
+  const k0 = auto.kapazitaet > 0 ? auto.kapazitaet : TOOLHUB_SEITEN_KAPAZITAET;
+  const frei = k0 - cStat;
   if (frei <= 0) return auto.mindestGroesse;
 
-  const roh = Math.sqrt(frei / cFeld);
+  const roh = start * Math.sqrt(frei / cFeld);
   const begrenzt = Math.min(start, Math.max(auto.mindestGroesse, roh));
   return Math.round(begrenzt * 2) / 2; // auf halbe Punkte runden
 }

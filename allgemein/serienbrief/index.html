@@ -168,7 +168,14 @@
 
               <label for="autoZeichenProZeile">Zeichen pro Zeile (Sch&auml;tzung):</label>
               <input type="number" id="autoZeichenProZeile" value="60" min="1" max="1000" step="1">
+
+              <label for="autoKapazitaet">Kapazit&auml;t pro Seite:</label>
+              <input type="number" id="autoKapazitaet" value="1100" min="100" max="20000" step="50">
             </div>
+            <p class="hinweis-klein auto-hinweis">Die <em>Kapazit&auml;t</em> steuert, wie voll eine Seite werden darf,
+            bevor verkleinert wird: <strong>h&ouml;her</strong> = gr&ouml;&szlig;ere Schrift, aber eher eine zus&auml;tzliche
+            Seite; <strong>niedriger</strong> = sichereres Einpassen mit kleinerer Schrift. Enge mehrseitige
+            Formulare brauchen einen kleineren Wert.</p>
 
             <label class="radio-row">
               <input type="checkbox" id="umbruecheZuLeerzeichen">

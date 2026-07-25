@@ -25,6 +25,7 @@ const autoSchriftZeile = document.getElementById('autoSchriftZeile');
 const autoStart = document.getElementById('autoStart');
 const autoMin = document.getElementById('autoMin');
 const autoZeichenProZeile = document.getElementById('autoZeichenProZeile');
+const autoKapazitaet = document.getElementById('autoKapazitaet');
 const umbruecheZuLeerzeichen = document.getElementById('umbruecheZuLeerzeichen');
 const schwellenAktiv = document.getElementById('schwellenAktiv');
 const schwellenZeile = document.getElementById('schwellenZeile');
@@ -59,6 +60,7 @@ const einstellungen = {
     startGroesse: 11,
     mindestGroesse: 6,
     zeichenProZeile: 60,
+    kapazitaet: 1100,            // Textlast pro Seite bei Startgröße (höher = größere Schrift)
     umbruecheZuLeerzeichen: false,
     schwellenAktiv: false,       // Schwellen standardmäßig aus -> alle Felder anpassen
     abZeichen: 100,
@@ -80,6 +82,7 @@ function vorlagenOptionen() {
       startGroesse: a.startGroesse,
       mindestGroesse: a.mindestGroesse,
       zeichenProZeile: a.zeichenProZeile,
+      kapazitaet: a.kapazitaet,
       schwellenAktiv: a.schwellenAktiv,
       abZeichen: a.abZeichen,
       abUmbrueche: a.abUmbrueche,
@@ -394,6 +397,7 @@ schriftGroesse.addEventListener('change', () => {
   [autoStart, 'startGroesse'],
   [autoMin, 'mindestGroesse'],
   [autoZeichenProZeile, 'zeichenProZeile'],
+  [autoKapazitaet, 'kapazitaet'],
   [autoAbZeichen, 'abZeichen'],
   [autoAbUmbrueche, 'abUmbrueche'],
   [autoKurzGroesse, 'kurzGroesse']
@@ -443,7 +447,7 @@ function aktualisiereEinstellungen() {
   schriftGroesse.disabled = !fest;
 
   autoSchriftZeile.classList.toggle('disabled', !auto);
-  [autoStart, autoMin, autoZeichenProZeile, umbruecheZuLeerzeichen, schwellenAktiv]
+  [autoStart, autoMin, autoZeichenProZeile, autoKapazitaet, umbruecheZuLeerzeichen, schwellenAktiv]
     .forEach((feld) => { feld.disabled = !auto; });
 
   // Schwellen-Unterbereich nur bei aktiver Schwelle

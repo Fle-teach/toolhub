@@ -121,6 +121,7 @@ Einstellungen:
 | Startgröße | größte Größe; wird verwendet, wenn die Seite noch nicht voll ist |
 | Mindestgröße | Untergrenze; darunter wird nicht verkleinert, auch wenn es dann noch nicht passt |
 | Zeichen pro Zeile | wie viele Zeichen als eine Zeile gelten (steuert, wie stark manuelle Umbrüche zählen) |
+| **Kapazität pro Seite** | wie voll eine Seite werden darf, bevor verkleinert wird: **höher** = größere Schrift, aber eher eine zusätzliche Seite; **niedriger** = sichereres Einpassen mit kleinerer Schrift |
 | Manuelle Zeilenumbrüche in Leerzeichen umwandeln | ersetzt harte Umbrüche im Wert durch ein Leerzeichen; der Text fließt dann und braucht weniger Platz |
 | Nur Felder ab einer Mindestlänge anpassen | Schalter (standardmäßig aus). Ist er an, werden nur Felder ab *n* Zeichen **oder** *m* Umbrüchen verkleinert; kürzere Felder behalten die Größe ihrer Fundstelle oder erhalten eine feste Größe. Bei „Umbrüche → Leerzeichen" ist die Umbruch-Schwelle deaktiviert. |
 
@@ -130,11 +131,19 @@ Steht der Schalter aus (Standard), bekommen alle Felder einer Seite die berechne
 Seite rutscht, entscheidet erst Word bzw. Writer. Die Automatik senkt die Wahrscheinlichkeit
 zusätzlicher Seiten deutlich; bei sehr vollen Seiten kann es sein, dass selbst die Mindestgröße
 nicht ausreicht. Für ein verlässliches Ergebnis die erzeugten Dokumente kurz durchsehen und die
-Werte (Start-/Mindestgröße, ggf. Schwellen) bei Bedarf nachjustieren.
+Werte bei Bedarf nachjustieren.
 
-Die Standardwerte sind an mehreren echten LEG-Bögen kalibriert (Startgröße 11 pt, Mindestgröße
-6 pt). Damit halten typische Bögen ihre Seitenzahl; nur außergewöhnlich lange Datensätze
-brauchen dann noch eine Seite mehr.
+### Kapazität einstellen
+
+Weil das Tool die echte Seitenaufteilung nicht kennt, lässt sich nicht für jede Vorlage
+dieselbe „Fülle" ansetzen. Der Standard (Kapazität **1100**, Startgröße 11 pt, Mindestgröße
+6 pt) ist so gewählt, dass geräumigere Bögen ihre Seitenzahl mit möglichst großer Schrift halten.
+
+* Wirkt die Schrift **unnötig klein** und wäre noch Platz auf der Seite → Kapazität **erhöhen**.
+* Rutscht Inhalt auf eine **zusätzliche Seite** → Kapazität **verringern**.
+
+Enge, dicht gefüllte mehrseitige Formulare (z. B. der Oberstufen-LEG-Bogen) brauchen einen
+kleineren Wert (etwa 750), um die Seitenzahl zu halten; luftigere Bögen vertragen deutlich mehr.
 
 ## Beispieldateien
 
