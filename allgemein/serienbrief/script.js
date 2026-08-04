@@ -25,7 +25,7 @@ const autoSchriftZeile = document.getElementById('autoSchriftZeile');
 const autoStart = document.getElementById('autoStart');
 const autoMin = document.getElementById('autoMin');
 const autoZeichenProZeile = document.getElementById('autoZeichenProZeile');
-const autoKapazitaet = document.getElementById('autoKapazitaet');
+const kapazitaetGitter = document.getElementById('kapazitaetGitter');
 const umbruecheZuLeerzeichen = document.getElementById('umbruecheZuLeerzeichen');
 const schwellenAktiv = document.getElementById('schwellenAktiv');
 const schwellenZeile = document.getElementById('schwellenZeile');
@@ -60,7 +60,9 @@ const einstellungen = {
     startGroesse: 11,
     mindestGroesse: 6,
     zeichenProZeile: 60,
-    kapazitaet: 1100,            // Textlast pro Seite bei Startgröße (höher = größere Schrift)
+    // Textlast je Vorlagen-Seite bei Startgröße (höher = größere Schrift);
+    // ein Eintrag je Seite, wird beim Laden der Vorlage aufgebaut
+    kapazitaeten: [],
     umbruecheZuLeerzeichen: false,
     schwellenAktiv: false,       // Schwellen standardmäßig aus -> alle Felder anpassen
     abZeichen: 100,
@@ -82,7 +84,7 @@ function vorlagenOptionen() {
       startGroesse: a.startGroesse,
       mindestGroesse: a.mindestGroesse,
       zeichenProZeile: a.zeichenProZeile,
-      kapazitaet: a.kapazitaet,
+      kapazitaeten: a.kapazitaeten.slice(),
       schwellenAktiv: a.schwellenAktiv,
       abZeichen: a.abZeichen,
       abUmbrueche: a.abUmbrueche,
@@ -397,7 +399,6 @@ schriftGroesse.addEventListener('change', () => {
   [autoStart, 'startGroesse'],
   [autoMin, 'mindestGroesse'],
   [autoZeichenProZeile, 'zeichenProZeile'],
-  [autoKapazitaet, 'kapazitaet'],
   [autoAbZeichen, 'abZeichen'],
   [autoAbUmbrueche, 'abUmbrueche'],
   [autoKurzGroesse, 'kurzGroesse']
@@ -435,6 +436,41 @@ behaltUnbekannte.addEventListener('change', () => {
   zeigeStatistik();
 });
 
+/*
+ * Baut je Vorlagen-Seite ein Eingabefeld für die Kapazität. Bereits eingestellte Werte
+ * bleiben erhalten, solange es die Seite noch gibt; neue Seiten starten beim Standard.
+ */
+function baueKapazitaetsFelder() {
+  const seiten = zustand.vorlage ? Math.max(1, zustand.vorlage.seitenAnzahl) : 1;
+  const bisher = einstellungen.auto.kapazitaeten;
+  einstellungen.auto.kapazitaeten = Array.from({ length: seiten }, (_, i) =>
+    (bisher[i] > 0 ? bisher[i] : TOOLHUB_SEITEN_KAPAZITAET));
+
+  kapazitaetGitter.innerHTML = '';
+  einstellungen.auto.kapazitaeten.forEach((wert, i) => {
+    const id = `autoKapazitaet_${i}`;
+
+    const label = document.createElement('label');
+    label.htmlFor = id;
+    label.textContent = seiten > 1 ? `Seite ${i + 1}:` : 'Kapazität:';
+
+    const feld = document.createElement('input');
+    feld.type = 'number';
+    feld.id = id;
+    feld.value = wert;
+    feld.min = '100';
+    feld.max = '20000';
+    feld.step = '50';
+    feld.addEventListener('change', () => {
+      const neu = parseFloat(feld.value);
+      if (neu > 0) einstellungen.auto.kapazitaeten[i] = neu;
+      ergebnisLeeren();
+    });
+
+    kapazitaetGitter.append(label, feld);
+  });
+}
+
 function aktualisiereEinstellungen() {
   gruppenZeile.classList.toggle('disabled', einstellungen.modus !== 'gruppiert');
   gruppenSpalte.disabled = einstellungen.modus !== 'gruppiert';
@@ -447,8 +483,9 @@ function aktualisiereEinstellungen() {
   schriftGroesse.disabled = !fest;
 
   autoSchriftZeile.classList.toggle('disabled', !auto);
-  [autoStart, autoMin, autoZeichenProZeile, autoKapazitaet, umbruecheZuLeerzeichen, schwellenAktiv]
+  [autoStart, autoMin, autoZeichenProZeile, umbruecheZuLeerzeichen, schwellenAktiv]
     .forEach((feld) => { feld.disabled = !auto; });
+  kapazitaetGitter.querySelectorAll('input').forEach((feld) => { feld.disabled = !auto; });
 
   // Schwellen-Unterbereich nur bei aktiver Schwelle
   const schwellen = auto && einstellungen.auto.schwellenAktiv;
@@ -663,6 +700,7 @@ function aktualisiere() {
 
   ordneZu();
   fuelleGruppenSpalte();
+  baueKapazitaetsFelder();
   aktualisiereEinstellungen();
   zeigeFelder();
   zeigeStatistik();

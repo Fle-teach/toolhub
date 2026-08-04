@@ -202,6 +202,20 @@ function toolhubVorlageUmbrueche(text, optionen) {
  */
 const TOOLHUB_SEITEN_KAPAZITAET = 1100;
 
+/*
+ * Kapazität für eine bestimmte Seite der Vorlage (0-basierter Index).
+ * `auto.kapazitaeten` ist ein Array mit einem Wert je Vorlagen-Seite; fehlt ein Eintrag,
+ * gilt der zuletzt angegebene Wert und ersatzweise auto.kapazitaet bzw. die Konstante.
+ */
+function toolhubVorlageKapazitaet(auto, seitenIndex) {
+  const liste = auto && auto.kapazitaeten;
+  if (Array.isArray(liste) && liste.length > 0) {
+    const wert = liste[Math.min(seitenIndex, liste.length - 1)];
+    if (wert > 0) return wert;
+  }
+  return auto && auto.kapazitaet > 0 ? auto.kapazitaet : TOOLHUB_SEITEN_KAPAZITAET;
+}
+
 // Effektive Zeichenlast: sichtbare Zeichen plus je Umbruch eine volle Zeile
 function toolhubVorlageLast(text, zpz) {
   const zeichen = text.length;
@@ -233,7 +247,8 @@ function toolhubVorlageUeberSchwelle(text, auto) {
  * „Aggressiv einpassen" heißt: notfalls bis zur Mindestgröße verkleinern, auch wenn es
  * dann immer noch nicht ganz passt.
  *
- * K0 kommt aus auto.kapazitaet (vom Nutzer einstellbar) oder der kalibrierten Konstante.
+ * K0 kommt aus auto.kapazitaet – das setzt _ersetzeProSeite je Seite aus der vom Nutzer
+ * eingestellten Liste auto.kapazitaeten (siehe toolhubVorlageKapazitaet).
  * Das bleibt eine Näherung – die echte Seitenaufteilung entsteht erst in Word/Writer.
  */
 function toolhubVorlageSeitengroesse(cStat, cFeld, auto) {
@@ -340,6 +355,8 @@ class ToolhubVorlage {
     this.kopfFelder = [];
     // Namen, die aus einem formateigenen Seriendruckfeld stammen und nicht aus {{…}}
     this.formatFelder = [];
+    // Seiten der Vorlage je Datensatz, erkannt an den fest gesetzten Seitenumbrüchen
+    this.seitenAnzahl = 1;
   }
 
   // Alle Feldnamen der Vorlage (Fließtext zuerst, dann nur in Kopf-/Fußzeilen benutzte)
@@ -418,8 +435,12 @@ class ToolhubVorlage {
    * gesetzt. So bekommen alle (langen) Felder einer Seite dieselbe Größe.
    */
   _ersetzeProSeite(wurzeln, werte, optionen) {
-    this._seitenGruppen(wurzeln).forEach((gruppe) => {
-      const seitengroesse = this._seitenGroesse(gruppe, werte, optionen.autoSchrift, optionen);
+    this._seitenGruppen(wurzeln).forEach((gruppe, seitenIndex) => {
+      // Jede Seite darf ihre eigene Kapazität haben
+      const auto = Object.assign({}, optionen.autoSchrift, {
+        kapazitaet: toolhubVorlageKapazitaet(optionen.autoSchrift, seitenIndex)
+      });
+      const seitengroesse = this._seitenGroesse(gruppe, werte, auto, optionen);
       this._ersetze(gruppe, werte, Object.assign({}, optionen, { seitengroesse }));
     });
   }
@@ -740,6 +761,7 @@ class ToolhubVorlageDocx extends ToolhubVorlage {
     if (!doc) throw new Error(`"${datei.name}" ist keine gültige DOCX-Datei (word/document.xml fehlt).`);
 
     vorlage.felder = vorlage._sammleFelder(vorlage._absaetze([doc.documentElement]));
+    vorlage.seitenAnzahl = vorlage._zaehleSeiten(doc);
 
     const kopfNamen = [];
     for (const pfad of ToolhubVorlageDocx._kopfDateien(zip)) {
@@ -996,6 +1018,26 @@ class ToolhubVorlageDocx extends ToolhubVorlage {
   }
 
   /*
+   * Zerlegt den Textkörper in die zu vervielfältigenden Knoten und das abschließende
+   * <w:sectPr> (Seitenformat), das das letzte Element des Bodys bleiben muss.
+   */
+  static _koerperTeile(body) {
+    const kinder = Array.from(body.childNodes);
+    const letztes = kinder[kinder.length - 1];
+    const sectPr = letztes && letztes.nodeType === 1 && letztes.namespaceURI === TOOLHUB_NS.w &&
+      letztes.localName === 'sectPr' ? letztes : null;
+    return { sectPr, vorlageKnoten: kinder.filter((knoten) => knoten !== sectPr) };
+  }
+
+  // Seiten je Datensatz: Vorlagen-Knoten an den festen Seitenumbrüchen gruppieren
+  _zaehleSeiten(doc) {
+    const body = doc.getElementsByTagNameNS(TOOLHUB_NS.w, 'body')[0];
+    if (!body) return 1;
+    const { vorlageKnoten } = ToolhubVorlageDocx._koerperTeile(body);
+    return Math.max(1, this._seitenGruppen(vorlageKnoten).length);
+  }
+
+  /*
    * Baut den Inhalt des Dokuments: je Datensatz eine Kopie der Vorlage, dazwischen ein
    * Seitenumbruch. Das abschließende <w:sectPr> (Seitenformat) muss das letzte Element
    * des Bodys bleiben und wird deshalb erst am Ende wieder angehängt.
@@ -1004,11 +1046,7 @@ class ToolhubVorlageDocx extends ToolhubVorlage {
     const body = doc.getElementsByTagNameNS(TOOLHUB_NS.w, 'body')[0];
     if (!body) throw new Error('Die DOCX-Vorlage enthält keinen Textkörper.');
 
-    const kinder = Array.from(body.childNodes);
-    const letztes = kinder[kinder.length - 1];
-    const sectPr = letztes && letztes.nodeType === 1 && letztes.namespaceURI === TOOLHUB_NS.w &&
-      letztes.localName === 'sectPr' ? letztes : null;
-    const vorlageKnoten = kinder.filter((knoten) => knoten !== sectPr);
+    const { sectPr, vorlageKnoten } = ToolhubVorlageDocx._koerperTeile(body);
 
     while (body.firstChild) body.removeChild(body.firstChild);
 
@@ -1091,6 +1129,7 @@ class ToolhubVorlageOdt extends ToolhubVorlage {
     if (!doc) throw new Error(`"${datei.name}" ist keine gültige ODT-Datei (content.xml fehlt).`);
 
     vorlage.felder = vorlage._sammleFelder(vorlage._absaetze([doc.documentElement]));
+    vorlage.seitenAnzahl = vorlage._zaehleSeiten(doc);
 
     // Kopf- und Fußzeilen stehen in den Seitenvorlagen der styles.xml
     const stile = await toolhubVorlageXmlLesen(zip, 'styles.xml');
@@ -1304,6 +1343,26 @@ class ToolhubVorlageOdt extends ToolhubVorlage {
   }
 
   /*
+   * Zerlegt den Textkörper in die Deklarationen am Anfang (Nummernkreise, Variablen –
+   * dürfen nur einmal vorkommen) und die zu vervielfältigenden Knoten.
+   */
+  static _koerperTeile(text) {
+    const deklarationen = ['sequence-decls', 'variable-decls', 'user-field-decls'];
+    const kinder = Array.from(text.childNodes);
+    const kopf = kinder.filter((knoten) => knoten.nodeType === 1 &&
+      knoten.namespaceURI === TOOLHUB_NS.text && deklarationen.includes(knoten.localName));
+    return { kopf, vorlageKnoten: kinder.filter((knoten) => !kopf.includes(knoten)) };
+  }
+
+  // Seiten je Datensatz: Vorlagen-Knoten an den festen Seitenumbrüchen gruppieren
+  _zaehleSeiten(doc) {
+    const text = doc.getElementsByTagNameNS(TOOLHUB_NS.office, 'text')[0];
+    if (!text) return 1;
+    const { vorlageKnoten } = ToolhubVorlageOdt._koerperTeile(text);
+    return Math.max(1, this._seitenGruppen(vorlageKnoten).length);
+  }
+
+  /*
    * Baut den Inhalt: je Datensatz eine Kopie der Vorlage, dazwischen ein
    * Seitenumbruch. Die Deklarationen am Anfang des Textkörpers (Nummernkreise,
    * Variablen) dürfen nur einmal vorkommen und bleiben deshalb unangetastet.
@@ -1312,11 +1371,7 @@ class ToolhubVorlageOdt extends ToolhubVorlage {
     const text = doc.getElementsByTagNameNS(TOOLHUB_NS.office, 'text')[0];
     if (!text) throw new Error('Die ODT-Vorlage enthält keinen Textkörper.');
 
-    const deklarationen = ['sequence-decls', 'variable-decls', 'user-field-decls'];
-    const kinder = Array.from(text.childNodes);
-    const kopf = kinder.filter((knoten) => knoten.nodeType === 1 &&
-      knoten.namespaceURI === TOOLHUB_NS.text && deklarationen.includes(knoten.localName));
-    const vorlageKnoten = kinder.filter((knoten) => !kopf.includes(knoten));
+    const { kopf, vorlageKnoten } = ToolhubVorlageOdt._koerperTeile(text);
 
     while (text.firstChild) text.removeChild(text.firstChild);
     kopf.forEach((knoten) => text.appendChild(knoten));
