@@ -96,6 +96,59 @@ function toolhubSetzeIcons(wurzel = document) {
 }
 
 /*
+ * Sucht in einer Kategorie den Eintrag, dessen `ziel` auf die gerade geöffnete Seite
+ * verweist – daraus stammt der Name, unter dem das Tool hier auftritt.
+ */
+function toolhubAliasEintrag(kategorie) {
+  const seite = location.pathname.replace(/index\.html$/, '');
+  return kategorie.tools.find((tool) => {
+    if (!tool.ziel) return false;
+    const pfad = tool.ziel.split('?')[0].replace(/index\.html$/, '');
+    return pfad && seite.endsWith(pfad);
+  });
+}
+
+/*
+ * Ein Tool kann in mehreren Kategorien auftauchen, ohne kopiert zu werden: Wird die
+ * Seite mit ?kategorie=<id> geöffnet, übernimmt sie Farbe, Icon und Bezeichnung dieser
+ * Kategorie. Eingetragen wird das in tools.js über `ziel` beim jeweiligen Tool.
+ *
+ * Die Farbe steckt in der Klasse .cat-<id> am <body>. Icon und Bezeichnung greifen nur,
+ * wenn die Seite zusätzlich tools.js einbindet (dort stehen Icon und Name) und ihre
+ * Platzhalter mit data-kategorie-icon bzw. data-kategorie-titel markiert hat.
+ *
+ * Läuft vor toolhubSetzeIcons(), damit nur der endgültige Icon-Name gezeichnet wird.
+ */
+function toolhubKategorieUebernehmen() {
+  const id = new URLSearchParams(location.search).get('kategorie');
+  // Nur einfache Ordnernamen zulassen – der Wert landet in einem Klassennamen
+  if (!id || !/^[a-z0-9_]+$/.test(id)) return;
+
+  const body = document.body;
+  [...body.classList].forEach((klasse) => {
+    if (klasse.startsWith('cat-')) body.classList.remove(klasse);
+  });
+  body.classList.add(`cat-${id}`);
+
+  const kategorie = typeof TOOLHUB_KATEGORIEN !== 'undefined'
+    ? TOOLHUB_KATEGORIEN.find((eintrag) => eintrag.id === id)
+    : null;
+  if (!kategorie) return;
+
+  document.querySelectorAll('[data-kategorie-icon]').forEach((el) => {
+    el.dataset.icon = kategorie.icon;
+  });
+
+  // Bezeichnung aus tools.js übernehmen – so steht der Name nur an einer Stelle
+  const eintrag = toolhubAliasEintrag(kategorie);
+  if (!eintrag) return;
+  document.querySelectorAll('[data-kategorie-titel]').forEach((el) => {
+    el.textContent = eintrag.name;
+  });
+  document.title = `${eintrag.name} – toolhub`;
+}
+
+/*
  * Kopfzeile jeder Seite: Zurück-Link (nur auf Tool-Seiten) und Theme-Umschalter.
  * Beides wird hier erzeugt, damit das Markup nicht in jeder Tool-Seite steht.
  *
@@ -149,6 +202,7 @@ function toolhubKopf() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  toolhubKategorieUebernehmen();
   toolhubKopf();
   toolhubSetzeIcons();
 });

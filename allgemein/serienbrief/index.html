@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="../../assets/toolhub.css">
   <link rel="stylesheet" href="styles.css">
   <script src="../../assets/toolhub.js"></script>
+  <!-- Verzeichnis der Kategorien: liefert das Icon, wenn die Seite über ?kategorie=… geöffnet wird -->
+  <script src="../../assets/tools.js" defer></script>
   <!-- Bibliotheken lokal eingebunden -> Tool funktioniert auch offline -->
   <script src="../../assets/vendor/papaparse.min.js" defer></script>
   <script src="../../assets/vendor/xlsx.full.min.js" defer></script>
@@ -19,14 +21,16 @@
 <body class="cat-allgemein">
 
   <header>
-    <h1>&#9993;&#65039; Serienbrief</h1>
+    <!-- data-kategorie-titel: folgt dem Namen aus tools.js, wenn die Seite über ?kategorie=… geöffnet wird -->
+    <h1>&#9993;&#65039; <span data-kategorie-titel>Serienbrief</span></h1>
     <p class="subtitle">Vorlage mit Serienbrieffeldern und Datens&auml;tze aus einer Tabelle zu fertigen Dokumenten verbinden</p>
   </header>
 
   <main>
 
     <section class="panel">
-      <span data-icon="raster" class="panel-icon"></span>
+      <!-- data-kategorie-icon: folgt der Kategorie, wenn die Seite über ?kategorie=… geöffnet wird -->
+      <span data-icon="raster" data-kategorie-icon class="panel-icon"></span>
       <h2>Vorlage &amp; Datens&auml;tze ausw&auml;hlen</h2>
       <p class="hint">Die Vorlage ist ein gew&ouml;hnliches Word- oder Writer-Dokument. Die sp&auml;ter einzusetzenden
       Stellen sind entweder als <code>{{Feldname}}</code> geschrieben oder es sind die Seriendruckfelder des

@@ -20,6 +20,13 @@
  *   icon    Schlüssel aus TOOLHUB_ICONS
  *   tools   { name, ordner } – ohne `ordner` gilt das Tool als geplant und
  *           wird ausgegraut dargestellt statt als toter Link
+ *
+ * Ein Tool kann in mehreren Kategorien auftauchen, ohne kopiert zu werden: statt
+ * `ordner` bekommt der Eintrag dann `ziel` – einen Pfad ab dem Wurzelverzeichnis.
+ * Mit `?kategorie=<id>` übernimmt die Zielseite Farbe und Icon dieser Kategorie:
+ *
+ *   { name: 'Lernfördervereinbarungen erstellen',
+ *     ziel: 'allgemein/serienbrief/index.html?kategorie=foerderkoordination' }
  */
 const TOOLHUB_KATEGORIEN = [
   {
@@ -36,7 +43,9 @@ const TOOLHUB_KATEGORIEN = [
     icon: 'setzling',
     tools: [
       { name: 'SuS mit Förderbedarf ermitteln', ordner: 'sus_mit_foerderbedarf_ermitteln' },
-      { name: 'Lernfördervereinbarungen erstellen' },
+      // Verweist auf das allgemeine Serienbrief-Tool – dort in den Farben dieser Kategorie
+      { name: 'Lernfördervereinbarungen erstellen',
+        ziel: 'allgemein/serienbrief/index.html?kategorie=foerderkoordination' },
       { name: 'Förderlisten kombinieren', ordner: 'foerderlisten_kombinieren' }
     ]
   },
@@ -97,8 +106,10 @@ function toolhubRendereKacheln(ziel) {
   ziel.innerHTML = TOOLHUB_KATEGORIEN.map((kategorie) => {
     const links = kategorie.tools.map((tool) => {
       const beschriftung = toolhubEscapeHtml(tool.name);
-      return tool.ordner
-        ? `<a href="${kategorie.id}/${tool.ordner}/index.html">${beschriftung}</a>`
+      // `ziel` verweist auf ein Tool in einem anderen Ordner (siehe Kopf der Datei)
+      const pfad = tool.ziel || (tool.ordner && `${kategorie.id}/${tool.ordner}/index.html`);
+      return pfad
+        ? `<a href="${toolhubEscapeHtml(pfad)}">${beschriftung}</a>`
         : `<span class="geplant" title="noch nicht verfügbar">${beschriftung}</span>`;
     }).join('\n      ');
 

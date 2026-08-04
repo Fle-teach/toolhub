@@ -30,6 +30,30 @@ Ein Eintrag ohne `ordner` gilt als geplant und erscheint ausgegraut statt als to
 Neue Kategorie? Zusätzlich ein Icon in `TOOLHUB_ICONS` und eine Farbklasse `.cat-<id>`
 in `toolhub.css` anlegen.
 
+## Ein Tool in mehreren Kategorien zeigen
+
+Statt ein Tool zu kopieren, bekommt der Eintrag `ziel` (Pfad ab dem Wurzelverzeichnis)
+anstelle von `ordner`. Mit `?kategorie=<id>` übernimmt die Zielseite Farbe, Icon und
+Bezeichnung der aufrufenden Kategorie:
+
+```js
+{ name: 'Lernfördervereinbarungen erstellen',
+  ziel: 'allgemein/serienbrief/index.html?kategorie=foerderkoordination' }
+```
+
+Die Farbe (Klasse `.cat-<id>` am `<body>`) setzt `toolhub.js` selbst. Icon und Bezeichnung
+greifen, wenn die Zielseite zusätzlich `assets/tools.js` einbindet und ihre Platzhalter
+markiert:
+
+```html
+<span data-icon="raster" data-kategorie-icon class="panel-icon"></span>
+<h1>✉️ <span data-kategorie-titel>Serienbrief</span></h1>
+```
+
+`data-kategorie-titel` wird durch den `name` des Eintrags ersetzt (auch im `<title>`) – der
+Name steht damit weiterhin nur in `tools.js`. Fehlen die Markierungen oder `tools.js`,
+bleibt es beim eigenen Icon bzw. Titel; die Farbe wirkt trotzdem.
+
 ## Aufbau eines Tools
 
 Verbindlich sind diese Dateinamen:
