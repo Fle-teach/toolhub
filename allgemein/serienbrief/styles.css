@@ -21,14 +21,27 @@
 
 /* ----- Feldzuordnung ----- */
 
-#felderTabelle td:first-child {
-  width: 30%;
-  white-space: nowrap;
+/* Feste Spaltenbreiten: drei gleich breite Spalten, Inhalte brechen um */
+#felderTabelle {
+  table-layout: fixed;
+}
+
+#felderTabelle th,
+#felderTabelle td {
+  width: 33.33%;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 #felderTabelle select {
   width: 100%;
-  max-width: 320px;
+}
+
+/* Lange Spaltennamen zusätzlich umgebrochen zeigen – ein <select> kürzt sie sonst ab */
+.spalte-voll {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
 .feld-hinweis {
@@ -43,9 +56,33 @@
   font-weight: 600;
 }
 
+/* Ganze Zeile hervorheben; diese Felder stehen zudem oben in der Tabelle */
+#felderTabelle tr.zeile-fehlt td {
+  background: color-mix(in srgb, var(--warn-col) 14%, transparent);
+}
+
+#felderTabelle tr.zeile-fehlt td:first-child {
+  border-left: 3px solid var(--warn-col);
+}
+
 #felderTabelle td.leer {
   color: var(--text-muted);
   font-style: italic;
+}
+
+/* Kurzstand im Summary des eingeklappten Panels */
+.summary-hinweis {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.summary-hinweis:empty {
+  display: none;
+}
+
+.summary-hinweis.warnung {
+  color: var(--warn-col);
 }
 
 #unbenutzteSpalten:empty {
@@ -101,6 +138,12 @@
   color: var(--text-muted);
 }
 
+/* Meldungen brauchen Luft zum Element darüber (leer: kein Abstand) */
+#erzeugenMeldung:not(:empty),
+#ladeMeldung:not(:empty) {
+  margin-top: 18px;
+}
+
 /* ----- Automatische Schriftgröße ----- */
 
 /* Unterzeile, die mehrere Reihen enthält (nicht in einer Flex-Zeile) */
@@ -113,13 +156,27 @@
   max-width: 640px;
 }
 
-/* Zweispaltig: Beschriftung + Zahleneingabe; auf schmalen Displays einspaltig */
+/*
+ * Einstellungspaare (Beschriftung + Zahleneingabe). Auf breiten Bildschirmen stehen
+ * mehrere Paare nebeneinander, auf schmalen rutschen sie untereinander.
+ */
 .auto-gitter {
   display: grid;
-  grid-template-columns: auto 90px;
-  gap: 8px 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 8px 24px;
   align-items: center;
   margin-bottom: 12px;
+}
+
+/*
+ * Wert steht direkt neben seiner Beschriftung – nicht am rechten Spaltenrand.
+ * Sonst rückt er optisch an das Label der nächsten Spalte heran.
+ */
+.feld-paar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
 }
 
 .auto-gitter label {
@@ -129,14 +186,5 @@
 
 .auto-gitter input {
   width: 90px;
-}
-
-@media (max-width: 520px) {
-  .auto-gitter {
-    grid-template-columns: 1fr;
-    gap: 4px 0;
-  }
-  .auto-gitter input {
-    margin-bottom: 8px;
-  }
+  flex: none;
 }

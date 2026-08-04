@@ -60,34 +60,40 @@
       <div id="ladeMeldung"></div>
     </section>
 
-    <section class="panel hidden" id="felderPanel">
-      <!-- Motiv: Etikett mit Feldmarke -->
-      <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M3 7a2 2 0 0 1 2-2h9l6 7-6 7H5a2 2 0 0 1-2-2z"/>
-        <path d="M7 10h5"/>
-        <path d="M7 14h3"/>
-      </svg>
-      <h2>Felder zuordnen</h2>
-      <p class="hint">Jedes Feld der Vorlage wird einer Spalte der Tabelle zugeordnet. Gleichnamige Spalten
-      werden automatisch erkannt (Gro&szlig;- und Kleinschreibung sowie Leerzeichen spielen dabei keine Rolle);
-      abweichende Zuordnungen lassen sich hier &auml;ndern.</p>
+    <details class="advanced-panel hidden" id="felderPanel">
+      <!-- Icon liegt im <summary>, damit es auch im eingeklappten Zustand sichtbar bleibt -->
+      <summary>
+        <!-- Motiv: Etikett mit Feldmarke -->
+        <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 7a2 2 0 0 1 2-2h9l6 7-6 7H5a2 2 0 0 1-2-2z"/>
+          <path d="M7 10h5"/>
+          <path d="M7 14h3"/>
+        </svg>
+        Felder zuordnen
+        <span class="summary-hinweis" id="felderKurzstand"></span>
+      </summary>
+      <div class="advanced-content">
+        <p class="hint">Jedes Feld der Vorlage wird einer Spalte der Tabelle zugeordnet. Gleichnamige Spalten
+        werden automatisch erkannt (Gro&szlig;- und Kleinschreibung sowie Leerzeichen spielen dabei keine Rolle);
+        abweichende Zuordnungen lassen sich hier &auml;ndern.</p>
 
-      <div class="stats" id="statistik"></div>
-      <div id="felderMeldung"></div>
-      <div class="table-wrap">
-        <table id="felderTabelle">
-          <thead>
-            <tr>
-              <th>Feld in der Vorlage</th>
-              <th>Spalte der Tabelle</th>
-              <th>Wert im 1. Datensatz</th>
-            </tr>
-          </thead>
-          <tbody id="felderKoerper"></tbody>
-        </table>
+        <div class="stats" id="statistik"></div>
+        <div id="felderMeldung"></div>
+        <div class="table-wrap">
+          <table id="felderTabelle">
+            <thead>
+              <tr>
+                <th>Feld in der Vorlage</th>
+                <th>Spalte der Tabelle</th>
+                <th>Wert im 1. Datensatz</th>
+              </tr>
+            </thead>
+            <tbody id="felderKoerper"></tbody>
+          </table>
+        </div>
+        <p class="hint" id="unbenutzteSpalten"></p>
       </div>
-      <p class="hint" id="unbenutzteSpalten"></p>
-    </section>
+    </details>
 
     <details class="advanced-panel hidden" id="einstellungenPanel">
       <!-- Icon liegt im <summary>, damit es auch im eingeklappten Zustand sichtbar bleibt -->
@@ -96,38 +102,8 @@
         Erweiterte Einstellungen
       </summary>
       <div class="advanced-content">
-        <p class="hint">Standardm&auml;&szlig;ig entsteht ein einziges Dokument, in dem die Datens&auml;tze durch
-        Seitenumbr&uuml;che getrennt hintereinander stehen &ndash; praktisch zum Drucken. Alternativ l&auml;sst sich
-        je Datensatz oder je Gruppe (z. B. je Klasse) ein eigenes Dokument erzeugen.</p>
-
-        <div class="setting-group">
-          <div class="setting-label">Ausgabe</div>
-
-          <label class="radio-row">
-            <input type="radio" name="ausgabeModus" value="einzeln" checked>
-            <span>Alles in ein Dokument &ndash; ein Seitenumbruch je Datensatz</span>
-          </label>
-
-          <label class="radio-row">
-            <input type="radio" name="ausgabeModus" value="gruppiert">
-            <span>Nach Spalte gruppieren &ndash; ein Dokument je Gruppe</span>
-          </label>
-          <div class="setting-sub" id="gruppenZeile">
-            <label for="gruppenSpalte">Gruppieren nach:</label>
-            <select id="gruppenSpalte"></select>
-          </div>
-
-          <label class="radio-row">
-            <input type="radio" name="ausgabeModus" value="proDatensatz">
-            <span>Ein Dokument je Datensatz</span>
-          </label>
-          <div class="setting-sub" id="dateinameZeile">
-            <label for="dateiname">Dateiname:</label>
-            <input type="text" id="dateiname" value="Serienbrief_{{Nr}}" size="30">
-            <span class="hinweis-klein">Spalten der Tabelle in doppelten geschweiften Klammern, z. B.
-            <code>{{Nachname}}_{{Vorname}}</code>; <code>{{Nr}}</code> ist die laufende Nummer.</span>
-          </div>
-        </div>
+        <p class="hint">Hier l&auml;sst sich steuern, in welcher Gr&ouml;&szlig;e die Werte in die Vorlage eingesetzt
+        werden &ndash; und wie mit Feldern umgegangen wird, denen keine Spalte zugeordnet ist.</p>
 
         <div class="setting-group">
           <div class="setting-label">Schriftgr&ouml;&szlig;e der eingesetzten Werte</div>
@@ -160,14 +136,18 @@
             entscheidet erst Word bzw. Writer.</p>
 
             <div class="auto-gitter">
-              <label for="autoStart">Startgr&ouml;&szlig;e (pt):</label>
-              <input type="number" id="autoStart" value="11" min="4" max="96" step="0.5">
-
-              <label for="autoMin">Mindestgr&ouml;&szlig;e (pt):</label>
-              <input type="number" id="autoMin" value="6" min="4" max="96" step="0.5">
-
-              <label for="autoZeichenProZeile">Zeichen pro Zeile (Sch&auml;tzung):</label>
-              <input type="number" id="autoZeichenProZeile" value="60" min="1" max="1000" step="1">
+              <div class="feld-paar">
+                <label for="autoStart">Startgr&ouml;&szlig;e (pt):</label>
+                <input type="number" id="autoStart" value="11" min="4" max="96" step="0.5">
+              </div>
+              <div class="feld-paar">
+                <label for="autoMin">Mindestgr&ouml;&szlig;e (pt):</label>
+                <input type="number" id="autoMin" value="6" min="4" max="96" step="0.5">
+              </div>
+              <div class="feld-paar">
+                <label for="autoZeichenProZeile">Zeichen pro Zeile (Sch&auml;tzung):</label>
+                <input type="number" id="autoZeichenProZeile" value="60" min="1" max="1000" step="1">
+              </div>
             </div>
 
             <div class="setting-label">Kapazit&auml;t je Seite</div>
@@ -188,11 +168,14 @@
             </label>
             <div class="setting-sub setting-sub-block" id="schwellenZeile">
               <div class="auto-gitter">
-                <label for="autoAbZeichen">Anpassen ab Zeichen:</label>
-                <input type="number" id="autoAbZeichen" value="100" min="0" max="100000" step="10">
-
-                <label for="autoAbUmbrueche">oder ab Umbr&uuml;chen:</label>
-                <input type="number" id="autoAbUmbrueche" value="2" min="0" max="1000" step="1">
+                <div class="feld-paar">
+                  <label for="autoAbZeichen">Anpassen ab Zeichen:</label>
+                  <input type="number" id="autoAbZeichen" value="100" min="0" max="100000" step="10">
+                </div>
+                <div class="feld-paar">
+                  <label for="autoAbUmbrueche">oder ab Umbr&uuml;chen:</label>
+                  <input type="number" id="autoAbUmbrueche" value="2" min="0" max="1000" step="1">
+                </div>
               </div>
 
               <div class="setting-label">F&uuml;r k&uuml;rzere Felder</div>
@@ -227,8 +210,39 @@
         <path d="M6 7H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h9"/>
       </svg>
       <h2>Serienbriefe erzeugen</h2>
-      <p class="hint">Die fertigen Dokumente behalten das Format der Vorlage. Mehrere Dokumente werden als
-      ZIP-Datei gesammelt.</p>
+      <p class="hint">Standardm&auml;&szlig;ig entsteht ein einziges Dokument, in dem die Datens&auml;tze durch
+      Seitenumbr&uuml;che getrennt hintereinander stehen &ndash; praktisch zum Drucken. Alternativ l&auml;sst sich
+      je Datensatz oder je Gruppe (z. B. je Klasse) ein eigenes Dokument erzeugen. Die fertigen Dokumente
+      behalten das Format der Vorlage; mehrere Dokumente werden als ZIP-Datei gesammelt.</p>
+
+      <div class="setting-group">
+        <div class="setting-label">Ausgabe</div>
+
+        <label class="radio-row">
+          <input type="radio" name="ausgabeModus" value="einzeln" checked>
+          <span>Alles in ein Dokument &ndash; ein Seitenumbruch je Datensatz</span>
+        </label>
+
+        <label class="radio-row">
+          <input type="radio" name="ausgabeModus" value="gruppiert">
+          <span>Nach Spalte gruppieren &ndash; ein Dokument je Gruppe</span>
+        </label>
+        <div class="setting-sub" id="gruppenZeile">
+          <label for="gruppenSpalte">Gruppieren nach:</label>
+          <select id="gruppenSpalte"></select>
+        </div>
+
+        <label class="radio-row">
+          <input type="radio" name="ausgabeModus" value="proDatensatz">
+          <span>Ein Dokument je Datensatz</span>
+        </label>
+        <div class="setting-sub" id="dateinameZeile">
+          <label for="dateiname">Dateiname:</label>
+          <input type="text" id="dateiname" value="Serienbrief_{{Nr}}" size="30">
+          <span class="hinweis-klein">Spalten der Tabelle in doppelten geschweiften Klammern, z. B.
+          <code>{{Nachname}}_{{Vorname}}</code>; <code>{{Nr}}</code> ist die laufende Nummer.</span>
+        </div>
+      </div>
 
       <div class="button-group">
         <button type="button" id="vorschauBtn" class="btn-secondary">&#128065;&#65039; Vorschau (1. Datensatz)</button>

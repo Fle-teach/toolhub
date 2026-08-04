@@ -15,6 +15,7 @@ const blattAuswahl = document.getElementById('blattAuswahl');
 const statistik = document.getElementById('statistik');
 const felderKoerper = document.getElementById('felderKoerper');
 const unbenutzteSpalten = document.getElementById('unbenutzteSpalten');
+const felderKurzstand = document.getElementById('felderKurzstand');
 const gruppenZeile = document.getElementById('gruppenZeile');
 const gruppenSpalte = document.getElementById('gruppenSpalte');
 const dateinameZeile = document.getElementById('dateinameZeile');
@@ -254,11 +255,16 @@ function felderDerVorlage() {
 }
 
 function zeigeFelder() {
-  const felder = felderDerVorlage();
+  // Nicht zugeordnete Felder zuerst – sie brauchen Aufmerksamkeit; sonst Reihenfolge der Vorlage
+  const felder = felderDerVorlage()
+    .map((feld, index) => ({ feld, index, fehlt: !zustand.zuordnung[feld] }))
+    .sort((a, b) => (a.fehlt === b.fehlt ? a.index - b.index : (a.fehlt ? -1 : 1)))
+    .map((eintrag) => eintrag.feld);
   felderKoerper.innerHTML = '';
 
   felder.forEach((feld) => {
     const zeile = document.createElement('tr');
+    if (!zustand.zuordnung[feld]) zeile.className = 'zeile-fehlt';
 
     // Word- und Writer-Felder werden in ihrer eigenen Schreibweise gezeigt,
     // damit sie in der Vorlage wiederzuerkennen sind
@@ -300,6 +306,14 @@ function zeigeFelder() {
     });
     spaltenZelle.appendChild(auswahl);
 
+    // Ein <select> kürzt lange Namen ab – deshalb den vollen Namen darunter umgebrochen zeigen
+    if (auswahl.value && auswahl.value.length > 28) {
+      const voll = document.createElement('div');
+      voll.className = 'spalte-voll';
+      voll.textContent = auswahl.value;
+      spaltenZelle.appendChild(voll);
+    }
+
     const wertZelle = document.createElement('td');
     const spalte = zustand.zuordnung[feld];
     if (!spalte) {
@@ -320,6 +334,13 @@ function zeigeFelder() {
   unbenutzteSpalten.textContent = uebrig.length > 0
     ? `Nicht verwendete Spalten: ${uebrig.join(', ')}`
     : '';
+
+  // Kurzstand am eingeklappten Panel, damit Probleme auch zugeklappt sichtbar sind
+  const ohne = felder.filter((feld) => !zustand.zuordnung[feld]).length;
+  felderKurzstand.textContent = ohne > 0
+    ? `${ohne} Feld(er) ohne Spalte`
+    : `${felder.length} Feld(er) zugeordnet`;
+  felderKurzstand.classList.toggle('warnung', ohne > 0);
 }
 
 function zeigeStatistik() {
@@ -467,7 +488,11 @@ function baueKapazitaetsFelder() {
       ergebnisLeeren();
     });
 
-    kapazitaetGitter.append(label, feld);
+    // Beschriftung und Eingabe bilden ein Paar, damit sie im Raster zusammenbleiben
+    const paar = document.createElement('div');
+    paar.className = 'feld-paar';
+    paar.append(label, feld);
+    kapazitaetGitter.appendChild(paar);
   });
 }
 
@@ -704,6 +729,9 @@ function aktualisiere() {
   aktualisiereEinstellungen();
   zeigeFelder();
   zeigeStatistik();
+
+  // Zuordnung nur aufklappen, wenn etwas zu tun ist (Felder ohne Spalte)
+  felderPanel.open = felderDerVorlage().some((feld) => !zustand.zuordnung[feld]);
 }
 
 aktualisiereEinstellungen();

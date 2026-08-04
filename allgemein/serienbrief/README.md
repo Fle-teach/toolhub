@@ -70,6 +70,9 @@ Abweichende Zuordnungen (Feld `Anrede` ← Spalte `Briefanrede`) werden im Panel
 „Felder zuordnen“ eingestellt. Ein Feld ohne Spalte bleibt im Dokument leer; auf Wunsch
 bleibt stattdessen `{{Feld}}` stehen, was beim Prüfen einer neuen Vorlage hilft.
 
+Das Panel bleibt eingeklappt, solange alle Felder zugeordnet sind – gibt es Felder ohne
+Spalte, öffnet es sich von selbst, hebt diese Zeilen hervor und stellt sie nach oben.
+
 Zeilenumbrüche innerhalb einer Zelle bleiben erhalten und werden zu Zeilenumbrüchen im
 Dokument.
 
