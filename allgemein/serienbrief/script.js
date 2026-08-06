@@ -646,8 +646,8 @@ erzeugenBtn.addEventListener('click', async () => {
     zeigeErgebnis();
     downloadBtn.disabled = false;
     meldung('erzeugenMeldung',
-      `✓ ${zustand.dokumente.length} Dokument(e) mit insgesamt ${zustand.datensaetze.length} Datensätzen erzeugt.`,
-      'success');
+      `${zustand.dokumente.length} Dokument(e) mit insgesamt ${zustand.datensaetze.length} Datensätzen erzeugt.`,
+      'success', 'haken');
   } catch (fehler) {
     zustand.dokumente = [];
     meldung('erzeugenMeldung', `Fehler beim Erzeugen: ${fehler.message}`, 'error');
@@ -711,8 +711,8 @@ function ergebnisLeeren() {
 // Oberfläche auffrischen
 // ---------------------------------------------------------------------------
 
-function meldung(id, text, art) {
-  toolhubMessage(id, text, art);
+function meldung(id, text, art, icon) {
+  toolhubMessage(id, text, art, icon);
 }
 
 function aktualisiere() {

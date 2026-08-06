@@ -11,8 +11,19 @@ document.documentElement.dataset.theme =
   localStorage.getItem('toolhub-theme') ||
   (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
 
-// Icon-Motive, die an mehr als einer Stelle vorkommen (Kachel + Tool-Seiten).
-// Einbindung im Markup über <span data-icon="setzling" class="panel-icon"></span>.
+/*
+ * Icon-Vorrat: eigene Strichzeichnungen (einfarbig, 24×24, Kontur in currentColor).
+ * Sie treten an die Stelle von Emojis – die sehen je nach Betriebssystem anders aus
+ * und passen farblich nicht zum übrigen Design.
+ *
+ * Einbindung im Markup über einen Platzhalter, dessen Klasse die Größe bestimmt:
+ *   <span data-icon="setzling" class="panel-icon"></span>    großes Wasserzeichen im Panel
+ *   <span data-icon="download" class="inline-icon"></span>   in Buttons und Fließtext
+ *
+ * Hier stehen die Motive, die an mehr als einer Stelle vorkommen (Kacheln der
+ * Startseite, Bedienelemente). Ein Motiv, das nur ein einziges Tool braucht, bleibt
+ * als <svg> in dessen Seite.
+ */
 const TOOLHUB_ICONS = {
   // Vier Kacheln (Allgemeines, Verschiedenes)
   raster:
@@ -75,7 +86,39 @@ const TOOLHUB_ICONS = {
     '<circle cx="12" cy="18" r="2.5"/>' +
     '<path d="M8 6h8"/>' +
     '<path d="M6.8 8.2l4 7.6"/>' +
-    '<path d="M17.2 8.2l-4 7.6"/>'
+    '<path d="M17.2 8.2l-4 7.6"/>',
+
+  /* ----- Motive für Bedienelemente (Überschriften, Buttons, Hinweise) ----- */
+
+  // Briefumschlag (Serienbrief, Anschreiben)
+  brief:
+    '<rect x="3" y="5" width="18" height="14" rx="2"/>' +
+    '<path d="M3.6 6.6l7.2 5.1a2 2 0 0 0 2.4 0l7.2-5.1"/>',
+  // Textdokument mit umgeknickter Ecke (DOCX/ODT)
+  dokument:
+    '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>' +
+    '<path d="M14 3v5h5"/>' +
+    '<path d="M8.5 13h7"/>' +
+    '<path d="M8.5 16.5h4.5"/>',
+  // Tabelle mit Kopfzeile (Datensätze aus CSV/XLSX)
+  tabelle:
+    '<rect x="3" y="4" width="18" height="16" rx="2"/>' +
+    '<path d="M3 9h18"/>' +
+    '<path d="M3 14.5h18"/>' +
+    '<path d="M9.5 9v11"/>',
+  // Auge (Vorschau)
+  auge:
+    '<path d="M2.5 12S6.4 5.8 12 5.8 21.5 12 21.5 12 17.6 18.2 12 18.2 2.5 12 2.5 12z"/>' +
+    '<circle cx="12" cy="12" r="2.8"/>',
+  // Pfeil in eine Ablage (Herunterladen, Speichern)
+  download:
+    '<path d="M12 3.5v10.5"/>' +
+    '<path d="M7.8 10.2L12 14.4l4.2-4.2"/>' +
+    '<path d="M4.5 16.5v2a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2"/>',
+  // Haken im Kreis (erledigt)
+  haken:
+    '<circle cx="12" cy="12" r="8.8"/>' +
+    '<path d="M8 12.3l2.7 2.7L16 9.6"/>'
 };
 
 // Baut ein SVG aus dem Icon-Vorrat; `klasse` ist z. B. 'card-icon' oder 'panel-icon'.

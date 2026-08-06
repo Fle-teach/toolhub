@@ -301,6 +301,32 @@ main {
   transform: rotate(-8deg);
 }
 
+/* ----- Icons im Text (statt Emojis) -----
+ *
+ * Die Motive stehen in TOOLHUB_ICONS (toolhub.js) und werden über einen Platzhalter
+ * eingesetzt; die Klasse bestimmt die Größe:
+ *
+ *   <button><span data-icon="download" class="inline-icon"></span> Herunterladen</button>
+ *
+ * Größe und Farbe kommen aus dem umgebenden Text, damit das Icon wie ein Schriftzeichen
+ * mitwächst. Der Ausgleich unter der Grundlinie hält es auf Höhe der Kleinbuchstaben.
+ */
+
+.inline-icon {
+  width: 1.15em;
+  height: 1.15em;
+  flex: none;
+  vertical-align: -0.22em;
+}
+
+/* In der Überschrift wirkt das Motiv sonst zu wuchtig neben der Schreibmaschinenschrift */
+h1 .inline-icon {
+  width: 0.92em;
+  height: 0.92em;
+  vertical-align: -0.1em;
+  margin-right: 6px;
+}
+
 .panel h2 {
   position: relative;
   font-size: 1.25rem;
@@ -476,6 +502,21 @@ main {
   font-size: 0.95rem;
 }
 
+/* Icon vor dem Meldungstext – toolhubMessage(…, art, 'haken') setzt es ein.
+ * Bewusst inline (nicht als Flex-Element): sonst zerfiele der Text an den <br>
+ * mehrzeiliger Meldungen in einzelne Flex-Elemente. */
+.msg-icon {
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.22em;
+  margin-right: 7px;
+}
+
+.error .msg-icon { color: var(--err); }
+.success .msg-icon { color: var(--ok); }
+.warn .msg-icon { color: var(--warn-col); }
+.info .msg-icon { color: var(--info-col); }
+
 .error {
   background: color-mix(in srgb, var(--err) 14%, transparent);
   border: 1px solid color-mix(in srgb, var(--err) 45%, transparent);
@@ -562,6 +603,15 @@ button {
   font-family: inherit;
 }
 
+/* Flex, damit ein vorangestelltes Icon mit gleichem Abstand neben der Beschriftung sitzt */
+.btn-primary,
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 .btn-primary {
   background: var(--accent);
   color: var(--accent-text);
@@ -636,6 +686,7 @@ input[type="radio"] {
  * Markup:
  *   <input class="file-input" type="file" id="meinInput" accept=".xlsx" multiple>
  *   <div class="upload-box" id="meinInputZone">
+ *     <span data-icon="tabelle" class="upload-icon"></span>
  *     <div class="upload-text"><strong>Dateien hier ablegen</strong> oder klicken zum Auswählen</div>
  *     <div class="upload-hint">optionaler Hinweistext</div>
  *   </div>
@@ -685,6 +736,19 @@ input[type="radio"] {
 .upload-box.dragover {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* Zeigt an, welche Art Datei hier erwartet wird – steht über dem Text der Ablagefläche */
+.upload-icon {
+  display: block;
+  width: 30px;
+  height: 30px;
+  margin: 0 auto 10px;
+  color: var(--accent);
+}
+
+:root[data-theme="light"] .upload-icon {
+  color: color-mix(in srgb, var(--accent) 85%, #000000);
 }
 
 .upload-text {

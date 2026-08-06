@@ -22,7 +22,7 @@
 
   <header>
     <!-- data-kategorie-titel: folgt dem Namen aus tools.js, wenn die Seite über ?kategorie=… geöffnet wird -->
-    <h1>&#9993;&#65039; <span data-kategorie-titel>Serienbrief</span></h1>
+    <h1><span data-icon="brief" class="inline-icon"></span><span data-kategorie-titel>Serienbrief</span></h1>
     <p class="subtitle">Vorlage mit Serienbrieffeldern und Datens&auml;tze aus einer Tabelle zu fertigen Dokumenten verbinden</p>
   </header>
 
@@ -42,7 +42,8 @@
         <div>
           <input type="file" id="vorlageInput" class="file-input" accept=".docx,.odt">
           <div class="upload-box" id="vorlageZone">
-            <div class="upload-text">&#128196; <strong>Vorlage hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
+            <span data-icon="dokument" class="upload-icon"></span>
+            <div class="upload-text"><strong>Vorlage hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
             <div class="upload-hint">Formate: .docx (Word) und .odt (Writer)</div>
           </div>
           <div class="file-list" id="vorlageListe"></div>
@@ -50,7 +51,8 @@
         <div>
           <input type="file" id="datenInput" class="file-input" accept=".csv,.xlsx,.xls,.xlsm">
           <div class="upload-box" id="datenZone">
-            <div class="upload-text">&#128202; <strong>Datens&auml;tze hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
+            <span data-icon="tabelle" class="upload-icon"></span>
+            <div class="upload-text"><strong>Datens&auml;tze hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
             <div class="upload-hint">Formate: .csv (Trennzeichen wird erkannt), .xlsx, .xls, .xlsm</div>
           </div>
           <div class="file-list" id="datenListe"></div>
@@ -249,9 +251,12 @@
       </div>
 
       <div class="button-group">
-        <button type="button" id="vorschauBtn" class="btn-secondary">&#128065;&#65039; Vorschau (1. Datensatz)</button>
-        <button type="button" id="erzeugenBtn" class="btn-primary">&#128196; Serienbriefe erzeugen</button>
-        <button type="button" id="downloadBtn" class="btn-secondary" disabled>&#128190; Herunterladen</button>
+        <button type="button" id="vorschauBtn" class="btn-secondary">
+          <span data-icon="auge" class="inline-icon"></span>Vorschau (1. Datensatz)</button>
+        <button type="button" id="erzeugenBtn" class="btn-primary">
+          <span data-icon="dokument" class="inline-icon"></span>Serienbriefe erzeugen</button>
+        <button type="button" id="downloadBtn" class="btn-secondary" disabled>
+          <span data-icon="download" class="inline-icon"></span>Herunterladen</button>
       </div>
 
       <div id="erzeugenMeldung"></div>

@@ -47,7 +47,7 @@ markiert:
 
 ```html
 <span data-icon="raster" data-kategorie-icon class="panel-icon"></span>
-<h1>✉️ <span data-kategorie-titel>Serienbrief</span></h1>
+<h1><span data-icon="brief" class="inline-icon"></span><span data-kategorie-titel>Serienbrief</span></h1>
 ```
 
 `data-kategorie-titel` wird durch den `name` des Eintrags ersetzt (auch im `<title>`) – der
@@ -94,8 +94,8 @@ Vor eigenen Hilfsfunktionen prüfen, ob es die Aufgabe schon gibt:
 | Datei | Inhalt |
 | --- | --- |
 | `assets/toolhub.css` | Grunddesign, Kategoriefarben, `.panel`, `.section`, `.stats`, Meldungen, Buttons, Upload, Tabellen |
-| `assets/toolhub.js` | Theme, Kopfzeile (Zurück-Link + Umschalter), `toolhubUpload()` (Datei-Auswahl inkl. Drag-and-drop) |
-| `assets/tools.js` | Verzeichnis aller Kategorien und Tools, Icon-Vorrat, Kacheln der Startseite |
+| `assets/toolhub.js` | Theme, Kopfzeile (Zurück-Link + Umschalter), Icon-Vorrat (`TOOLHUB_ICONS`), `toolhubUpload()` (Datei-Auswahl inkl. Drag-and-drop) |
+| `assets/tools.js` | Verzeichnis aller Kategorien und Tools, Kacheln der Startseite |
 | `assets/toolhub-io.js` | Dateien lesen, Kodierung erkennen, CSV lesen/schreiben, Downloads, Meldungen, `toolhubEscapeHtml()` |
 | `assets/toolhub-xlsx.js` | Arbeitsmappen lesen und schreiben, Spaltenbreiten, Blattnamen |
 | `assets/toolhub-vorlagen.js` | Serienbrief-Vorlagen (DOCX/ODT): Felder `{{…}}` sowie Word- und Writer-Seriendruckfelder auswerten |
@@ -128,14 +128,28 @@ Zurück-Link und Theme-Umschalter erzeugt `toolhub.js` selbst – kein Markup da
 Tool-Seite. Der Zurück-Link erscheint, sobald der `<body>` eine `cat-*`-Klasse trägt;
 ein abweichendes Ziel geht über `<body data-zurueck="…">`.
 
-Mehrfach verwendete Icons stehen in `assets/tools.js` (`TOOLHUB_ICONS`) und werden im
-Markup als Platzhalter eingesetzt – nur für Motive, die auch anderswo vorkommen:
+## Icons statt Emojis
+
+Die Oberfläche verwendet eigene Icons, keine Emojis: einfarbige Strichzeichnungen auf
+`viewBox="0 0 24 24"`, Kontur in `currentColor`, `stroke-width="1.5"`, ohne Füllung. Emojis
+sehen je nach Betriebssystem anders aus und passen farblich nicht zum übrigen Design.
+Umgestellt ist bisher der Serienbrief; die übrigen Tools folgen nach und nach.
+
+Mehrfach verwendete Motive stehen in `assets/toolhub.js` (`TOOLHUB_ICONS`) und werden im
+Markup als Platzhalter eingesetzt – die Klasse bestimmt die Größe:
 
 ```html
-<span data-icon="knoten" class="panel-icon"></span>
+<span data-icon="knoten" class="panel-icon"></span>     <!-- großes Wasserzeichen im Panel -->
+<span data-icon="download" class="inline-icon"></span>  <!-- in Überschrift, Button, Fließtext -->
+<span data-icon="tabelle" class="upload-icon"></span>   <!-- über der Ablagefläche -->
 ```
 
-Emojis in Buttons und Hinweistexten sind gewollt und bleiben bei Umbauten erhalten.
+Ein Motiv, das nur ein einziges Tool braucht, bleibt als `<svg>` in dessen Seite. Meldungen
+bekommen ihr Icon über den vierten Parameter:
+
+```js
+toolhubMessage('erzeugenMeldung', 'Fertig.', 'success', 'haken');
+```
 
 ## Sprache
 

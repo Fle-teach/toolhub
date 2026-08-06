@@ -225,12 +225,16 @@ function toolhubEscapeHtml(value) {
  *
  *   toolhubMessage('meldung', 'Datei eingelesen.', 'success');
  *   toolhubMessage('meldung', ['Zeile 1', 'Zeile 2'], 'error');   // je Eintrag eine Zeile
+ *   toolhubMessage('meldung', 'Fertig.', 'success', 'haken');     // mit Icon davor
  *   toolhubMessage('meldung', '');                                // Meldung entfernen
  *
  * target ist eine id oder ein Element. Der Text wird als Text eingefügt, nie als HTML –
  * Inhalte aus eingelesenen Dateien müssen so nicht eigens entschärft werden.
+ *
+ * icon ist ein Schlüssel aus TOOLHUB_ICONS (toolhub.js) – dort stehen die eigenen
+ * Strichzeichnungen, die in der Oberfläche an die Stelle von Emojis treten.
  */
-function toolhubMessage(target, text, type = 'info') {
+function toolhubMessage(target, text, type = 'info', icon = '') {
   const el = typeof target === 'string' ? document.getElementById(target) : target;
   if (!el) return;
   el.innerHTML = '';
@@ -240,6 +244,14 @@ function toolhubMessage(target, text, type = 'info') {
 
   const box = document.createElement('div');
   box.className = type;
+
+  // Das Markup stammt allein aus TOOLHUB_ICONS, enthält also keine fremden Inhalte
+  if (icon && typeof toolhubIcon === 'function') {
+    const huelle = document.createElement('span');
+    huelle.innerHTML = toolhubIcon(icon, 'msg-icon');
+    if (huelle.firstChild) box.appendChild(huelle.firstChild);
+  }
+
   zeilen.forEach((zeile, index) => {
     if (index > 0) box.appendChild(document.createElement('br'));
     box.appendChild(document.createTextNode(zeile));
