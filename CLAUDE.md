@@ -47,7 +47,7 @@ markiert:
 
 ```html
 <span data-icon="raster" data-kategorie-icon class="panel-icon"></span>
-<h1><span data-icon="brief" class="inline-icon"></span><span data-kategorie-titel>Serienbrief</span></h1>
+<h1><span data-kategorie-titel>Serienbrief</span><span data-icon="brief" class="title-icon"></span></h1>
 ```
 
 `data-kategorie-titel` wird durch den `name` des Eintrags ersetzt (auch im `<title>`) – der
@@ -153,9 +153,15 @@ Markup als Platzhalter eingesetzt – die Klasse bestimmt die Größe:
 
 ```html
 <span data-icon="knoten" class="panel-icon"></span>     <!-- großes Wasserzeichen im Panel -->
-<span data-icon="download" class="inline-icon"></span>  <!-- in Überschrift, Button, Fließtext -->
+<span data-icon="brief" class="title-icon"></span>      <!-- angeschrägt hinter der Seitenüberschrift -->
+<span data-icon="download" class="inline-icon"></span>  <!-- in Button und Fließtext -->
 <span data-icon="tabelle" class="upload-icon"></span>   <!-- über der Ablagefläche -->
 ```
+
+`title-icon` gehört als letztes Kind in die `<h1>`; es ist absolut positioniert, damit die
+Überschrift mittig bleibt. Jede Tool-Seite trägt dort ein Motiv, das den **Gegenstand des
+Tools** benennt (Serienbrief → `brief`, Förderlisten kombinieren → `zusammenfuehren`) &ndash;
+nicht das Kategorie-Motiv, denn das steht schon als Wasserzeichen im ersten Panel.
 
 Ein Motiv, das nur ein einziges Tool braucht, bleibt als `<svg>` in dessen Seite. Meldungen
 bekommen ihr Icon über den vierten Parameter:

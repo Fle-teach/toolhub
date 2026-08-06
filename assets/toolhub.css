@@ -327,6 +327,46 @@ h1 .inline-icon {
   margin-right: 6px;
 }
 
+/* ----- Motiv an der Seitenüberschrift -----
+ *
+ * Angeschrägt am rechten Rand der Überschrift, in der Kategoriefarbe – dieselbe
+ * Bildsprache wie das Wasserzeichen der Panels (.panel-icon):
+ *
+ *   <h1><span data-kategorie-titel>Serienbrief</span><span data-icon="brief" class="title-icon"></span></h1>
+ *
+ * Absolut positioniert, damit es die Überschrift weder verschiebt noch aus der Mitte
+ * rückt; der negative Einzug schiebt es leicht hinter das letzte Zeichen.
+ */
+
+/* inline-block + relative: Anker für das Motiv. Die Breitengrenze hält den Platz frei,
+ * den es rechts überragt (1.8em) – doppelt, weil die zentrierte Überschrift freien Raum
+ * auf beide Seiten verteilt. Ohne das würde es auf schmalen Displays am Bildschirmrand
+ * abgeschnitten. Nur für Überschriften mit Motiv, damit die übrigen wie bisher die
+ * volle Breite nutzen. */
+h1:has(.title-icon) {
+  display: inline-block;
+  position: relative;
+  max-width: calc(100% - 3.8em);
+}
+
+.title-icon {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  width: 2.3em;
+  height: 2.3em;
+  margin-left: -0.5em;
+  /* im Uhrzeigersinn: das Motiv neigt sich vom Titel weg – gegenläufig geneigt
+   * schneidet seine Kante in das letzte Zeichen der Überschrift */
+  transform: translateY(-50%) rotate(9deg);
+  color: var(--accent);
+  /* kräftiger als das Panel-Wasserzeichen (--icon-opacity), aber schwach genug,
+   * dass die Überschrift darüber lesbar bleibt */
+  opacity: 0.32;
+  z-index: -1;
+  pointer-events: none;
+}
+
 .panel h2 {
   position: relative;
   font-size: 1.25rem;

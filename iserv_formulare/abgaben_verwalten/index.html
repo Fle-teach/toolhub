@@ -15,7 +15,7 @@
 <body class="cat-iserv_formulare">
 
 <header>
-  <h1>Abgaben verwalten</h1>
+  <h1>Abgaben verwalten<span data-icon="formular" class="title-icon"></span></h1>
   <p class="subtitle">IServ-Formulare: fehlende Abgaben ermitteln und doppelte Abgaben entfernen</p>
 </header>
 
@@ -27,7 +27,9 @@
   </div>
 
   <section class="panel" id="panel-fehlende" role="tabpanel" aria-labelledby="tab-fehlende">
-    <span data-icon="formular" class="panel-icon"></span>
+    <!-- Motiv des Schritts: die Teilnehmerliste, gegen die abgeglichen wird
+         (das Formular-Motiv steht bereits in der Überschrift) -->
+    <span data-icon="liste" class="panel-icon"></span>
     <h2>Fehlende Abgaben ermitteln</h2>
     <p class="hint">
       Vergleicht eine Teilnehmerliste mit den Formulardaten und listet alle Teilnehmer auf, die noch kein

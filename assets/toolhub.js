@@ -176,6 +176,11 @@ const TOOLHUB_ICONS = {
     '<path d="M7 11h4"/>' +
     '<path d="M12 15v2.6"/>' +
     '<path d="M8.4 20.5l3.6-3 3.6 3"/>',
+  // Zwei Stränge laufen zu einem zusammen (Dateien zusammenführen)
+  zusammenfuehren:
+    '<path d="M3.5 5.5h3.2a3 3 0 0 1 2.6 1.5l2 3.5a3 3 0 0 0 2.6 1.5h3.6"/>' +
+    '<path d="M3.5 18.5h3.2a3 3 0 0 0 2.6-1.5l2-3.5a3 3 0 0 1 2.6-1.5h3.6"/>' +
+    '<path d="M17.2 9.2L20 12l-2.8 2.8"/>',
   // Aufzählung (Liste, Kursliste)
   liste:
     '<path d="M4.5 6.5h.01"/>' +
