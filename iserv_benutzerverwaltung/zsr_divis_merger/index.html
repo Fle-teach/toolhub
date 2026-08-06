@@ -30,6 +30,7 @@
                 <label for="divisFile">1. DiViS-Datei (export_schueler_&hellip;.xlsx)</label>
                 <input type="file" id="divisFile" accept=".xlsx" class="file-input" />
                 <div class="upload-box" id="divisFileZone">
+                    <span data-icon="tabelle" class="upload-icon"></span>
                     <div class="upload-text"><strong>XLSX-Datei hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
                 </div>
                 <div class="file-list" id="divisFileList"></div>
@@ -40,6 +41,7 @@
                 <label for="zsrFile">2. ZSR-Datei(en) (z.&nbsp;B. S_L_Aufgenommen.xlsx)</label>
                 <input type="file" id="zsrFile" accept=".xlsx" class="file-input" multiple />
                 <div class="upload-box" id="zsrFileZone">
+                    <span data-icon="tabelle" class="upload-icon"></span>
                     <div class="upload-text"><strong>XLSX-Dateien hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
                 </div>
                 <div class="file-list" id="zsrFileList"></div>
@@ -50,6 +52,7 @@
                 <label for="electiveFile">3. Kurse-Dateien (Klassenverband und Klassen&uuml;bergreifend, export_angebotSchueler_&hellip;.xlsx) <span class="optional">Optional</span></label>
                 <input type="file" id="electiveFile" accept=".xlsx" class="file-input" multiple />
                 <div class="upload-box" id="electiveFileZone">
+                    <span data-icon="tabelle" class="upload-icon"></span>
                     <div class="upload-text"><strong>XLSX-Dateien hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
                 </div>
                 <div class="file-list" id="electiveFileList"></div>
@@ -60,6 +63,7 @@
                 <label for="classTeacherFile">4. Klassenlehrer-Datei <span class="optional">Optional</span></label>
                 <input type="file" id="classTeacherFile" accept=".xlsx" class="file-input" />
                 <div class="upload-box" id="classTeacherFileZone">
+                    <span data-icon="tabelle" class="upload-icon"></span>
                     <div class="upload-text"><strong>XLSX-Datei hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
                 </div>
                 <div class="file-list" id="classTeacherFileList"></div>
@@ -71,10 +75,10 @@
                     <button id="processButton" class="btn-primary" disabled>Zusammenf&uuml;hren</button>
                 </div>
                 <div class="toolbar-right">
-                    <button id="downloadSchuelerButton" class="btn-success" style="display: none;" disabled>📥Sch&uuml;lerimport herunterladen</button>
-                    <button id="downloadElternButton" class="btn-success" style="display: none;" disabled>👨‍👩‍👧‍👦 Elternimport herunterladen</button>
-                    <button id="downloadLehrerButton" class="btn-success" style="display: none;" disabled>👩‍🏫 Lehrerimport herunterladen</button>
-                    <button id="downloadKurslisteButton" class="btn-success" style="display: none;" disabled>📋 Kursliste herunterladen</button>
+                    <button id="downloadSchuelerButton" class="btn-success" style="display: none;" disabled><span data-icon="person" class="inline-icon"></span>Sch&uuml;lerimport herunterladen</button>
+                    <button id="downloadElternButton" class="btn-success" style="display: none;" disabled><span data-icon="eltern" class="inline-icon"></span>Elternimport herunterladen</button>
+                    <button id="downloadLehrerButton" class="btn-success" style="display: none;" disabled><span data-icon="tafel" class="inline-icon"></span>Lehrerimport herunterladen</button>
+                    <button id="downloadKurslisteButton" class="btn-success" style="display: none;" disabled><span data-icon="liste" class="inline-icon"></span>Kursliste herunterladen</button>
                 </div>
             </div>
         </section>

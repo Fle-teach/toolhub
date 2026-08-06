@@ -42,7 +42,8 @@
                     <h3 class="block-title">Wünsche-Datei (CSV)</h3>
                     <input type="file" id="wishesFile" class="file-input" accept=".csv">
                     <div class="upload-box" id="wishesFileZone">
-                        <div class="upload-text">📁 <strong>CSV-Datei hier ablegen</strong> oder klicken zum Auswählen</div>
+                        <span data-icon="tabelle" class="upload-icon"></span>
+                        <div class="upload-text"><strong>CSV-Datei hier ablegen</strong> oder klicken zum Auswählen</div>
                         <div class="upload-hint">Spalten: Schüler, „Wunsch 1&ndash;3“, Ausschlüsse</div>
                     </div>
                     <div class="file-list" id="wishesFileList"></div>
@@ -52,7 +53,8 @@
                     <h3 class="block-title">Schülerdaten-Datei (CSV)</h3>
                     <input type="file" id="studentDataFile" class="file-input" accept=".csv">
                     <div class="upload-box" id="studentDataFileZone">
-                        <div class="upload-text">📁 <strong>CSV-Datei hier ablegen</strong> oder klicken zum Auswählen</div>
+                        <span data-icon="tabelle" class="upload-icon"></span>
+                        <div class="upload-text"><strong>CSV-Datei hier ablegen</strong> oder klicken zum Auswählen</div>
                         <div class="upload-hint">Spalten: Schüler, Alte Klasse, Geschlecht, Typ, Note, Ignorieren</div>
                     </div>
                     <div class="file-list" id="studentDataFileList"></div>
@@ -62,7 +64,7 @@
             <p class="inline-tip">Oder eine gespeicherte Zusammenstellung laden &ndash; sie enthält Schüler- &amp; Wünsche-Daten, die CSV-Dateien werden dann nicht benötigt.</p>
             <div class="button-group">
                 <button type="button" class="btn-secondary" id="importStartBtn">
-                    📥 Zusammenstellung importieren (JSON)
+                    <span data-icon="upload" class="inline-icon"></span>Zusammenstellung importieren (JSON)
                 </button>
                 <input type="file" id="importFileStart" class="file-input" accept=".json">
             </div>
@@ -225,16 +227,16 @@
 
             <div class="button-group">
                 <button class="btn-primary" id="generateBtn" disabled>
-                    ⚙️ Klassen generieren
+                    <span data-icon="knoten" class="inline-icon"></span>Klassen generieren
                 </button>
                 <button class="btn-secondary" id="pauseBtn" style="display: none;">
-                    ⏸ Pausieren
+                    <span data-icon="pause" class="inline-icon"></span>Pausieren
                 </button>
                 <button class="btn-primary" id="resumeBtn" style="display: none;">
-                    ▶ Fortsetzen
+                    <span data-icon="start" class="inline-icon"></span>Fortsetzen
                 </button>
                 <button class="btn-secondary" id="stopBtn" style="display: none;">
-                    ⏹ Beenden
+                    <span data-icon="stopp" class="inline-icon"></span>Beenden
                 </button>
                 <button class="btn-secondary" id="resetBtn">
                     Zurücksetzen
@@ -282,13 +284,13 @@
 
             <div class="button-group">
                 <button class="btn-primary" id="exportExcelBtn">
-                    📊 Als Excel exportieren
+                    <span data-icon="download" class="inline-icon"></span>Als Excel exportieren
                 </button>
                 <button class="btn-secondary" id="exportJsonBtn">
-                    💾 Zusammenstellung exportieren
+                    <span data-icon="download" class="inline-icon"></span>Zusammenstellung exportieren
                 </button>
                 <button class="btn-secondary" id="importBtn">
-                    📥 Zusammenstellung importieren
+                    <span data-icon="upload" class="inline-icon"></span>Zusammenstellung importieren
                 </button>
                 <input type="file" id="importFile" class="file-input" accept=".json">
             </div>

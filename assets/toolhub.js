@@ -118,7 +118,72 @@ const TOOLHUB_ICONS = {
   // Haken im Kreis (erledigt)
   haken:
     '<circle cx="12" cy="12" r="8.8"/>' +
-    '<path d="M8 12.3l2.7 2.7L16 9.6"/>'
+    '<path d="M8 12.3l2.7 2.7L16 9.6"/>',
+  // Kreuz im Kreis (fehlgeschlagen, fehlt)
+  kreuz:
+    '<circle cx="12" cy="12" r="8.8"/>' +
+    '<path d="M9.3 9.3l5.4 5.4"/>' +
+    '<path d="M14.7 9.3l-5.4 5.4"/>',
+  // Dreieck mit Ausrufezeichen (Warnung)
+  warnung:
+    '<path d="M10.3 4.4L2.9 17.3A2 2 0 0 0 4.6 20.3h14.8a2 2 0 0 0 1.7-3L13.7 4.4a2 2 0 0 0-3.4 0z"/>' +
+    '<path d="M12 9.8v3.9"/>' +
+    '<path d="M12 16.9v.01"/>',
+  // Pfeil aus einer Ablage heraus (Hochladen, Importieren)
+  upload:
+    '<path d="M12 15.5V4.5"/>' +
+    '<path d="M7.8 8.7L12 4.5l4.2 4.2"/>' +
+    '<path d="M4.5 16.5v2a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2"/>',
+  // Trichter (Filter, Auswahl einschränken)
+  filter:
+    '<path d="M4.2 5h15.6l-6.1 7.3v5.3l-3.4 2v-7.3z"/>',
+  // Balkendiagramm mit Achse (Auswertung, Zusammenfassung)
+  diagramm:
+    '<path d="M3.5 3.5v17h17"/>' +
+    '<rect x="7" y="12" width="3" height="5.5" rx="0.7"/>' +
+    '<rect x="12" y="8.5" width="3" height="9" rx="0.7"/>' +
+    '<rect x="17" y="5.5" width="3" height="12" rx="0.7"/>',
+  // Sanduhr (Verarbeitung läuft)
+  sanduhr:
+    '<path d="M7 3.5h10"/>' +
+    '<path d="M7 20.5h10"/>' +
+    '<path d="M8.2 3.5v3.7L12 12l-3.8 4.8v3.7"/>' +
+    '<path d="M15.8 3.5v3.7L12 12l3.8 4.8v3.7"/>',
+  // Wiedergabe-Zeichen (Start, Fortsetzen)
+  start:
+    '<path d="M8.5 5.6l9.4 6.4-9.4 6.4z"/>',
+  // Pause
+  pause:
+    '<rect x="8" y="5.5" width="2.8" height="13" rx="1"/>' +
+    '<rect x="13.2" y="5.5" width="2.8" height="13" rx="1"/>',
+  // Stopp (Beenden)
+  stopp:
+    '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+  // Einzelne Person (Schülerdaten)
+  person:
+    '<circle cx="12" cy="8" r="3.4"/>' +
+    '<path d="M5.6 20c0-3.5 2.9-6.4 6.4-6.4s6.4 2.9 6.4 6.4"/>',
+  // Zwei Erwachsene (Elterndaten)
+  eltern:
+    '<circle cx="8.6" cy="8.4" r="2.7"/>' +
+    '<circle cx="15.4" cy="8.4" r="2.7"/>' +
+    '<path d="M3.5 19c0-2.8 2.3-5.1 5.1-5.1 1.1 0 2.1.3 2.9.9"/>' +
+    '<path d="M20.5 19c0-2.8-2.3-5.1-5.1-5.1-1.1 0-2.1.3-2.9.9"/>',
+  // Tafel auf Gestell (Lehrkräfte)
+  tafel:
+    '<rect x="3.5" y="3.5" width="17" height="11.5" rx="1.5"/>' +
+    '<path d="M7 7.5h7"/>' +
+    '<path d="M7 11h4"/>' +
+    '<path d="M12 15v2.6"/>' +
+    '<path d="M8.4 20.5l3.6-3 3.6 3"/>',
+  // Aufzählung (Liste, Kursliste)
+  liste:
+    '<path d="M4.5 6.5h.01"/>' +
+    '<path d="M4.5 12h.01"/>' +
+    '<path d="M4.5 17.5h.01"/>' +
+    '<path d="M8.5 6.5h11"/>' +
+    '<path d="M8.5 12h11"/>' +
+    '<path d="M8.5 17.5h11"/>'
 };
 
 // Baut ein SVG aus dem Icon-Vorrat; `klasse` ist z. B. 'card-icon' oder 'panel-icon'.

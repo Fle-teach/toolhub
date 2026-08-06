@@ -133,7 +133,20 @@ ein abweichendes Ziel geht über `<body data-zurueck="…">`.
 Die Oberfläche verwendet eigene Icons, keine Emojis: einfarbige Strichzeichnungen auf
 `viewBox="0 0 24 24"`, Kontur in `currentColor`, `stroke-width="1.5"`, ohne Füllung. Emojis
 sehen je nach Betriebssystem anders aus und passen farblich nicht zum übrigen Design.
-Umgestellt ist bisher der Serienbrief; die übrigen Tools folgen nach und nach.
+Umgestellt sind alle Tools außer den LEG-Bögen.
+
+Damit gleiche Aktionen in allen Tools gleich aussehen:
+
+| Stelle | Motiv |
+| --- | --- |
+| Herunterladen, Exportieren | `download` &ndash; unabhängig vom Dateiformat |
+| Importieren, Hochladen (Button) | `upload` |
+| Ablagefläche (`.upload-box`) | nach erwarteter Dateiart: `tabelle` (CSV/XLSX), `dokument` (DOCX/ODT/TXT) |
+| Meldungen | `haken` (erledigt), `kreuz` (fehlt), `warnung` |
+
+Ausnahme sind Zeichen, die eine Bedeutung *tragen* statt sie nur zu bebildern: die Emojis,
+mit denen der Optimierer Schülerpaare kennzeichnet, ebenso `♂`/`♀` in der WPB-Kurseinteilung,
+der Notenstern `★` und typografische Pfeile (`→`, `▸`). Sie bleiben Text.
 
 Mehrfach verwendete Motive stehen in `assets/toolhub.js` (`TOOLHUB_ICONS`) und werden im
 Markup als Platzhalter eingesetzt – die Klasse bestimmt die Größe:
@@ -150,6 +163,10 @@ bekommen ihr Icon über den vierten Parameter:
 ```js
 toolhubMessage('erzeugenMeldung', 'Fertig.', 'success', 'haken');
 ```
+
+In Buttons stehen Icon und Beschriftung als Flex-Paar (`.btn-primary`/`.btn-secondary` in
+`toolhub.css`). Blendet ein Skript so einen Button ein, muss es `display = 'inline-flex'`
+setzen &ndash; `'inline-block'` würde das Flex-Layout und damit den Abstand überschreiben.
 
 ## Sprache
 

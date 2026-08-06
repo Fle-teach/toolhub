@@ -643,8 +643,8 @@ function renderResults() {
         totalViol += cost.hard;
     });
     $('resultsSummary').innerHTML = totalViol > 0
-        ? `<div class="warn">⚠️ ${totalViol} Verletzung(en) harter Regeln verbleiben (rot markiert). Evtl. ist eine Regel mit den aktuellen Zahlen nicht voll erfüllbar – per Drag &amp; Drop nachbessern oder Kriterium lockern.</div>`
-        : `<div class="success">✓ Alle als „Hart" gesetzten Regeln sind erfüllt.</div>`;
+        ? `<div class="warn">${toolhubIcon('warnung', 'msg-icon')}${totalViol} Verletzung(en) harter Regeln verbleiben (rot markiert). Evtl. ist eine Regel mit den aktuellen Zahlen nicht voll erfüllbar – per Drag &amp; Drop nachbessern oder Kriterium lockern.</div>`
+        : `<div class="success">${toolhubIcon('haken', 'msg-icon')}Alle als „Hart" gesetzten Regeln sind erfüllt.</div>`;
 
     const cont = $('resultsContainer');
     cont.innerHTML = '';
@@ -709,7 +709,7 @@ function refreshSubjectBoard(option) {
     if (r.params.crit.minN === 'hard' && cost.detail.minN > 0) msgs.push(`Mindest-N je Klasse/Geschlecht ${cost.detail.minN}× verletzt`);
     if (r.params.crit.maxN === 'hard' && cost.detail.maxN > 0) msgs.push(`Höchst-N je Klasse/Geschlecht ${cost.detail.maxN}× verletzt`);
     if (r.params.crit.classEven === 'hard' && cost.detail.classEven > 0) msgs.push('Klassenverteilung ungleichmäßig');
-    warnDiv.innerHTML = msgs.length ? `<div class="warn">⚠️ ${msgs.join(' · ')}</div>` : '';
+    warnDiv.innerHTML = msgs.length ? `<div class="warn">${toolhubIcon('warnung', 'msg-icon')}${msgs.join(' · ')}</div>` : '';
 
     const cols = board.querySelectorAll('.course-col');
     const ratio = r.params.ratio;
@@ -759,8 +759,8 @@ function refreshSubjectBoard(option) {
         totalViol += costOf(buildCoursesFromAssign(o), rr.params).hard;
     });
     $('resultsSummary').innerHTML = totalViol > 0
-        ? `<div class="warn">⚠️ ${totalViol} Verletzung(en) harter Regeln verbleiben (rot markiert).</div>`
-        : `<div class="success">✓ Alle als „Hart" gesetzten Regeln sind erfüllt.</div>`;
+        ? `<div class="warn">${toolhubIcon('warnung', 'msg-icon')}${totalViol} Verletzung(en) harter Regeln verbleiben (rot markiert).</div>`
+        : `<div class="success">${toolhubIcon('haken', 'msg-icon')}Alle als „Hart" gesetzten Regeln sind erfüllt.</div>`;
 }
 
 // einfache CSS-Attribut-Escape-Hilfe für querySelector

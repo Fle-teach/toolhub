@@ -75,6 +75,11 @@ main {
 
 /* Download-Buttons (grün, da Export-Aktionen) */
 .btn-success {
+    /* wie .btn-primary in toolhub.css: Icon und Beschriftung als Flex-Paar */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     background: #2f9e6e;
     color: #ffffff;
     border: none;

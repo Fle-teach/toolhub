@@ -28,44 +28,39 @@
             <p class="intro">W&auml;hle den Fehlzeiten-Export aus dem Digitalen Klassenbuch (DKB) in IServ aus.
             Die Fehlstunden werden pro Sch&uuml;ler:in fachgenau ausgez&auml;hlt &ndash; inklusive
             unentschuldigter Stunden und Versp&auml;tungen.<br>
-            📥 <a href="https://goa-hh.de/iserv/fs/file/local/Groups/Kollegium/Digitales%20Klassenbuch/Fachgenaue%20Fehlzeitenübersicht%20erstellen/Anleitung%20Fehlzeiten%20herunterladen.pdf" target="_blank" rel="noopener">Anleitung: Fehlzeiten aus dem DKB in IServ herunterladen</a></p>
+            <span data-icon="download" class="inline-icon"></span> <a href="https://goa-hh.de/iserv/fs/file/local/Groups/Kollegium/Digitales%20Klassenbuch/Fachgenaue%20Fehlzeitenübersicht%20erstellen/Anleitung%20Fehlzeiten%20herunterladen.pdf" target="_blank" rel="noopener">Anleitung: Fehlzeiten aus dem DKB in IServ herunterladen</a></p>
 
             <input type="file" id="fileInput" class="file-input" accept=".xlsx">
             <div class="upload-box" id="uploadArea">
-                <div class="upload-text">📁 <strong>Fehlzeiten-Datei aus dem DKB hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
+                <span data-icon="tabelle" class="upload-icon"></span>
+                <div class="upload-text"><strong>Fehlzeiten-Datei aus dem DKB hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
                 <div class="upload-hint">Unterst&uuml;tztes Format: .xlsx (Excel-Datei)</div>
             </div>
             <div class="file-list" id="fileList"></div>
 
             <div id="processing" class="processing" style="display: none;">
-                ⏳ Verarbeite Daten...
+                <span data-icon="sanduhr" class="inline-icon"></span> Verarbeite Daten...
             </div>
 
             <div id="error" class="error" style="display: none;"></div>
         </section>
 
         <section class="panel" id="results" style="display: none;">
-            <!-- Motiv: Balkendiagramm (Auswertung) -->
-            <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M3 3v18h18"/>
-                <rect x="7" y="12" width="3" height="6"/>
-                <rect x="12" y="8" width="3" height="10"/>
-                <rect x="17" y="5" width="3" height="13"/>
-            </svg>
+            <span data-icon="diagramm" class="panel-icon"></span>
             <h2>Auswertung</h2>
 
             <div class="summary">
-                <h3>📊 Zusammenfassung</h3>
+                <h3><span data-icon="diagramm" class="inline-icon"></span> Zusammenfassung</h3>
                 <div class="summary-stats" id="summaryStats"></div>
             </div>
 
             <div class="controls">
-                <h4>🎯 Fach-Filter</h4>
+                <h4><span data-icon="filter" class="inline-icon"></span> Fach-Filter</h4>
                 <div class="subject-filters" id="subjectFilters"></div>
                 <div class="filter-buttons">
                     <button class="btn-secondary" id="selectAllBtn" type="button">Alle ausw&auml;hlen</button>
                     <button class="btn-secondary" id="deselectAllBtn" type="button">Alle abw&auml;hlen</button>
-                    <button class="btn-primary" id="exportBtn" type="button">📄 Als Excel exportieren</button>
+                    <button class="btn-primary" id="exportBtn" type="button"><span data-icon="download" class="inline-icon"></span>Als Excel exportieren</button>
                 </div>
             </div>
 

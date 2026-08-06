@@ -41,7 +41,8 @@
 
             <input type="file" id="fileInput" class="file-input" accept=".csv">
             <div class="upload-box" id="uploadBox">
-                <div class="upload-text">📁 <strong>CSV-Datei hier ablegen</strong> oder klicken zum Auswählen</div>
+                <span data-icon="tabelle" class="upload-icon"></span>
+                <div class="upload-text"><strong>CSV-Datei hier ablegen</strong> oder klicken zum Auswählen</div>
                 <div class="upload-hint">Erwartete Spalten (Trennzeichen «;»): Vorname, Nachname, „Zusätzliche Informationen“ (= Klasse), Option (= gewähltes Fach)</div>
             </div>
             <div class="file-list" id="fileList"></div>
@@ -102,7 +103,7 @@
             <div id="resultsSummary"></div>
             <div id="resultsContainer"></div>
             <div class="button-group">
-                <button class="btn-primary" id="btnExport">📄 Als Excel (.xlsx) exportieren</button>
+                <button class="btn-primary" id="btnExport"><span data-icon="download" class="inline-icon"></span>Als Excel (.xlsx) exportieren</button>
                 <button class="btn-secondary" id="btnRegenerate">Neu generieren (andere Lösung)</button>
                 <button class="btn-secondary" id="btnBackConfig">← Einstellungen ändern</button>
                 <button class="btn-secondary" id="btnReset">Alles zurücksetzen</button>

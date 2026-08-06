@@ -33,7 +33,8 @@
 
             <input type="file" id="fileInput" class="file-input" accept=".csv">
             <div class="upload-box" id="uploadBox">
-                <div class="upload-text">📁 <strong>CSV-Datei hier ablegen</strong> oder klicken zum Auswählen</div>
+                <span data-icon="tabelle" class="upload-icon"></span>
+                <div class="upload-text"><strong>CSV-Datei hier ablegen</strong> oder klicken zum Auswählen</div>
                 <div class="upload-hint">Erforderliche Spalten: Schüler, Nachname, Vorname, Alte Klasse, „Wunsch 1 - Höchste Priorität“</div>
             </div>
             <div class="file-list" id="fileList"></div>
@@ -72,7 +73,7 @@
             <div id="tableContainer"></div>
 
             <div class="button-group">
-                <button class="btn-primary" id="exportBtn">📄 Als CSV exportieren</button>
+                <button class="btn-primary" id="exportBtn"><span data-icon="download" class="inline-icon"></span>Als CSV exportieren</button>
                 <button class="btn-secondary" id="resetBtn">Zurücksetzen</button>
             </div>
         </section>

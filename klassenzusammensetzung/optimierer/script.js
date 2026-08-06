@@ -238,10 +238,12 @@ function startContinuousOptimization(students) {
         showError(initialSolutionFailureReason);
     }
 
+    // inline-flex (nicht inline-block): sonst überschriebe die Zuweisung das Flex-Layout
+    // aus toolhub.css, mit dem Icon und Beschriftung im Button ihren Abstand halten
     document.getElementById('generateBtn').style.display = 'none';
-    document.getElementById('pauseBtn').style.display = 'inline-block';
+    document.getElementById('pauseBtn').style.display = 'inline-flex';
     document.getElementById('resumeBtn').style.display = 'none';
-    document.getElementById('stopBtn').style.display = 'inline-block';
+    document.getElementById('stopBtn').style.display = 'inline-flex';
     document.getElementById('optimizationStatus').style.display = 'block';
 
     bestClasses = JSON.parse(JSON.stringify(currentClasses));
@@ -1496,7 +1498,7 @@ function stopOptimization() {
         displayClasses();
     }
 
-    document.getElementById('generateBtn').style.display = 'inline-block';
+    document.getElementById('generateBtn').style.display = 'inline-flex';
     document.getElementById('pauseBtn').style.display = 'none';
     document.getElementById('resumeBtn').style.display = 'none';
     document.getElementById('stopBtn').style.display = 'none';
@@ -1517,7 +1519,7 @@ function pauseOptimization() {
     }
 
     document.getElementById('pauseBtn').style.display = 'none';
-    document.getElementById('resumeBtn').style.display = 'inline-block';
+    document.getElementById('resumeBtn').style.display = 'inline-flex';
     showSuccess('Optimierung pausiert. Verteilungsregeln können nun verändert werden — beim Fortsetzen werden die neuen Werte berücksichtigt.');
 }
 
@@ -1534,9 +1536,9 @@ function resumeOptimization() {
     // Vollständigen Lauf-Button-Zustand setzen, damit Fortsetzen auch direkt aus dem
     // Import-Zustand (statt nur nach Pause) korrekt funktioniert.
     document.getElementById('generateBtn').style.display = 'none';
-    document.getElementById('pauseBtn').style.display = 'inline-block';
+    document.getElementById('pauseBtn').style.display = 'inline-flex';
     document.getElementById('resumeBtn').style.display = 'none';
-    document.getElementById('stopBtn').style.display = 'inline-block';
+    document.getElementById('stopBtn').style.display = 'inline-flex';
     document.getElementById('optimizationStatus').style.display = 'block';
     document.getElementById('currentScore').textContent = bestScore;
 
@@ -3207,7 +3209,7 @@ async function importClasses(event) {
         // Button-Zustand: nach dem Import "Fortsetzen" statt "Klassen generieren".
         document.getElementById('generateBtn').style.display = 'none';
         document.getElementById('pauseBtn').style.display = 'none';
-        document.getElementById('resumeBtn').style.display = 'inline-block';
+        document.getElementById('resumeBtn').style.display = 'inline-flex';
         document.getElementById('stopBtn').style.display = 'none';
         document.getElementById('optimizationStatus').style.display = 'none';
 
@@ -3238,7 +3240,7 @@ function resetAll() {
 
     // Button-Zustand zurücksetzen (z. B. falls vorher importiert wurde -> "Fortsetzen").
     optimizationRunning = false;
-    document.getElementById('generateBtn').style.display = 'inline-block';
+    document.getElementById('generateBtn').style.display = 'inline-flex';
     document.getElementById('pauseBtn').style.display = 'none';
     document.getElementById('resumeBtn').style.display = 'none';
     document.getElementById('stopBtn').style.display = 'none';

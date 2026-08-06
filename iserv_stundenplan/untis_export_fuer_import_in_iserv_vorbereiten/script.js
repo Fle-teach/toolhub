@@ -475,9 +475,13 @@ if (typeof document !== 'undefined') {
     }
 
     function aktualisiere() {
+        // Icons aus TOOLHUB_ICONS: Haken für geladen, Kreuz für fehlend
+        const stand = (geladen) => geladen
+            ? `${toolhubIcon('haken', 'inline-icon geladen')} geladen`
+            : `${toolhubIcon('kreuz', 'inline-icon fehlt')} fehlt`;
         fileStatus.innerHTML =
-            `GPU001.TXT: <strong>${gpu001Text ? '✓ geladen' : 'fehlt'}</strong> &middot; ` +
-            `GPU002.TXT: <strong>${gpu002Text ? '✓ geladen' : 'fehlt'}</strong>`;
+            `GPU001.TXT: <strong>${stand(gpu001Text)}</strong> &middot; ` +
+            `GPU002.TXT: <strong>${stand(gpu002Text)}</strong>`;
         downloadBtn.disabled = !(gpu001Text && gpu002Text);
 
         if (gpu002Text === null) return;

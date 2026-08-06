@@ -1771,21 +1771,22 @@ document.getElementById('processButton').addEventListener('click', async functio
         // Elterndaten verarbeiten
         await processParentData(mergedData);
         
-        // Download-Buttons aktivieren
-        document.getElementById('downloadSchuelerButton').style.display = 'inline-block';
+        // Download-Buttons aktivieren (inline-flex, damit Icon und Beschriftung
+        // ihren Abstand aus .btn-success behalten)
+        document.getElementById('downloadSchuelerButton').style.display = 'inline-flex';
         document.getElementById('downloadSchuelerButton').disabled = false;
-        document.getElementById('downloadElternButton').style.display = 'inline-block';
+        document.getElementById('downloadElternButton').style.display = 'inline-flex';
         document.getElementById('downloadElternButton').disabled = false;
         // Lehrer-Export Button (falls vorhanden)
         const lehrerBtn = document.getElementById('downloadLehrerButton');
         if (lehrerBtn) {
-            lehrerBtn.style.display = 'inline-block';
+            lehrerBtn.style.display = 'inline-flex';
             lehrerBtn.disabled = teacherList.length === 0;
         }
         // Kursliste-Export Button
         const kurslisteBtn = document.getElementById('downloadKurslisteButton');
         if (kurslisteBtn) {
-            kurslisteBtn.style.display = 'inline-block';
+            kurslisteBtn.style.display = 'inline-flex';
             kurslisteBtn.disabled = courseList.length === 0;
         }
         

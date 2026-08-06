@@ -34,6 +34,10 @@
     color: var(--text);
 }
 
+/* Haken/Kreuz vor "geladen" bzw. "fehlt" – die Farbe sagt den Stand auf einen Blick */
+#fileStatus .geladen { color: var(--ok); }
+#fileStatus .fehlt { color: var(--text-muted); }
+
 /* === OPTIONEN === */
 .optionen {
     position: relative;
@@ -65,6 +69,10 @@
     background: color-mix(in srgb, #d69e2e 16%, transparent);
     border: 1px solid color-mix(in srgb, #d69e2e 50%, transparent);
     border-radius: 10px;
+}
+
+#fachCsvFallback .inline-icon {
+    color: var(--warn-col);
 }
 
 #fachCsvFallback input[type="file"] {
