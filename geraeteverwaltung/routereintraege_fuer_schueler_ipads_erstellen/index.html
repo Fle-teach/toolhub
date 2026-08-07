@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Routereintr&auml;ge f&uuml;r Sch&uuml;ler-iPads &ndash; toolhub</title>
+  <link rel="stylesheet" href="../../assets/toolhub.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="../../assets/toolhub.js"></script>
+  <!-- Bibliotheken lokal eingebunden -> Tool funktioniert auch offline -->
+  <script src="../../assets/vendor/papaparse.min.js" defer></script>
+  <script src="../../assets/vendor/xlsx.full.min.js" defer></script>
+  <script src="../../assets/toolhub-io.js" defer></script>
+  <script src="../../assets/toolhub-xlsx.js" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body class="cat-geraeteverwaltung">
+
+  <header>
+    <h1>Routereintr&auml;ge f&uuml;r Sch&uuml;ler-iPads erstellen<!-- Motiv: Router mit Antennen -->
+      <svg class="title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="13" width="18" height="7" rx="2"/>
+        <path d="M6.5 16.5h.01"/>
+        <path d="M9.5 16.5h.01"/>
+        <path d="M13 16.5h4.5"/>
+        <path d="M8 13L6 8.5"/>
+        <path d="M16 13l2-4.5"/>
+      </svg>
+    </h1>
+    <p class="subtitle">Anmeldelisten der Sch&uuml;lerger&auml;te zu einer Tabelle aus Hostname, MAC und fortlaufender IP verbinden</p>
+  </header>
+
+  <main>
+
+    <section class="panel">
+      <span data-icon="geraet" class="panel-icon"></span>
+      <h2>Anmeldelisten ausw&auml;hlen</h2>
+      <p class="hint">Erwartet werden die Spalten <code>Nachname</code>, <code>Vorname</code>,
+      <code>Klasse/Information</code>, <code>Import-ID</code>, <code>Ausgef&uuml;llt am</code> und
+      <code>WLAN-Adresse</code> &ndash; also der gew&ouml;hnliche Export des Anmeldeformulars. Mehrere Dateien
+      werden zusammen ausgewertet; alles bleibt lokal im Browser.</p>
+
+      <input type="file" id="dateiInput" class="file-input" accept=".csv,.txt,.xlsx,.xls,.xlsm" multiple>
+      <div class="upload-box" id="dateiZone">
+        <span data-icon="tabelle" class="upload-icon"></span>
+        <div class="upload-text"><strong>Tabellen hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
+        <div class="upload-hint">Formate: .csv (Trennzeichen wird erkannt), .xlsx, .xls, .xlsm &ndash; mehrere Dateien m&ouml;glich</div>
+      </div>
+      <div class="file-list" id="dateiListe"></div>
+
+      <div id="ladeMeldung"></div>
+    </section>
+
+    <section class="panel">
+      <span data-icon="einstellungen" class="panel-icon"></span>
+      <h2>Jahr &amp; IP-Bereiche</h2>
+      <p class="hint">Die IPs werden je Jahrgang fortlaufend ab der Start-IP vergeben. Ein Bereich endet
+      eine Adresse vor der n&auml;chsth&ouml;heren Start-IP; der oberste Bereich endet am Ende seines
+      Adressblocks. Adressen, die auf <code>.0</code>, <code>.254</code> oder <code>.255</code> enden, werden
+      dabei &uuml;bersprungen.</p>
+
+      <div class="setting-group">
+        <div class="setting-label">Jahr im Hostnamen</div>
+        <div class="feld-zeile">
+          <label for="jahrEingabe">Jahr:</label>
+          <input type="number" id="jahrEingabe" min="2000" max="2100" step="1">
+          <span class="hinweis-klein">Steht im Hostnamen an dritter Stelle
+          (<code>S-10-2026-Mueller-M-B2W5P1</code>).</span>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-label">Start-IPs der Jahrg&auml;nge</div>
+        <div class="table-wrap">
+          <table id="bereicheTabelle">
+            <thead>
+              <tr>
+                <th>Jahrgang</th>
+                <th>Start-IP</th>
+                <th>Bereich</th>
+                <th>Adressen</th>
+                <th><span class="sr-only">Entfernen</span></th>
+              </tr>
+            </thead>
+            <tbody id="bereicheKoerper"></tbody>
+          </table>
+        </div>
+        <div class="row">
+          <button id="bereichHinzufuegenBtn" class="btn-secondary btn-small" type="button">Jahrgang hinzuf&uuml;gen</button>
+          <button id="bereicheZuruecksetzenBtn" class="btn-secondary btn-small" type="button">Standardwerte</button>
+        </div>
+        <div id="bereicheMeldung"></div>
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-label">Ausgabe</div>
+        <div class="feld-zeile">
+          <label for="trennzeichenAuswahl">Trennzeichen der CSV-Datei:</label>
+          <select id="trennzeichenAuswahl">
+            <option value=";" selected>Semikolon (;)</option>
+            <option value=",">Komma (,)</option>
+            <option value="&#9;">Tabulator</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="erzeugenBtn" class="btn-primary" type="button" disabled>Routereintr&auml;ge erzeugen</button>
+      </div>
+      <div id="erzeugenMeldung"></div>
+    </section>
+
+    <section class="panel hidden" id="ergebnisPanel">
+      <!-- Motiv: Tabelle -->
+      <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="16" rx="2"/>
+        <path d="M3 9h18"/>
+        <path d="M9 9v11"/>
+        <path d="M15 9v11"/>
+      </svg>
+      <h2>Routereintr&auml;ge</h2>
+      <div class="stats" id="statistik"></div>
+      <div id="warnungen"></div>
+      <div class="row">
+        <button id="downloadBtn" class="btn-secondary" type="button"><span data-icon="download" class="inline-icon"></span>Tabelle als CSV herunterladen</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Hostname</th>
+              <th>MAC</th>
+              <th>IP</th>
+            </tr>
+          </thead>
+          <tbody id="ergebnisKoerper"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="dublettenPanel">
+      <!-- Motiv: zwei Datensätze, von denen einer gestrichen ist -->
+      <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="13" height="7" rx="1.5"/>
+        <rect x="8" y="13" width="13" height="7" rx="1.5"/>
+        <path d="M4.5 5.5l10 8"/>
+      </svg>
+      <h2>Mehrfach angemeldete Ger&auml;te</h2>
+      <p class="hint">Gibt es zu einer Import-ID mehrere Anmeldungen, z&auml;hlt die zuletzt ausgef&uuml;llte.
+      Die Reihenfolge der IP-Vergabe richtet sich dagegen nach der <em>ersten</em> Anmeldung dieser
+      Import-ID.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Import-ID</th>
+              <th>Verworfen</th>
+              <th>Stattdessen verwendet</th>
+            </tr>
+          </thead>
+          <tbody id="dublettenKoerper"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="uebersprungenPanel">
+      <span data-icon="warnung" class="panel-icon"></span>
+      <h2>&Uuml;bersprungene Zeilen</h2>
+      <p class="hint">Diese Zeilen stehen nicht in der Ausgabe, weil eine Angabe fehlt oder nicht
+      auswertbar ist.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Datei</th>
+              <th>Zeile</th>
+              <th>Datensatz</th>
+              <th>Grund</th>
+            </tr>
+          </thead>
+          <tbody id="uebersprungenKoerper"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+</body>
+</html>

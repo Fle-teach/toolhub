@@ -1,0 +1,100 @@
+/* Tool-spezifische Ergänzungen – Grunddesign siehe assets/toolhub.css */
+
+.row {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+/* Beschriftung und Eingabefeld nebeneinander (ohne die Einrückung von .setting-sub,
+ * die dort zu einer darüberstehenden Option gehört) */
+.feld-zeile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.hinweis-klein {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Meldungen brauchen Luft zum Element darüber (leer: kein Abstand) */
+#ladeMeldung:not(:empty),
+#erzeugenMeldung:not(:empty),
+#bereicheMeldung:not(:empty) {
+  margin-top: 18px;
+}
+
+/* ----- Tabelle der IP-Bereiche ----- */
+
+#bereicheTabelle {
+  max-width: 760px;
+}
+
+.spalte-jahrgang {
+  width: 6em;
+}
+
+.spalte-start {
+  width: 11em;
+}
+
+/* Errechnete Angaben stehen ruhiger als die Eingaben daneben */
+#bereicheTabelle td.abgeleitet {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Bereich, für den die Adressen nicht reichen */
+#bereicheTabelle td.knapp {
+  color: var(--err);
+  font-weight: 700;
+}
+
+.zeile-entfernen {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.zeile-entfernen:hover {
+  color: var(--err);
+  background: color-mix(in srgb, var(--err) 12%, transparent);
+}
+
+/* ----- Ergebnis ----- */
+
+/* Technische Werte sind in Festbreitenschrift leichter zu vergleichen */
+#ergebnisKoerper td,
+#dublettenKoerper td {
+  font-family: "Consolas", "Menlo", "DejaVu Sans Mono", monospace;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+/* Fehlt die IP, ist das ein Mangel und kein leeres Feld */
+#ergebnisKoerper td.ohne-ip {
+  color: var(--err);
+  font-weight: 700;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

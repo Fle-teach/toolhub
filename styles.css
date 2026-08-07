@@ -123,6 +123,17 @@ main {
   }
   .cat-foerderkoordination:hover .card-icon .blatt-rechts { animation-delay: 0.12s; }
 
+  /* Geräteverwaltung: das Tablet funkt – die Wellen gehen nacheinander von seinem
+   * rechten Rand aus. Sie wachsen aus diesem Punkt heraus, statt an Ort und Stelle
+   * aufzugehen; deshalb liegt der Drehpunkt dort und nicht in der Mitte der Welle. */
+  .cat-geraeteverwaltung:hover .card-icon .wellen path {
+    transform-box: view-box;
+    transform-origin: 14px 12px;   /* der rechte Rand des Geräts */
+    animation: entfalten 0.6s ease-out backwards;
+  }
+  .cat-geraeteverwaltung:hover .card-icon .wellen path:nth-of-type(2) { animation-delay: 0.12s; }
+  .cat-geraeteverwaltung:hover .card-icon .wellen path:nth-of-type(3) { animation-delay: 0.24s; }
+
   /* IServ-Benutzerverwaltung: die Reihe rückt auf. Die beiden Personen des Ruhezustands
    * treten nur ab; bewegt werden ihre Doppelgänger, die am Ende wieder deckungsgleich
    * auf ihnen liegen. Deshalb fällt weder der Anfang noch das Zurückspringen auf. */

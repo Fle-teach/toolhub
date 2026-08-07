@@ -50,6 +50,15 @@ const TOOLHUB_KATEGORIEN = [
     ]
   },
   {
+    id: 'geraeteverwaltung',
+    name: 'Geräteverwaltung',
+    icon: 'geraet',
+    tools: [
+      { name: 'Routereinträge für Schüler-iPads erstellen',
+        ordner: 'routereintraege_fuer_schueler_ipads_erstellen' }
+    ]
+  },
+  {
     id: 'iserv_benutzerverwaltung',
     name: 'IServ-Benutzerverwaltung',
     icon: 'benutzer',

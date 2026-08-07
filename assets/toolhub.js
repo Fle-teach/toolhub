@@ -115,6 +115,17 @@ const TOOLHUB_ICONS = {
     '<path d="M4 18h9"/>' +
     '<path d="M17 18h3"/>' +
     '<circle cx="15" cy="18" r="2"/>',
+  // Funkendes Tablet (Geräteverwaltung). Die drei Wellen sitzen konzentrisch um den
+  // rechten Rand des Geräts (14,12) und sind die einzigen Pfade der Gruppe .wellen –
+  // auf der Startseite gehen sie von dort nacheinander nach außen (siehe styles.css).
+  geraet:
+    '<rect x="3" y="3.5" width="11" height="17" rx="2"/>' +
+    '<path d="M6.5 17.8h4"/>' +
+    '<g class="wellen">' +
+      '<path d="M15.4 10.6a2 2 0 0 1 0 2.8"/>' +
+      '<path d="M16.8 9.2a4 4 0 0 1 0 5.7"/>' +
+      '<path d="M18.2 7.8a6 6 0 0 1 0 8.5"/>' +
+    '</g>',
   // Verbundene Knoten (Gruppenzusammensetzung). Die drei Kanten sind die einzigen
   // <path> im Motiv; auf der Startseite ziehen sie sich nacheinander zwischen den
   // Knoten – jede von ihrem ersten Knoten aus (`pathLength="1"`, siehe styles.css).

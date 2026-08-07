@@ -184,9 +184,9 @@ abbestellt hat, sieht den unveränderten Ruhezustand.
 
 Neben der gemeinsamen Grundbewegung hat jede Kategorie eine eigene, die ihren Gegenstand
 aufgreift: Die Kacheln des Rasters poppen nacheinander auf, die Keimblätter entfalten sich,
-die Benutzerreihe rückt auf, die Haken werden gesetzt, das Stundenplanraster entsteht Linie
-für Linie, die Gesprächsblasen sprechen abwechselnd, die Verbindungen zwischen den Knoten
-ziehen sich, und im Klassenbuch schlägt eine Seite um.
+das Tablet funkt in drei Wellen, die Benutzerreihe rückt auf, die Haken werden gesetzt, das
+Stundenplanraster entsteht Linie für Linie, die Gesprächsblasen sprechen abwechselnd, die
+Verbindungen zwischen den Knoten ziehen sich, und im Klassenbuch schlägt eine Seite um.
 
 Die Bewegungen stehen als `@keyframes` in `styles.css`; mehrere Motive teilen sich dieselbe:
 
