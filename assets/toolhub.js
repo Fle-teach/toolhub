@@ -31,24 +31,42 @@ const TOOLHUB_ICONS = {
     '<rect x="13.5" y="3.5" width="7" height="7" rx="1.8"/>' +
     '<rect x="3.5" y="13.5" width="7" height="7" rx="1.8"/>' +
     '<rect x="13.5" y="13.5" width="7" height="7" rx="1.8"/>',
-  // Setzling / Wachstum
+  // Setzling / Wachstum. Beide Keimblätter setzen bei (12,12) am Stiel an – dort liegt
+  // auch der Drehpunkt, um den sie sich auf der Startseite entfalten.
   setzling:
     '<path d="M12 22V12"/>' +
-    '<path d="M12 12C12 8.5 9.2 6 5 6c0 4.2 2.8 6.5 7 6.5"/>' +
-    '<path d="M12 12C12 8.5 14.8 6 19 6c0 4.2-2.8 6.5-7 6.5"/>' +
+    '<path class="blatt-links" d="M12 12C12 8.5 9.2 6 5 6c0 4.2 2.8 6.5 7 6.5"/>' +
+    '<path class="blatt-rechts" d="M12 12C12 8.5 14.8 6 19 6c0 4.2-2.8 6.5-7 6.5"/>' +
     '<path d="M7 22h10"/>',
-  // Benutzergruppe
+  // Benutzergruppe. Auf der Startseite rückt die Reihe auf: Die linke Person tritt ab,
+  // die rechte nimmt ihren Platz ein, von rechts kommt eine neue hinzu. Bewegt werden
+  // dabei nicht die Personen selbst, sondern zwei Doppelgänger, die im Ruhezustand
+  // deckungsgleich auf ihnen liegen und deshalb nicht zu sehen sind – so ist sowohl der
+  // Anfang als auch das Ende der Bewegung genau dieses Icon (siehe styles.css).
   benutzer:
-    '<circle cx="9" cy="8" r="3.5"/>' +
-    '<path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/>' +
-    '<circle cx="17.5" cy="9.5" r="2.5"/>' +
-    '<path d="M16.5 14.2c2.7.4 4.8 2.8 4.8 5.8"/>',
-  // Formular mit Häkchen
+    '<g class="person-links">' +
+      '<circle cx="9" cy="8" r="3.5"/>' +
+      '<path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/>' +
+    '</g>' +
+    '<g class="person-rechts">' +
+      '<circle cx="17.5" cy="9.5" r="2.5"/>' +
+      '<path d="M16.5 14.2c2.7.4 4.8 2.8 4.8 5.8"/>' +
+    '</g>' +
+    '<g class="nachruecker">' +
+      '<circle cx="9" cy="8" r="3.5"/>' +
+      '<path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/>' +
+    '</g>' +
+    '<g class="neuzugang">' +
+      '<circle cx="17.5" cy="9.5" r="2.5"/>' +
+      '<path d="M16.5 14.2c2.7.4 4.8 2.8 4.8 5.8"/>' +
+    '</g>',
+  // Formular mit Häkchen. Die Haken werden auf der Startseite nacheinander gesetzt;
+  // `pathLength="1"` macht die Strichrechnung unabhängig von ihrer echten Länge.
   formular:
     '<rect x="5" y="3" width="14" height="18" rx="2"/>' +
-    '<path d="M8.5 9.5l1.3 1.3 2.4-2.6"/>' +
+    '<path class="haken" pathLength="1" d="M8.5 9.5l1.3 1.3 2.4-2.6"/>' +
     '<path d="M14.5 10h2"/>' +
-    '<path d="M8.5 15.5l1.3 1.3 2.4-2.6"/>' +
+    '<path class="haken spaeter" pathLength="1" d="M8.5 15.5l1.3 1.3 2.4-2.6"/>' +
     '<path d="M14.5 16h2"/>',
   // Aufgeschlagenes Buch (Klassenbuch)
   buch:
@@ -73,12 +91,13 @@ const TOOLHUB_ICONS = {
       '<path d="M14 9.4c1-.3 2-.4 3-.4"/>' +
       '<path d="M14 12.9c1-.3 2-.4 3-.4"/>' +
     '</g>',
-  // Stundenplan-Raster
+  // Stundenplan-Raster. Auf der Startseite entsteht das Raster Linie für Linie:
+  // erst die Kopfzeile, dann die Spalten (`pathLength="1"`, siehe styles.css).
   stundenplan:
     '<rect x="3" y="5" width="18" height="16" rx="2"/>' +
-    '<path d="M3 10h18"/>' +
-    '<path d="M9 10v11"/>' +
-    '<path d="M15 10v11"/>' +
+    '<path class="kopfzeile" pathLength="1" d="M3 10h18"/>' +
+    '<path class="spalte" pathLength="1" d="M9 10v11"/>' +
+    '<path class="spalte spaeter" pathLength="1" d="M15 10v11"/>' +
     '<path d="M8 3v4"/>' +
     '<path d="M16 3v4"/>',
   // Gesprächsblasen (Lernentwicklungsgespräche)
@@ -96,14 +115,16 @@ const TOOLHUB_ICONS = {
     '<path d="M4 18h9"/>' +
     '<path d="M17 18h3"/>' +
     '<circle cx="15" cy="18" r="2"/>',
-  // Verbundene Knoten (Gruppenzusammensetzung)
+  // Verbundene Knoten (Gruppenzusammensetzung). Die drei Kanten sind die einzigen
+  // <path> im Motiv; auf der Startseite ziehen sie sich nacheinander zwischen den
+  // Knoten – jede von ihrem ersten Knoten aus (`pathLength="1"`, siehe styles.css).
   knoten:
     '<circle cx="5.5" cy="6" r="2.5"/>' +
     '<circle cx="18.5" cy="6" r="2.5"/>' +
     '<circle cx="12" cy="18" r="2.5"/>' +
-    '<path d="M8 6h8"/>' +
-    '<path d="M6.8 8.2l4 7.6"/>' +
-    '<path d="M17.2 8.2l-4 7.6"/>',
+    '<path pathLength="1" d="M8 6h8"/>' +
+    '<path pathLength="1" d="M6.8 8.2l4 7.6"/>' +
+    '<path pathLength="1" d="M17.2 8.2l-4 7.6"/>',
 
   /* ----- Motive für Bedienelemente (Überschriften, Buttons, Hinweise) ----- */
 

@@ -182,9 +182,24 @@ liegt. Die Regeln stehen gesammelt in `styles.css` und gelten nur dort: Jede hä
 Alles steckt in `@media (prefers-reduced-motion: no-preference)` &ndash; wer Bewegung
 abbestellt hat, sieht den unveränderten Ruhezustand.
 
-Neben der gemeinsamen Grundbewegung kann ein Motiv eine eigene bekommen. Der bewegte Teil
-braucht dafür eine Klasse im Icon-String (`TOOLHUB_ICONS` in `toolhub.js`); gehören mehrere
-Pfade zusammen, fasst sie ein `<g>`:
+Neben der gemeinsamen Grundbewegung hat jede Kategorie eine eigene, die ihren Gegenstand
+aufgreift: Die Kacheln des Rasters poppen nacheinander auf, die Keimblätter entfalten sich,
+die Benutzerreihe rückt auf, die Haken werden gesetzt, das Stundenplanraster entsteht Linie
+für Linie, die Gesprächsblasen sprechen abwechselnd, die Verbindungen zwischen den Knoten
+ziehen sich, und im Klassenbuch schlägt eine Seite um.
+
+Die Bewegungen stehen als `@keyframes` in `styles.css`; mehrere Motive teilen sich dieselbe:
+
+| Name | Bewegung |
+| --- | --- |
+| `zeichnen` | ein Strich entsteht von seinem Anfang her (Haken, Rasterlinien, Kanten) |
+| `pochen` | kurzes Aufgehen und zurück (Rasterkacheln, Gesprächsblasen) |
+| `entfalten` | aus dem Drehpunkt heraus aufgehen, mit leichtem Überschwingen |
+| `weiterruecken`, `abtreten`, `nachruecken`, `hinzukommen` | das Aufrücken der Benutzerreihe |
+| `blaettern`, `zeile-erscheinen` | das Umschlagen im Klassenbuch (siehe unten) |
+
+Der bewegte Teil braucht dafür eine Klasse im Icon-String (`TOOLHUB_ICONS` in `toolhub.js`);
+gehören mehrere Pfade zusammen, fasst sie ein `<g>`:
 
 ```js
 '<g class="blatt">' +
@@ -222,7 +237,10 @@ Vier Punkte, die beim Klassenbuch die Arbeit gemacht haben und bei weiteren Moti
 anfallen:
 
 * Ein zusätzlicher Pfad wird **deckungsgleich** mit einem vorhandenen gezeichnet, dann fällt
-  er im Ruhezustand nirgends auf &ndash; auch nicht auf den Tool-Seiten.
+  er im Ruhezustand nirgends auf &ndash; auch nicht auf den Tool-Seiten. Soll sich etwas
+  *fortbewegen*, das am Ende wieder am Ausgangsort stehen muss, bewegt man deshalb nicht das
+  Original, sondern einen solchen Doppelgänger: Bei der Benutzergruppe blenden die beiden
+  Personen nur aus, während ihre Doppelgänger aufrücken und am Ende wieder auf ihnen liegen.
 * Anfang und Ende der Animation sollten **beide unsichtbar** sein (hier: rechte bzw. linke
   Buchhälfte), sonst springt das Motiv zurück, wenn die Animation ausläuft.
 * Ein bewegtes Teil nimmt **mit, was auf ihm steht**. Klappt nur die Kontur des Blatts um und
@@ -230,6 +248,18 @@ anfallen:
 * Was es **freigibt, darf nicht leer bleiben**: Die Ebene darunter füllt sich im selben Takt,
   sonst hat die rechte Seite mitten in der Bewegung nichts stehen. Die Zeilen sind fertig,
   sobald das Blatt hochkant steht &ndash; also nach der halben Laufzeit.
+
+Zwei Regeln für gestaffelte Bewegungen:
+
+* Beginnt eine Animation **nicht im Ruhezustand** (`zeichnen` startet unsichtbar, `entfalten`
+  klein), gehört zu jeder Verzögerung ein `backwards`. Ohne das steht das Teil während der
+  Verzögerung fertig da und verschwindet dann &ndash; sichtbar als Zucken. Bei `pochen` ist es
+  entbehrlich, weil dessen erstes Bild schon der Ruhezustand ist.
+* Für die zweite Stufe reicht eine zusätzliche Klasse `spaeter` (`class="haken spaeter"`);
+  die Verzögerung steht bei der Kategorie, damit sie sich nicht über Motive hinweg
+  gegenseitig überschreibt. Sind die bewegten Teile die **einzigen ihrer Art** im Motiv &ndash;
+  die vier `<rect>` des Rasters, die drei `<path>` der Knoten &ndash;, ist `:nth-of-type()`
+  lesbarer als mehrere gleichlautende Klassen.
 
 ## Sprache
 
