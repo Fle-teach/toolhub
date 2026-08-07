@@ -184,7 +184,7 @@ abbestellt hat, sieht den unveränderten Ruhezustand.
 
 Neben der gemeinsamen Grundbewegung hat jede Kategorie eine eigene, die ihren Gegenstand
 aufgreift: Die Kacheln des Rasters poppen nacheinander auf, die Keimblätter entfalten sich,
-das Tablet funkt in drei Wellen, die Benutzerreihe rückt auf, die Haken werden gesetzt, das
+die Funkwellen ziehen vom Tablet fort, die Benutzerreihe rückt auf, die Haken werden gesetzt, das
 Stundenplanraster entsteht Linie für Linie, die Gesprächsblasen sprechen abwechselnd, die
 Verbindungen zwischen den Knoten ziehen sich, und im Klassenbuch schlägt eine Seite um.
 
@@ -196,6 +196,7 @@ Die Bewegungen stehen als `@keyframes` in `styles.css`; mehrere Motive teilen si
 | `pochen` | kurzes Aufgehen und zurück (Rasterkacheln, Gesprächsblasen) |
 | `entfalten` | aus dem Drehpunkt heraus aufgehen, mit leichtem Überschwingen |
 | `weiterruecken`, `abtreten`, `nachruecken`, `hinzukommen` | das Aufrücken der Benutzerreihe |
+| `welle-fort`, `welle-nach` | die Funkwellen des Geräts ziehen fort, neue rücken nach |
 | `blaettern`, `zeile-erscheinen` | das Umschlagen im Klassenbuch (siehe unten) |
 
 Der bewegte Teil braucht dafür eine Klasse im Icon-String (`TOOLHUB_ICONS` in `toolhub.js`);
@@ -241,6 +242,10 @@ anfallen:
   *fortbewegen*, das am Ende wieder am Ausgangsort stehen muss, bewegt man deshalb nicht das
   Original, sondern einen solchen Doppelgänger: Bei der Benutzergruppe blenden die beiden
   Personen nur aus, während ihre Doppelgänger aufrücken und am Ende wieder auf ihnen liegen.
+  Beim Gerät sind es die Funkwellen &ndash; die vorhandenen Bögen ziehen nach rechts aus dem
+  Bild, ihre Doppelgänger entstehen am Gerät und nehmen deren Platz ein. Nur so ist schon
+  das **erste** Bild der Ruhezustand; wächst das Motiv stattdessen aus dem Nichts heran
+  (`entfalten`), fehlt es im Moment des Überfahrens.
 * Anfang und Ende der Animation sollten **beide unsichtbar** sein (hier: rechte bzw. linke
   Buchhälfte), sonst springt das Motiv zurück, wenn die Animation ausläuft.
 * Ein bewegtes Teil nimmt **mit, was auf ihm steht**. Klappt nur die Kontur des Blatts um und

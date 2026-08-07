@@ -24,6 +24,16 @@ document.documentElement.dataset.theme =
  * Startseite, Bedienelemente). Ein Motiv, das nur ein einziges Tool braucht, bleibt
  * als <svg> in dessen Seite.
  */
+/*
+ * Die drei Funkwellen des Geräte-Motivs. Sie stehen hier für sich, weil sie im Icon
+ * zweimal vorkommen: einmal als die Bögen, die man sieht, und einmal als Doppelgänger,
+ * der im Ruhezustand deckungsgleich darauf liegt (siehe `geraet`).
+ */
+const TOOLHUB_WELLEN =
+  '<path d="M15.4 10.6a2 2 0 0 1 0 2.8"/>' +
+  '<path d="M16.8 9.2a4 4 0 0 1 0 5.7"/>' +
+  '<path d="M18.2 7.8a6 6 0 0 1 0 8.5"/>';
+
 const TOOLHUB_ICONS = {
   // Vier Kacheln (Allgemeines, Verschiedenes)
   raster:
@@ -116,16 +126,15 @@ const TOOLHUB_ICONS = {
     '<path d="M17 18h3"/>' +
     '<circle cx="15" cy="18" r="2"/>',
   // Funkendes Tablet (Geräteverwaltung). Die drei Wellen sitzen konzentrisch um den
-  // rechten Rand des Geräts (14,12) und sind die einzigen Pfade der Gruppe .wellen –
-  // auf der Startseite gehen sie von dort nacheinander nach außen (siehe styles.css).
+  // rechten Rand des Geräts (14,12). Auf der Startseite ziehen sie nach rechts aus dem
+  // Bild, während am Gerät die nächsten entstehen – bewegt werden dafür zwei Sätze: die
+  // sichtbaren Bögen ziehen fort, ihre Doppelgänger rücken auf deren Platz nach und
+  // liegen am Ende wieder deckungsgleich auf ihnen (siehe styles.css).
   geraet:
     '<rect x="3" y="3.5" width="11" height="17" rx="2"/>' +
     '<path d="M6.5 17.8h4"/>' +
-    '<g class="wellen">' +
-      '<path d="M15.4 10.6a2 2 0 0 1 0 2.8"/>' +
-      '<path d="M16.8 9.2a4 4 0 0 1 0 5.7"/>' +
-      '<path d="M18.2 7.8a6 6 0 0 1 0 8.5"/>' +
-    '</g>',
+    `<g class="wellen">${TOOLHUB_WELLEN}</g>` +
+    `<g class="nachwellen">${TOOLHUB_WELLEN}</g>`,
   // Verbundene Knoten (Gruppenzusammensetzung). Die drei Kanten sind die einzigen
   // <path> im Motiv; auf der Startseite ziehen sie sich nacheinander zwischen den
   // Knoten – jede von ihrem ersten Knoten aus (`pathLength="1"`, siehe styles.css).

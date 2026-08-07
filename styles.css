@@ -123,16 +123,18 @@ main {
   }
   .cat-foerderkoordination:hover .card-icon .blatt-rechts { animation-delay: 0.12s; }
 
-  /* Geräteverwaltung: das Tablet funkt – die Wellen gehen nacheinander von seinem
-   * rechten Rand aus. Sie wachsen aus diesem Punkt heraus, statt an Ort und Stelle
-   * aufzugehen; deshalb liegt der Drehpunkt dort und nicht in der Mitte der Welle. */
+  /* Geräteverwaltung: das Tablet funkt. Die Wellen des Ruhezustands ziehen geschlossen
+   * nach rechts fort, die äußerste aus dem Bild hinaus; ihre Doppelgänger entstehen
+   * derweil am Gerät und rücken auf die frei werdenden Plätze. Weil beide Sätze
+   * dieselben drei Bögen sind, ist das erste Bild der Ruhezustand (die Doppelgänger
+   * sind noch unsichtbar) und das letzte ebenso (sie liegen wieder auf den Bögen).
+   * Verschoben statt vergrößert: eine Skalierung würde die Konturbreite mitziehen. */
   .cat-geraeteverwaltung:hover .card-icon .wellen path {
-    transform-box: view-box;
-    transform-origin: 14px 12px;   /* der rechte Rand des Geräts */
-    animation: entfalten 0.6s ease-out backwards;
+    animation: welle-fort 1.1s ease-out;
   }
-  .cat-geraeteverwaltung:hover .card-icon .wellen path:nth-of-type(2) { animation-delay: 0.12s; }
-  .cat-geraeteverwaltung:hover .card-icon .wellen path:nth-of-type(3) { animation-delay: 0.24s; }
+  .cat-geraeteverwaltung:hover .card-icon .nachwellen path {
+    animation: welle-nach 1.1s ease-out;
+  }
 
   /* IServ-Benutzerverwaltung: die Reihe rückt auf. Die beiden Personen des Ruhezustands
    * treten nur ab; bewegt werden ihre Doppelgänger, die am Ende wieder deckungsgleich
@@ -219,6 +221,24 @@ main {
   from { transform: scale(0.4); }
   70% { transform: scale(1.05); }
   to { transform: scale(1); }
+}
+
+/* Eine Welle zieht vom Gerät fort und verlässt das Bild nach rechts: 5 Einheiten reichen,
+ * damit der Bauch des äußersten Bogens (x = 20) über den Rand des viewBox hinausläuft. */
+@keyframes welle-fort {
+  from { transform: translateX(0); opacity: 1; }
+  40% { opacity: 1; }   /* erst auf dem letzten Stück ausblenden, sonst ist die Welle
+                           schon verschwunden, bevor sie den Rand erreicht */
+  to { transform: translateX(5px); opacity: 0; }
+}
+
+/* Die nächste Welle entsteht am Gerät und rückt auf den frei werdenden Platz. Sie beginnt
+ * nur 2.5 Einheiten weiter innen – weiter zurück läge sie auf dem Gerät selbst; bis sie
+ * dessen Rand erreicht hat, ist sie ohnehin noch fast durchsichtig. */
+@keyframes welle-nach {
+  from { transform: translateX(-2.5px); opacity: 0; }
+  55% { opacity: 1; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 /* Abtreten und aus dem Bild bleiben. Am Ende springen Deckkraft und Versatz zurück – das
