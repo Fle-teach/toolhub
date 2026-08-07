@@ -174,6 +174,63 @@ In Buttons stehen Icon und Beschriftung als Flex-Paar (`.btn-primary`/`.btn-seco
 `toolhub.css`). Blendet ein Skript so einen Button ein, muss es `display = 'inline-flex'`
 setzen &ndash; `'inline-block'` würde das Flex-Layout und damit den Abstand überschreiben.
 
+## Bewegte Kachel-Motive
+
+Auf der Startseite bewegt sich das Wasserzeichen einer Kachel, sobald der Zeiger darauf
+liegt. Die Regeln stehen gesammelt in `styles.css` und gelten nur dort: Jede hängt unter
+`.card:hover`, damit dieselben Motive auf den Tool-Seiten (`.panel-icon`) ruhig bleiben.
+Alles steckt in `@media (prefers-reduced-motion: no-preference)` &ndash; wer Bewegung
+abbestellt hat, sieht den unveränderten Ruhezustand.
+
+Neben der gemeinsamen Grundbewegung kann ein Motiv eine eigene bekommen. Der bewegte Teil
+braucht dafür eine Klasse im Icon-String (`TOOLHUB_ICONS` in `toolhub.js`); gehören mehrere
+Pfade zusammen, fasst sie ein `<g>`:
+
+```js
+'<g class="blatt">' +
+  '<path d="M12 6c2-1.5 4.5-2 8-2V18c-3.5 0-6 .5-8 2z"/>' +   // Kontur des Blatts
+  '<path d="M14 9.4c1-.3 2-.4 3-.4"/>' +                      // seine Zeilen
+  '<path d="M14 12.9c1-.3 2-.4 3-.4"/>' +
+'</g>'
+```
+
+```css
+.cat-iserv_klassenbuch:hover .card-icon .blatt {
+  transform-box: view-box;      /* Prozente im viewBox-System, nicht in der Bounding-Box */
+  transform-origin: 50% 50%;    /* x = 12: der Buchrücken */
+  animation: blaettern 1.1s ease-in-out;
+}
+```
+
+Was ein bewegtes Teil freigibt, gehört auf eine eigene Ebene darunter. Beim Klassenbuch sind
+das die Zeilen der rechten Seite: Sie zeichnen sich ein, während das Blatt sie freigibt &ndash;
+von rechts nach links, in der Reihenfolge, in der es sie aufdeckt. Ein `pathLength="1"` am
+Pfad macht die Strichrechnung unabhängig von der tatsächlichen Länge:
+
+```css
+.cat-iserv_klassenbuch:hover .card-icon .zeile {
+  stroke-dasharray: 1;                        /* eine Strichlänge = die ganze Zeile */
+  animation: zeile-erscheinen 1.1s ease-in-out;
+}
+@keyframes zeile-erscheinen {
+  from { stroke-dashoffset: -1; }   /* negativ: die Zeile erscheint von ihrem Ende her */
+  50%, to { stroke-dashoffset: 0; }
+}
+```
+
+Vier Punkte, die beim Klassenbuch die Arbeit gemacht haben und bei weiteren Motiven wieder
+anfallen:
+
+* Ein zusätzlicher Pfad wird **deckungsgleich** mit einem vorhandenen gezeichnet, dann fällt
+  er im Ruhezustand nirgends auf &ndash; auch nicht auf den Tool-Seiten.
+* Anfang und Ende der Animation sollten **beide unsichtbar** sein (hier: rechte bzw. linke
+  Buchhälfte), sonst springt das Motiv zurück, wenn die Animation ausläuft.
+* Ein bewegtes Teil nimmt **mit, was auf ihm steht**. Klappt nur die Kontur des Blatts um und
+  seine Zeilen bleiben liegen, wirkt das Blatt durchsichtig statt wie ein Blatt Papier.
+* Was es **freigibt, darf nicht leer bleiben**: Die Ebene darunter füllt sich im selben Takt,
+  sonst hat die rechte Seite mitten in der Bewegung nichts stehen. Die Zeilen sind fertig,
+  sobald das Blatt hochkant steht &ndash; also nach der halben Laufzeit.
+
 ## Sprache
 
 Oberfläche, Kommentare und Dokumentation auf Deutsch. Bezeichner im Code englisch, gemeinsame

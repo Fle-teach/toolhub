@@ -55,7 +55,24 @@ const TOOLHUB_ICONS = {
     '<path d="M12 6c-2-1.5-4.5-2-8-2v14c3.5 0 6 .5 8 2 2-1.5 4.5-2 8-2V4c-3.5 0-6 .5-8 2z"/>' +
     '<path d="M12 6v14"/>' +
     '<path d="M7 9c1 0 2 .1 3 .4"/>' +
-    '<path d="M14 9.4c1-.3 2-.4 3-.4"/>',
+    '<path d="M7 12.5c1 0 2 .1 3 .4"/>' +
+    // Zeilen der rechten Seite. Sie gehören zur Lage *unter* dem umschlagenden Blatt und
+    // zeichnen sich beim Umschlagen von rechts nach links ein, während das Blatt sie
+    // freigibt. Dafür `pathLength="1"`: eine Strichlänge ist damit genau eine Zeile,
+    // unabhängig von ihrer tatsächlichen Länge (siehe .zeile in styles.css).
+    '<path class="zeile" pathLength="1" d="M14 9.4c1-.3 2-.4 3-.4"/>' +
+    '<path class="zeile" pathLength="1" d="M14 12.9c1-.3 2-.4 3-.4"/>' +
+    // Umschlagendes Blatt samt seinen Zeilen: alle drei liegen deckungsgleich auf der
+    // rechten Buchhälfte und sind deshalb im Ruhezustand nicht als eigenes Blatt zu
+    // erkennen. Erst die Animation der Startseite klappt die Gruppe um den Rücken nach
+    // links, wo sie genau auf der linken Hälfte samt deren Zeilen landet – die Zeilen
+    // müssen mitwandern, sonst wirkt das Blatt beim Umschlagen durchsichtig
+    // (siehe .blatt in styles.css).
+    '<g class="blatt">' +
+      '<path d="M12 6c2-1.5 4.5-2 8-2V18c-3.5 0-6 .5-8 2z"/>' +
+      '<path d="M14 9.4c1-.3 2-.4 3-.4"/>' +
+      '<path d="M14 12.9c1-.3 2-.4 3-.4"/>' +
+    '</g>',
   // Stundenplan-Raster
   stundenplan:
     '<rect x="3" y="5" width="18" height="16" rx="2"/>' +
