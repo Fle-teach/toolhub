@@ -198,6 +198,17 @@ body {
   transition: transform 0.15s ease, border-color 0.15s ease;
 }
 
+/* Die Wortmarke im Zurück-Link ist dieselbe wie die Überschrift der Startseite:
+ * Schreibmaschinenschrift, eng gesetzt, ohne Lücke zwischen "tool" und "hub". Der
+ * Schriftgrad liegt über dem des Links, weil die Schreibmaschinenschrift kleiner
+ * wirkt als die Grundschrift daneben. */
+.back-link .wortmarke {
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -1px;
+}
+
 .back-link:hover {
   transform: scale(1.05);
   border-color: var(--text-muted);
@@ -253,8 +264,13 @@ h1 {
   margin: 0;
   /* Lange Komposita ("Klassenzusammensetzung") passen auf schmalen Displays
    * nicht in eine Zeile; ohne Umbruch wird die ganze Seite breiter als der
-   * Bildschirm. hyphens nutzt lang="de" der Seite für saubere Trennstellen. */
+   * Bildschirm. hyphens nutzt lang="de" der Seite für saubere Trennstellen.
+   *
+   * Getrennt wird aber nur, wo es Zeilen spart: toolhubUeberschriftTrennung() in
+   * toolhub.js misst das nach und schaltet die Trennung sonst wieder ab. Hier steht
+   * `auto`, damit ein zu breites Wort auch ohne Skript an einer Silbengrenze bricht. */
   overflow-wrap: break-word;
+  -webkit-hyphens: auto;
   hyphens: auto;
 }
 

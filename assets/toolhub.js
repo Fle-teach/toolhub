@@ -12,6 +12,25 @@ document.documentElement.dataset.theme =
   (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
 
 /*
+ * Seitensymbol für den Browser-Tab (assets/favicon.svg).
+ *
+ * Der Pfad wird aus dem eigenen <script src="…/assets/toolhub.js"> abgeleitet: Jede
+ * Tool-Seite liegt zwei Ebenen tiefer als die Startseite, ein fester Pfad im Markup
+ * wäre also in jeder Seite ein anderer. So steht die Einbindung an einer Stelle.
+ */
+// Leer nur dann, wenn diese Datei entgegen der Vorgabe mit defer/async geladen wird –
+// dann bleibt es beim Symbol des Browsers, statt einen falschen Pfad einzutragen.
+const TOOLHUB_ASSETS = (document.currentScript?.src || '').replace(/[^/]*$/, '');
+
+if (TOOLHUB_ASSETS && !document.querySelector('link[rel="icon"]')) {
+  const symbol = document.createElement('link');
+  symbol.rel = 'icon';
+  symbol.type = 'image/svg+xml';
+  symbol.href = `${TOOLHUB_ASSETS}favicon.svg`;
+  document.head.appendChild(symbol);
+}
+
+/*
  * Icon-Vorrat: eigene Strichzeichnungen (einfarbig, 24×24, Kontur in currentColor).
  * Sie treten an die Stelle von Emojis – die sehen je nach Betriebssystem anders aus
  * und passen farblich nicht zum übrigen Design.
@@ -350,7 +369,10 @@ function toolhubKopf() {
     const zurueck = document.createElement('a');
     zurueck.className = 'back-link';
     zurueck.href = body.dataset.zurueck || '../../index.html';
-    zurueck.innerHTML = '&#8592; <em id="h1a">tool</em><em id="h1b">hub</em>';
+    // Die beiden Hälften der Wortmarke stehen in einer gemeinsamen Hülle, damit die
+    // Lücke des Flex-Layouts nur den Pfeil abtrennt und nicht "tool" von "hub".
+    zurueck.innerHTML =
+      '&#8592; <span class="wortmarke"><em id="h1a">tool</em><em id="h1b">hub</em></span>';
     body.prepend(zurueck);
   }
 
@@ -373,10 +395,56 @@ function toolhubKopf() {
   });
 }
 
+/*
+ * Silbentrennung in Überschriften nur dort, wo sie etwas einbringt.
+ *
+ * `hyphens: auto` trennt jedes Wort, sobald die Zeile voll ist – auch dann, wenn es
+ * ungeteilt auf die nächste Zeile gepasst hätte. Dabei rutscht regelmäßig nur die
+ * letzte Silbe um ("DKB-Fehl-/zeiten nach Fä-/chern"), ohne dass die Überschrift
+ * dadurch kürzer wird; sie sieht bloß zerhackt aus.
+ *
+ * Deshalb wird gemessen statt geraten: Die Trennung bleibt nur stehen, wenn die
+ * Überschrift mit ihr weniger Zeilen braucht – oder wenn ein einzelnes Wort ohnehin
+ * breiter ist als der Platz. Im zweiten Fall muss der Browser das Wort umbrechen, und
+ * mit Trennung tut er das an einer Silbengrenze statt mitten im Wort.
+ *
+ * Weil die Antwort von der Fensterbreite abhängt, läuft die Messung nach jeder
+ * Größenänderung erneut.
+ */
+function toolhubUeberschriftTrennung(wurzel = document) {
+  wurzel.querySelectorAll('h1').forEach((titel) => {
+    const setze = (wert) => {
+      titel.style.hyphens = wert;
+      titel.style.webkitHyphens = wert;   // Safari kennt die Eigenschaft erst spät ohne Präfix
+    };
+
+    // Ohne Trennung und ohne Notumbruch: Passt das breiteste Wort überhaupt in die Zeile?
+    setze('manual');
+    titel.style.overflowWrap = 'normal';
+    const wortZuBreit = titel.scrollWidth > titel.clientWidth + 1;
+
+    // Ungetrennt, aber mit Notumbruch – so sähe die Überschrift ohne Trennung aus
+    titel.style.overflowWrap = '';
+    const hoeheOhne = titel.getBoundingClientRect().height;
+
+    setze('auto');
+    const hoeheMit = titel.getBoundingClientRect().height;
+
+    setze(wortZuBreit || hoeheMit < hoeheOhne - 1 ? 'auto' : 'manual');
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   toolhubKategorieUebernehmen();
   toolhubKopf();
   toolhubSetzeIcons();
+  toolhubUeberschriftTrennung();
+});
+
+let toolhubTrennungTimer;
+addEventListener('resize', () => {
+  clearTimeout(toolhubTrennungTimer);
+  toolhubTrennungTimer = setTimeout(toolhubUeberschriftTrennung, 150);
 });
 
 /*

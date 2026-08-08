@@ -94,7 +94,7 @@ Vor eigenen Hilfsfunktionen prüfen, ob es die Aufgabe schon gibt:
 | Datei | Inhalt |
 | --- | --- |
 | `assets/toolhub.css` | Grunddesign, Kategoriefarben, `.panel`, `.section`, `.stats`, Meldungen, Buttons, Upload, Tabellen |
-| `assets/toolhub.js` | Theme, Kopfzeile (Zurück-Link + Umschalter), Icon-Vorrat (`TOOLHUB_ICONS`), `toolhubUpload()` (Datei-Auswahl inkl. Drag-and-drop) |
+| `assets/toolhub.js` | Theme, Seitensymbol, Kopfzeile (Zurück-Link + Umschalter), Icon-Vorrat (`TOOLHUB_ICONS`), Silbentrennung der Überschriften, `toolhubUpload()` (Datei-Auswahl inkl. Drag-and-drop) |
 | `assets/tools.js` | Verzeichnis aller Kategorien und Tools, Kacheln der Startseite |
 | `assets/toolhub-io.js` | Dateien lesen, Kodierung erkennen, CSV lesen/schreiben, Downloads, Meldungen, `toolhubEscapeHtml()` |
 | `assets/toolhub-xlsx.js` | Arbeitsmappen lesen und schreiben, Spaltenbreiten, Blattnamen |
@@ -102,6 +102,7 @@ Vor eigenen Hilfsfunktionen prüfen, ob es die Aufgabe schon gibt:
 | `assets/toolhub-kurse.js` | Fachkürzel-Tabelle und Normalisierung von Fach- und Kursbezeichnungen |
 | `assets/vendor/` | PapaParse, SheetJS (`xlsx`), vis-network, JSZip |
 | `assets/fonts/` | Open Sans (woff2); die `@font-face`-Regeln stehen in `toolhub.css` |
+| `assets/favicon.svg` | Seitensymbol für den Browser-Tab; `toolhub.js` bindet es ein, kein `<link>` im Markup |
 
 Fremdbibliotheken und Schriften werden **lokal** abgelegt, nie aus einem CDN oder von Google
 Fonts geladen – die Tools müssen ohne Internetzugang funktionieren. Eine Tool-Seite bindet
@@ -126,7 +127,25 @@ sind (z. B. Legendenfarben) – ansonsten `var(--accent)`, `var(--text-muted)`, 
 
 Zurück-Link und Theme-Umschalter erzeugt `toolhub.js` selbst – kein Markup dafür in der
 Tool-Seite. Der Zurück-Link erscheint, sobald der `<body>` eine `cat-*`-Klasse trägt;
-ein abweichendes Ziel geht über `<body data-zurueck="…">`.
+ein abweichendes Ziel geht über `<body data-zurueck="…">`. Seine Wortmarke ist dieselbe
+wie die Überschrift der Startseite (Schreibmaschinenschrift, eng gesetzt, „tool" und
+„hub" ohne Lücke); die Lücke des Flex-Layouts trennt nur den Pfeil ab.
+
+Ebenso setzt `toolhub.js` das Seitensymbol (`assets/favicon.svg`) – den Pfad leitet es
+aus dem eigenen `<script src>` ab, damit er unabhängig von der Ordnertiefe stimmt.
+
+### Silbentrennung in Überschriften
+
+`hyphens: auto` trennt jedes Wort, sobald die Zeile voll ist – auch wenn es ungeteilt
+auf die nächste Zeile gepasst hätte. Dabei rutscht regelmäßig nur die letzte Silbe um
+(„IServ-Im-/port vorbereiten"), ohne dass die Überschrift kürzer wird.
+
+`toolhubUeberschriftTrennung()` misst deshalb nach und lässt die Trennung nur stehen,
+wenn sie eine Zeile spart oder ein einzelnes Wort ohnehin breiter ist als der Platz –
+sonst bräche der Browser es mitten im Wort um. Weil das Ergebnis von der Fensterbreite
+abhängt, läuft die Messung nach jeder Größenänderung erneut. In `toolhub.css` bleibt
+`hyphens: auto` als Ausgangswert stehen, damit ein zu breites Wort auch ohne Skript an
+einer Silbengrenze bricht.
 
 ## Icons statt Emojis
 

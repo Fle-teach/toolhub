@@ -1,0 +1,26 @@
+<!--
+  Seitensymbol (Browser-Tab). Ein Knotenpunkt: vier Werkzeuge, die an einer Mitte
+  hängen, links in der Farbe von "tool", rechts in der von "hub" (die Variablen
+  h1a und h1b des dunklen Designs). Die Farben stehen hier als feste Werte, weil das
+  Symbol außerhalb der Seite gezeichnet wird und keine CSS-Variablen kennt.
+
+  Der dunkle Grund gehört dazu: Ein Tab kann hell oder dunkel sein, und nur mit
+  eigenem Grund bleibt das Motiv in beiden Fällen erkennbar.
+
+  Hinweis: In XML-Kommentaren sind zwei Bindestriche hintereinander verboten, die
+  CSS-Schreibweise der Variablen darf hier also nicht stehen.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="7" fill="#0f172a"/>
+  <g stroke-width="2.6" stroke-linecap="round">
+    <path d="M16 16 9.5 9.5" stroke="#f47c7c"/>
+    <path d="M16 16 9.5 22.5" stroke="#f47c7c"/>
+    <path d="M16 16 22.5 9.5" stroke="#74b8ef"/>
+    <path d="M16 16 22.5 22.5" stroke="#74b8ef"/>
+  </g>
+  <circle cx="9.5" cy="9.5" r="3.1" fill="#f47c7c"/>
+  <circle cx="9.5" cy="22.5" r="3.1" fill="#f47c7c"/>
+  <circle cx="22.5" cy="9.5" r="3.1" fill="#74b8ef"/>
+  <circle cx="22.5" cy="22.5" r="3.1" fill="#74b8ef"/>
+  <circle cx="16" cy="16" r="4" fill="#e6edf6"/>
+</svg>
