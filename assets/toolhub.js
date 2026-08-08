@@ -6,10 +6,15 @@
  *   <script src="../../assets/toolhub.js"></script>
  */
 
-// Theme vor dem ersten Rendern setzen
-document.documentElement.dataset.theme =
-  localStorage.getItem('toolhub-theme') ||
-  (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+/*
+ * Theme vor dem ersten Rendern setzen.
+ *
+ * Beim ersten Besuch immer das dunkle Design – dafür ist das toolhub gestaltet, und
+ * die Systemeinstellung wird bewusst nicht gefragt. Wer über den Umschalter auf hell
+ * wechselt, findet seine Wahl beim nächsten Besuch wieder: toolhubKopf() legt sie
+ * unter "toolhub-theme" im localStorage ab.
+ */
+document.documentElement.dataset.theme = localStorage.getItem('toolhub-theme') || 'dark';
 
 /*
  * Seitensymbol für den Browser-Tab (assets/favicon.svg).

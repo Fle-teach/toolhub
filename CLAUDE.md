@@ -134,6 +134,10 @@ wie die Überschrift der Startseite (Schreibmaschinenschrift, eng gesetzt, „to
 Ebenso setzt `toolhub.js` das Seitensymbol (`assets/favicon.svg`) – den Pfad leitet es
 aus dem eigenen `<script src>` ab, damit er unabhängig von der Ordnertiefe stimmt.
 
+Beim ersten Besuch erscheint das toolhub **immer** im dunklen Design; die Systemeinstellung
+wird bewusst nicht abgefragt. Erst der Umschalter legt eine Wahl unter `toolhub-theme` im
+`localStorage` ab, und die gilt dann für alle weiteren Besuche.
+
 ### Silbentrennung in Überschriften
 
 `hyphens: auto` trennt jedes Wort, sobald die Zeile voll ist – auch wenn es ungeteilt
