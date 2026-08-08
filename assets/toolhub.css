@@ -331,20 +331,25 @@ h1 .inline-icon {
 
 /* ----- Motiv an der Seitenüberschrift -----
  *
- * Angeschrägt am rechten Rand der Überschrift, in der Kategoriefarbe – dieselbe
+ * Angeschrägt links neben der Überschrift, in der Kategoriefarbe – dieselbe
  * Bildsprache wie das Wasserzeichen der Panels (.panel-icon):
  *
  *   <h1><span data-kategorie-titel>Serienbrief</span><span data-icon="brief" class="title-icon"></span></h1>
  *
  * Absolut positioniert, damit es die Überschrift weder verschiebt noch aus der Mitte
- * rückt; der negative Einzug schiebt es leicht hinter das letzte Zeichen.
+ * rückt; im Markup steht es deshalb hinter dem Text, im Bild links davon.
+ *
+ * Links und nicht rechts, weil das Wasserzeichen des ersten Panels stets oben rechts
+ * sitzt: rechts stünden beide Akzentflächen fast übereinander, links tragen sie die
+ * Seite über die Diagonale.
  */
 
 /* inline-block + relative: Anker für das Motiv. Die Breitengrenze hält den Platz frei,
- * den es rechts überragt (1.8em) – doppelt, weil die zentrierte Überschrift freien Raum
+ * den es links überragt (2.2em) – doppelt, weil die zentrierte Überschrift freien Raum
  * auf beide Seiten verteilt. Ohne das würde es auf schmalen Displays am Bildschirmrand
- * abgeschnitten. Nur für Überschriften mit Motiv, damit die übrigen wie bisher die
- * volle Breite nutzen. */
+ * abgeschnitten. Mehr als diese 3.8em zu reservieren, kostet auf dem Handy eine
+ * zusätzliche Zeile Umbruch. Nur für Überschriften mit Motiv, damit die übrigen wie
+ * bisher die volle Breite nutzen. */
 h1:has(.title-icon) {
   display: inline-block;
   position: relative;
@@ -353,14 +358,15 @@ h1:has(.title-icon) {
 
 .title-icon {
   position: absolute;
-  left: 100%;
+  right: 100%;
   top: 50%;
   width: 2.3em;
   height: 2.3em;
-  margin-left: -0.5em;
-  /* im Uhrzeigersinn: das Motiv neigt sich vom Titel weg – gegenläufig geneigt
-   * schneidet seine Kante in das letzte Zeichen der Überschrift */
-  transform: translateY(-50%) rotate(9deg);
+  /* nur noch knapp überlappend statt wie früher um ein halbes Geviert: gegen den
+   * Uhrzeigersinn schwenkt die untere rechte Ecke des Motivs zum ersten Zeichen hin */
+  margin-right: -0.1em;
+  /* dieselbe Neigung wie .panel-icon und die Kacheln der Startseite */
+  transform: translateY(-50%) rotate(-8deg);
   color: var(--accent);
   /* kräftiger als das Panel-Wasserzeichen (--icon-opacity), aber schwach genug,
    * dass die Überschrift darüber lesbar bleibt */

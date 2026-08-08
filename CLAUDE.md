@@ -153,13 +153,16 @@ Markup als Platzhalter eingesetzt – die Klasse bestimmt die Größe:
 
 ```html
 <span data-icon="knoten" class="panel-icon"></span>     <!-- großes Wasserzeichen im Panel -->
-<span data-icon="brief" class="title-icon"></span>      <!-- angeschrägt hinter der Seitenüberschrift -->
+<span data-icon="brief" class="title-icon"></span>      <!-- angeschrägt links neben der Seitenüberschrift -->
 <span data-icon="download" class="inline-icon"></span>  <!-- in Button und Fließtext -->
 <span data-icon="tabelle" class="upload-icon"></span>   <!-- über der Ablagefläche -->
 ```
 
-`title-icon` gehört als letztes Kind in die `<h1>`; es ist absolut positioniert, damit die
-Überschrift mittig bleibt. Jede Tool-Seite trägt dort ein Motiv, das den **Gegenstand des
+`title-icon` gehört als letztes Kind in die `<h1>`; es ist absolut positioniert, steht im
+Bild also links neben der Überschrift, ohne sie aus der Mitte zu rücken. Es teilt die
+Neigung der Panel- und Kachel-Motive (`rotate(-8deg)`); links und nicht rechts, weil das
+Panel-Wasserzeichen stets oben rechts sitzt und beide Flächen sonst übereinander stünden.
+Jede Tool-Seite trägt dort ein Motiv, das den **Gegenstand des
 Tools** benennt (Serienbrief → `brief`, Förderlisten kombinieren → `zusammenfuehren`) &ndash;
 nicht das Kategorie-Motiv, denn das steht schon als Wasserzeichen im ersten Panel.
 
