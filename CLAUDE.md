@@ -103,6 +103,7 @@ Vor eigenen Hilfsfunktionen prüfen, ob es die Aufgabe schon gibt:
 | `assets/vendor/` | PapaParse, SheetJS (`xlsx`), vis-network, JSZip |
 | `assets/fonts/` | Open Sans (woff2); die `@font-face`-Regeln stehen in `toolhub.css` |
 | `assets/favicon.svg` | Seitensymbol für den Browser-Tab; `toolhub.js` bindet es ein, kein `<link>` im Markup |
+| `assets/goa-logo.svg` | Schulzeichen als einzelner Pfad in `currentColor` – nimmt damit jede Farbe an, die die einbindende Stelle setzt |
 
 Fremdbibliotheken und Schriften werden **lokal** abgelegt, nie aus einem CDN oder von Google
 Fonts geladen – die Tools müssen ohne Internetzugang funktionieren. Eine Tool-Seite bindet

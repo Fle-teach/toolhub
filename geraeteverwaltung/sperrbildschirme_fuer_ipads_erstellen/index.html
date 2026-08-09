@@ -82,8 +82,8 @@
           <input type="color" id="schriftFarbe" value="#ffffff">
           <input type="text" id="schriftHex" class="hex-feld" value="#ffffff" spellcheck="false"
                  aria-label="Schriftfarbe als Hex-Wert">
-          <span class="hinweis-klein">Das Logo wird unver&auml;ndert &uuml;bernommen &ndash; f&uuml;r einen dunklen
-          Hintergrund also eine helle Bilddatei w&auml;hlen.</span>
+          <span class="hinweis-klein">Gilt f&uuml;r <code>iPad</code> und die Laufnummer; die Farbe des
+          Logos steht weiter unten.</span>
         </div>
       </div>
     </section>
@@ -126,15 +126,50 @@
     <section class="panel">
       <span data-icon="bild" class="panel-icon"></span>
       <h2>Logo</h2>
-      <p class="hint">Das Logo steht mittig im unteren Drittel. Ohne Logo bleibt die Fl&auml;che dort frei.</p>
+      <p class="hint">Das Logo steht mittig im unteren Drittel und wird in ein Feld eingepasst, nicht
+      verzerrt.</p>
 
-      <input type="file" id="logoInput" class="file-input" accept=".svg,.png,.jpg,.jpeg,.webp">
-      <div class="upload-box" id="logoZone">
-        <span data-icon="bild" class="upload-icon"></span>
-        <div class="upload-text"><strong>Logo hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
-        <div class="upload-hint">Formate: .svg, .png, .jpg, .webp &ndash; am besten freigestellt (transparent)</div>
+      <div class="setting-group">
+        <div class="setting-label">Welches Logo</div>
+        <label class="radio-row">
+          <input type="radio" name="logoQuelle" value="standard" checked>
+          <span>Schulzeichen des Gymnasiums Oberalster</span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="logoQuelle" value="eigen">
+          <span>Eigenes Logo</span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="logoQuelle" value="ohne">
+          <span>Kein Logo &ndash; die Fl&auml;che bleibt frei</span>
+        </label>
       </div>
-      <div class="file-list" id="logoListe"></div>
+
+      <div id="eigenLogoBereich" class="upload-bereich hidden">
+        <input type="file" id="logoInput" class="file-input" accept=".svg,.png,.jpg,.jpeg,.webp">
+        <div class="upload-box" id="logoZone">
+          <span data-icon="bild" class="upload-icon"></span>
+          <div class="upload-text"><strong>Logo hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
+          <div class="upload-hint">Formate: .svg, .png, .jpg, .webp &ndash; am besten freigestellt (transparent)</div>
+        </div>
+        <div class="file-list" id="logoListe"></div>
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-label">Farbe</div>
+        <label class="radio-row" id="einfaerbenZeile">
+          <input type="checkbox" id="logoEinfaerben" checked>
+          <span>Logo einfarbig zeichnen</span>
+        </label>
+        <div class="setting-sub" id="logoFarbeZeile">
+          <input type="color" id="logoFarbe" value="#ffffff">
+          <input type="text" id="logoHex" class="hex-feld" value="#ffffff" spellcheck="false"
+                 aria-label="Logofarbe als Hex-Wert">
+          <span class="hinweis-klein">Gilt nur f&uuml;r SVG-Logos. Ein mehrfarbiges Logo wird dabei auf
+          eine Farbe gebracht &ndash; dann besser abw&auml;hlen. Pixelbilder (PNG, JPG) behalten immer ihre
+          eigenen Farben.</span>
+        </div>
+      </div>
 
       <div id="logoMeldung"></div>
     </section>

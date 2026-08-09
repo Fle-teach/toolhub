@@ -18,6 +18,12 @@ const hintergrundFarbe = document.getElementById('hintergrundFarbe');
 const hintergrundHex = document.getElementById('hintergrundHex');
 const schriftFarbe = document.getElementById('schriftFarbe');
 const schriftHex = document.getElementById('schriftHex');
+const eigenLogoBereich = document.getElementById('eigenLogoBereich');
+const einfaerbenZeile = document.getElementById('einfaerbenZeile');
+const logoEinfaerben = document.getElementById('logoEinfaerben');
+const logoFarbeZeile = document.getElementById('logoFarbeZeile');
+const logoFarbe = document.getElementById('logoFarbe');
+const logoHex = document.getElementById('logoHex');
 const praefix = document.getElementById('praefix');
 const startNummer = document.getElementById('startNummer');
 const endNummer = document.getElementById('endNummer');
@@ -46,8 +52,8 @@ const LAYOUT = {
   wortMitte: 1 / 3,       // "iPad" – Anteil der *Breite*
   nummerMitte: 2 / 3,     // Laufnummer – Anteil der *Breite*
   logoMitte: 0.75,        // Mitte des Logos – Anteil der *Höhe*
-  logoBreite: 0.42,       // Feld, in das das Logo eingepasst wird
-  logoHoehe: 0.2
+  logoBreite: 0.36,       // Feld, in das das Logo eingepasst wird; breit genug auch für
+  logoHoehe: 0.17         // einen querliegenden Schriftzug, hoch wie das Schulzeichen
 };
 
 /*
@@ -60,9 +66,17 @@ const VERSALHOEHE_HALB = 0.357;
 
 const SCHRIFT_URL = '../../assets/fonts/open-sans-latin-normal.woff2';
 
+// Das Schulzeichen liegt als gemeinsames Asset bereit und ist deshalb voreingestellt.
+// Es zeichnet sich in `currentColor`, nimmt die eingestellte Logofarbe also unmittelbar an.
+const STANDARDLOGO_URL = '../../assets/goa-logo.svg';
+
+// id des eingebetteten Logos im erzeugten SVG – daran hängt die Regel, die es einfärbt
+const LOGO_ID = 'logo';
+
 const zustand = {
-  logo: null,      // { name, datenUrl } des hochgeladenen Logos
-  schrift: null    // Data-URL der eingebetteten Schrift (wird einmal geladen)
+  standardlogo: null,  // Schulzeichen, beim Laden der Seite geholt
+  eigenesLogo: null,   // hochgeladenes Logo
+  schrift: null        // Data-URL der eingebetteten Schrift (wird einmal geladen)
 };
 
 // ---------------------------------------------------------------------------
@@ -137,16 +151,45 @@ function rund(wert) {
 }
 
 /*
+ * Setzt das Logo in das Feld, das für es vorgesehen ist. Beide Wege passen es dort ein,
+ * statt es zu verzerren (`preserveAspectRatio`), und beide legen seine Mitte auf die
+ * Mitte des Feldes:
+ *
+ *   Vektor  Das SVG wird als verschachteltes <svg> übernommen. Nur so lässt es sich
+ *           einfärben – über ein <image> wäre es ein eigenes Dokument, in dem weder
+ *           `currentColor` noch eine Regel von außen ankommt.
+ *   Pixel   PNG und JPG bleiben ein <image> mit dem Bild als Data-URL; ihre Farben
+ *           stehen in den Bildpunkten und sind nicht mehr zu ändern.
+ */
+function logoMarkup(logo, feld, logoId) {
+  const masze = `x="${rund(feld.x)}" y="${rund(feld.y)}" ` +
+    `width="${rund(feld.breite)}" height="${rund(feld.hoehe)}" preserveAspectRatio="xMidYMid meet"`;
+
+  if (logo.art === 'raster') return `<image ${masze} href="${xmlText(logo.datenUrl)}"/>`;
+
+  const kopie = logo.wurzel.cloneNode(true);
+  kopie.setAttribute('id', logoId);
+  ['x', 'y', 'width', 'height', 'preserveAspectRatio'].forEach((name) => kopie.removeAttribute(name));
+  const rumpf = new XMLSerializer().serializeToString(kopie);
+  return rumpf.replace(/^<svg/, `<svg ${masze}`);
+}
+
+/*
  * Erzeugt das SVG eines Sperrbildschirms.
  *
- *   text      Beschriftung rechts; ohne Angabe entsteht das reine Hintergrundbild
- *   logo      Data-URL des Logos (entfällt beim Hintergrundbild)
- *   schrift   Data-URL der eingebetteten Schriftdatei; ohne sie greift die Schrift
- *             der Umgebung – das genügt für die Vorschau innerhalb der Seite
+ *   text        Beschriftung rechts; ohne Angabe entsteht das reine Hintergrundbild
+ *   logo        eingelesenes Logo (entfällt beim Hintergrundbild)
+ *   logoFarbe   Farbe, auf die ein Vektorlogo gebracht wird; null = unverändert lassen
+ *   logoId      id des eingebetteten Logos; nur die Vorschau braucht eine eigene
+ *   schrift     Data-URL der eingebetteten Schriftdatei; ohne sie greift die Schrift
+ *               der Umgebung – das genügt für die Vorschau innerhalb der Seite
  */
-function baueSvg({ breite, hoehe, hintergrund, farbe, text, logo, schrift }) {
+function baueSvg({ breite, hoehe, hintergrund, farbe, text, logo, logoFarbe, logoId = LOGO_ID, schrift }) {
   const kurz = Math.min(breite, hoehe);
   const groesse = rund(kurz * LAYOUT.schriftgroesse);
+  const mitLogo = text !== undefined && logo;
+  const faerben = mitLogo && logo.art === 'vektor' && logoFarbe;
+  const regeln = [];
   const teile = [];
 
   teile.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${breite}" height="${hoehe}" ` +
@@ -156,11 +199,27 @@ function baueSvg({ breite, hoehe, hintergrund, farbe, text, logo, schrift }) {
     // Die Schrift steckt im SVG selbst: beim Rastern über ein <img> wäre eine
     // Datei daneben nicht erreichbar, und ein weitergegebenes SVG bliebe sonst
     // auf die Schriften des fremden Rechners angewiesen.
-    teile.push('<defs><style>' +
-      '@font-face{font-family:"Open Sans";font-style:normal;font-weight:300 800;' +
-      `src:url(${schrift}) format("woff2");}` +
-      '</style></defs>');
+    regeln.push('@font-face{font-family:"Open Sans";font-style:normal;font-weight:300 800;' +
+      `src:url(${schrift}) format("woff2");}`);
   }
+
+  if (faerben) {
+    /*
+     * Das eingebettete Logo auf eine Farbe bringen. `color` genügt allein nicht: Es
+     * greift nur bei `currentColor`, nicht bei fest eingetragenen Farbwerten. Deshalb
+     * zusätzlich zwei Regeln, die Füllung und Kontur überschreiben – "!important", weil
+     * sie sich sonst an einem style-Attribut im Logo die Zähne ausbeißen.
+     *
+     * Ausgenommen bleibt, was ausdrücklich auf "none" steht: Bei einer Strichzeichnung
+     * ist die Fläche bewusst leer, und eine Füllung würde sie zulaufen lassen.
+     */
+    const farbwert = xmlText(logoFarbe);
+    regeln.push(`#${logoId}{color:${farbwert}}`);
+    regeln.push(`#${logoId} :not([fill="none"]){fill:${farbwert} !important}`);
+    regeln.push(`#${logoId} [stroke]:not([stroke="none"]){stroke:${farbwert} !important}`);
+  }
+
+  if (regeln.length > 0) teile.push(`<defs><style>${regeln.join('')}</style></defs>`);
 
   teile.push(`<rect width="${breite}" height="${hoehe}" fill="${xmlText(hintergrund)}"/>`);
 
@@ -171,16 +230,17 @@ function baueSvg({ breite, hoehe, hintergrund, farbe, text, logo, schrift }) {
     teile.push(`<text x="${rund(breite * LAYOUT.wortMitte)}" y="${grundlinie}">${xmlText(GERAETEWORT)}</text>`);
     teile.push(`<text x="${rund(breite * LAYOUT.nummerMitte)}" y="${grundlinie}">${xmlText(text)}</text>`);
     teile.push('</g>');
+  }
 
-    if (logo) {
-      // Das Logo wird in ein Feld eingepasst (preserveAspectRatio), statt es zu
-      // verzerren – seine Mitte liegt dabei stets auf der Mitte des Feldes.
-      const feldBreite = kurz * LAYOUT.logoBreite;
-      const feldHoehe = kurz * LAYOUT.logoHoehe;
-      teile.push(`<image x="${rund((breite - feldBreite) / 2)}" y="${rund(hoehe * LAYOUT.logoMitte - feldHoehe / 2)}" ` +
-        `width="${rund(feldBreite)}" height="${rund(feldHoehe)}" ` +
-        `preserveAspectRatio="xMidYMid meet" href="${xmlText(logo)}"/>`);
-    }
+  if (mitLogo) {
+    const feldBreite = kurz * LAYOUT.logoBreite;
+    const feldHoehe = kurz * LAYOUT.logoHoehe;
+    teile.push(logoMarkup(logo, {
+      x: (breite - feldBreite) / 2,
+      y: hoehe * LAYOUT.logoMitte - feldHoehe / 2,
+      breite: feldBreite,
+      hoehe: feldHoehe
+    }, logoId));
   }
 
   teile.push('</svg>');
@@ -223,20 +283,62 @@ async function schriftEinbettung() {
   return zustand.schrift;
 }
 
+/*
+ * Bereitet ein Vektorlogo zum Einbetten vor: Aus dem Text wird das <svg>-Element, das
+ * später in jeden Sperrbildschirm kopiert wird.
+ *
+ * Weil dieses Element auch in der Vorschau *innerhalb der Seite* landet, fliegen Skripte
+ * und Ereignis-Attribute heraus. Sie wären dort ausführbarer Code aus einer fremden
+ * Datei – im fertigen Bild richten sie ohnehin nichts aus.
+ */
+function svgLogoVorbereiten(text, name) {
+  const baum = new DOMParser().parseFromString(text, 'image/svg+xml');
+  const wurzel = baum.documentElement;
+  if (baum.querySelector('parsererror') || wurzel.tagName.toLowerCase() !== 'svg') {
+    throw new Error('Die Datei enthält kein lesbares SVG.');
+  }
+
+  wurzel.querySelectorAll('script').forEach((el) => el.remove());
+  wurzel.querySelectorAll('*').forEach((el) => {
+    [...el.attributes].forEach((attribut) => {
+      if (/^on/i.test(attribut.name)) el.removeAttribute(attribut.name);
+    });
+  });
+
+  // Ohne viewBox hat das Logo kein festes Seitenverhältnis und zöge sich beim Einpassen
+  // auf das ganze Feld auseinander. Das lässt sich hier nicht heilen, aber sagen.
+  const warnung = wurzel.getAttribute('viewBox')
+    ? ''
+    : 'Das SVG-Logo hat kein viewBox-Attribut – es könnte verzerrt erscheinen. ' +
+      'Besser das viewBox in der Datei ergänzen oder ein PNG verwenden.';
+
+  return { name, art: 'vektor', wurzel, warnung };
+}
+
 async function logoEinlesen(datei) {
   const puffer = await toolhubReadArrayBuffer(datei);
   const istSvg = /\.svg$/i.test(datei.name) || datei.type === 'image/svg+xml';
-  const typ = istSvg ? 'image/svg+xml' : (datei.type || 'image/png');
 
-  // Ein SVG ohne viewBox hat kein festes Seitenverhältnis; beim Einpassen zöge es sich
-  // dann auf das ganze Feld auseinander. Das lässt sich hier nicht heilen, aber sagen.
-  let warnung = '';
-  if (istSvg && !/viewBox\s*=/.test(toolhubDecode(puffer).text)) {
-    warnung = 'Das SVG-Logo hat kein viewBox-Attribut – es könnte verzerrt erscheinen. ' +
-      'Besser eine PNG-Datei verwenden oder das viewBox ergänzen.';
-  }
+  if (istSvg) return svgLogoVorbereiten(toolhubDecode(puffer).text, datei.name);
 
-  return { name: datei.name, datenUrl: `data:${typ};base64,${base64VonPuffer(puffer)}`, warnung };
+  const typ = datei.type || 'image/png';
+  return {
+    name: datei.name,
+    art: 'raster',
+    datenUrl: `data:${typ};base64,${base64VonPuffer(puffer)}`,
+    warnung: ''
+  };
+}
+
+/*
+ * Das Schulzeichen aus assets/ – voreingestellt, damit die üblichen Sperrbildschirme
+ * ohne einen einzigen Handgriff fertig sind. Schlägt das fehl (etwa über file://),
+ * bleibt es beim leeren unteren Drittel; die Meldung sagt, woran es liegt.
+ */
+async function standardlogoLaden() {
+  const antwort = await fetch(STANDARDLOGO_URL);
+  if (!antwort.ok) throw new Error(`nicht gefunden (${antwort.status})`);
+  return svgLogoVorbereiten(await antwort.text(), 'goa-logo.svg');
 }
 
 // ---------------------------------------------------------------------------
@@ -248,9 +350,42 @@ async function logoEinlesen(datei) {
  * gewählt – das Hintergrundbild. Sie steht in der Seite und kommt deshalb ohne die
  * eingebettete Schrift aus.
  */
+/*
+ * Das Logo, mit dem gearbeitet wird – je nach Auswahl das Schulzeichen, ein eigenes
+ * oder keines. Ein eigenes, das (noch) nicht ausgewählt ist, bleibt dabei erhalten:
+ * Wer zwischen den Möglichkeiten hin und her springt, muss es nicht neu hochladen.
+ */
+function aktuellesLogo() {
+  switch (auswahl('logoQuelle')) {
+    case 'standard': return zustand.standardlogo;
+    case 'eigen': return zustand.eigenesLogo;
+    default: return null;
+  }
+}
+
+// Alles, was für jeden Sperrbildschirm gleich ist – Vorschau und Ausgabe teilen es sich
+function bildEinstellungen() {
+  return {
+    ...masse(),
+    hintergrund: hintergrundFarbe.value,
+    farbe: schriftFarbe.value,
+    logo: aktuellesLogo(),
+    logoFarbe: logoEinfaerben.checked ? logoFarbe.value : null
+  };
+}
+
 function aktualisiereVorschau() {
   eigenZeile.classList.toggle('disabled', auswahl('aufloesung') !== 'eigen');
   eigenBreite.disabled = eigenHoehe.disabled = auswahl('aufloesung') !== 'eigen';
+
+  // Einfärben ist eine Sache der Vektorlogos; ohne Logo und bei Pixelbildern grau
+  const logo = aktuellesLogo();
+  const faerbbar = Boolean(logo) && logo.art === 'vektor';
+  eigenLogoBereich.classList.toggle('hidden', auswahl('logoQuelle') !== 'eigen');
+  einfaerbenZeile.classList.toggle('disabled', !faerbbar);
+  logoEinfaerben.disabled = !faerbbar;
+  logoFarbeZeile.classList.toggle('disabled', !faerbbar || !logoEinfaerben.checked);
+  logoFarbe.disabled = logoHex.disabled = !faerbbar || !logoEinfaerben.checked;
 
   const { breite, hoehe } = masse();
   const { liste, fehler } = beschriftungen();
@@ -278,22 +413,20 @@ function aktualisiereVorschau() {
       <p>${mitHintergrundbild.checked ? 'mit Hintergrundbild' : 'ohne Hintergrundbild'}</p>
     </div>`;
 
-  const gemeinsam = {
-    breite,
-    hoehe,
-    hintergrund: hintergrundFarbe.value,
-    farbe: schriftFarbe.value,
-    logo: zustand.logo ? zustand.logo.datenUrl : null
-  };
-
   const bilder = [];
   if (anzahl > 0) bilder.push({ titel: `${GERAETEWORT} ${liste[0]}`, text: liste[0] });
   if (anzahl > 1) bilder.push({ titel: `${GERAETEWORT} ${liste[anzahl - 1]}`, text: liste[anzahl - 1] });
   if (mitHintergrundbild.checked) bilder.push({ titel: 'Hintergrundbild', text: undefined });
 
-  vorschauGitter.innerHTML = bilder.map((bild) => `
+  vorschauGitter.innerHTML = bilder.map((bild, i) => `
     <figure class="vorschau">
-      <div class="vorschau-bild">${baueSvg({ ...gemeinsam, text: bild.text })}</div>
+      <div class="vorschau-bild">${baueSvg({
+        ...bildEinstellungen(),
+        text: bild.text,
+        // Die Vorschauen stehen in derselben Seite: eine eigene id je Bild, damit die
+        // Regel zum Einfärben nicht auf die Logos der Nachbarn übergreift
+        logoId: `logo-vorschau-${i}`
+      })}</div>
       <figcaption>${toolhubEscapeHtml(bild.titel)}</figcaption>
     </figure>`).join('');
 }
@@ -366,15 +499,7 @@ erzeugenBtn.addEventListener('click', async () => {
   toolhubMessage(erzeugenMeldung, 'Sperrbildschirme werden erzeugt …', 'info', 'sanduhr');
 
   try {
-    const schrift = await schriftEinbettung();
-    const gemeinsam = {
-      breite,
-      hoehe,
-      hintergrund: hintergrundFarbe.value,
-      farbe: schriftFarbe.value,
-      logo: zustand.logo ? zustand.logo.datenUrl : null,
-      schrift
-    };
+    const gemeinsam = { ...bildEinstellungen(), schrift: await schriftEinbettung() };
 
     const aufgaben = liste.map((text) => ({ text, name: `${GERAETEWORT}-${text}` }));
     if (mitHintergrundbild.checked) aufgaben.push({ text: undefined, name: 'Hintergrund' });
@@ -438,18 +563,18 @@ function farbePaaren(waehler, feld) {
 
 farbePaaren(hintergrundFarbe, hintergrundHex);
 farbePaaren(schriftFarbe, schriftHex);
+farbePaaren(logoFarbe, logoHex);
 
 [eigenBreite, eigenHoehe, praefix, startNummer, endNummer].forEach((feld) => {
   feld.addEventListener('input', aktualisiereVorschau);
 });
 
-[fuehrendeNullen, mitHintergrundbild].forEach((feld) => {
+[fuehrendeNullen, mitHintergrundbild, logoEinfaerben].forEach((feld) => {
   feld.addEventListener('change', aktualisiereVorschau);
 });
 
-document.querySelectorAll('input[name="aufloesung"], input[name="ausrichtung"]').forEach((feld) => {
-  feld.addEventListener('change', aktualisiereVorschau);
-});
+document.querySelectorAll('input[name="aufloesung"], input[name="ausrichtung"], input[name="logoQuelle"]')
+  .forEach((feld) => feld.addEventListener('change', aktualisiereVorschau));
 
 toolhubUpload({
   input: 'logoInput',
@@ -460,20 +585,20 @@ toolhubUpload({
     `Kein Bildformat: ${namen.join(', ')} – erwartet werden .svg, .png, .jpg oder .webp.`, 'error', 'kreuz'),
   onChange: async (dateien) => {
     if (dateien.length === 0) {
-      zustand.logo = null;
+      zustand.eigenesLogo = null;
       toolhubMessage(logoMeldung, '');
       aktualisiereVorschau();
       return;
     }
 
     try {
-      zustand.logo = await logoEinlesen(dateien[0]);
+      zustand.eigenesLogo = await logoEinlesen(dateien[0]);
       toolhubMessage(logoMeldung,
-        zustand.logo.warnung || `Logo „${zustand.logo.name}“ übernommen.`,
-        zustand.logo.warnung ? 'warn' : 'success',
-        zustand.logo.warnung ? 'warnung' : 'haken');
+        zustand.eigenesLogo.warnung || `Logo „${zustand.eigenesLogo.name}“ übernommen.`,
+        zustand.eigenesLogo.warnung ? 'warn' : 'success',
+        zustand.eigenesLogo.warnung ? 'warnung' : 'haken');
     } catch (ausnahme) {
-      zustand.logo = null;
+      zustand.eigenesLogo = null;
       toolhubMessage(logoMeldung, `Logo konnte nicht gelesen werden: ${ausnahme.message}`, 'error', 'kreuz');
     }
     aktualisiereVorschau();
@@ -481,3 +606,14 @@ toolhubUpload({
 });
 
 aktualisiereVorschau();
+
+// Das voreingestellte Schulzeichen kommt nach: Die Vorschau steht schon, sobald es da
+// ist, wird sie ein zweites Mal gezeichnet.
+standardlogoLaden().then((logo) => {
+  zustand.standardlogo = logo;
+  aktualisiereVorschau();
+}).catch((ausnahme) => {
+  toolhubMessage(logoMeldung,
+    `Das Schulzeichen (${STANDARDLOGO_URL}) ließ sich nicht laden: ${ausnahme.message}. ` +
+    'Ein eigenes Logo lässt sich weiterhin hochladen.', 'warn', 'warnung');
+});

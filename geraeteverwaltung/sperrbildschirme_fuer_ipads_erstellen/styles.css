@@ -32,6 +32,25 @@
   margin-top: 18px;
 }
 
+/* Eine Option, die gerade nicht greift – gedämpft wie .setting-sub.disabled in
+ * toolhub.css, wo es diesen Zustand für die Zusatzangabe schon gibt */
+.radio-row.disabled {
+  opacity: 0.5;
+}
+
+/* ----- Logo ----- */
+
+.upload-bereich:not(.hidden) {
+  margin: 18px 0;
+}
+
+/* Meist ist der Upload-Bereich ausgeblendet; dann stehen die beiden Gruppen um ihn
+ * herum nicht nebeneinander und .setting-group + .setting-group aus toolhub.css
+ * greift nicht – die Farbwahl klebte sonst an der Logo-Auswahl darüber. */
+.upload-bereich + .setting-group {
+  margin-top: 22px;
+}
+
 /* ----- Farbwahl ----- */
 
 input[type="color"] {
