@@ -188,6 +188,11 @@ const TOOLHUB_ICONS = {
     '<path d="M3 9h18"/>' +
     '<path d="M3 14.5h18"/>' +
     '<path d="M9.5 9v11"/>',
+  // Bildrahmen mit Sonne und Horizont (Grafiken, Logos)
+  bild:
+    '<rect x="3" y="4" width="18" height="16" rx="2"/>' +
+    '<circle cx="8.5" cy="9.5" r="1.7"/>' +
+    '<path d="M4 17.2l4.6-4.6 3 3L15 12l5 5"/>',
   // Auge (Vorschau)
   auge:
     '<path d="M2.5 12S6.4 5.8 12 5.8 21.5 12 21.5 12 17.6 18.2 12 18.2 2.5 12 2.5 12z"/>' +

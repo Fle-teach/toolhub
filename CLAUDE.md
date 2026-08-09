@@ -164,7 +164,7 @@ Damit gleiche Aktionen in allen Tools gleich aussehen:
 | --- | --- |
 | Herunterladen, Exportieren | `download` &ndash; unabhängig vom Dateiformat |
 | Importieren, Hochladen (Button) | `upload` |
-| Ablagefläche (`.upload-box`) | nach erwarteter Dateiart: `tabelle` (CSV/XLSX), `dokument` (DOCX/ODT/TXT) |
+| Ablagefläche (`.upload-box`) | nach erwarteter Dateiart: `tabelle` (CSV/XLSX), `dokument` (DOCX/ODT/TXT), `bild` (SVG/PNG/JPG) |
 | Meldungen | `haken` (erledigt), `kreuz` (fehlt), `warnung` |
 
 Ausnahme sind Zeichen, die eine Bedeutung *tragen* statt sie nur zu bebildern: die Emojis,

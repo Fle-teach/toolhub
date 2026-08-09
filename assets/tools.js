@@ -55,7 +55,9 @@ const TOOLHUB_KATEGORIEN = [
     icon: 'geraet',
     tools: [
       { name: 'Routereinträge für Schüler-iPads erstellen',
-        ordner: 'routereintraege_fuer_schueler_ipads_erstellen' }
+        ordner: 'routereintraege_fuer_schueler_ipads_erstellen' },
+      { name: 'Sperrbildschirme für iPads erstellen',
+        ordner: 'sperrbildschirme_fuer_ipads_erstellen' }
     ]
   },
   {

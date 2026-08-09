@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sperrbildschirme f&uuml;r iPads erstellen &ndash; toolhub</title>
+  <link rel="stylesheet" href="../../assets/toolhub.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="../../assets/toolhub.js"></script>
+  <!-- Bibliotheken lokal eingebunden -> Tool funktioniert auch offline -->
+  <script src="../../assets/vendor/jszip.min.js" defer></script>
+  <script src="../../assets/toolhub-io.js" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body class="cat-geraeteverwaltung">
+
+  <header>
+    <h1>Sperrbildschirme f&uuml;r iPads erstellen<!-- Motiv: Tablet mit Schloss -->
+      <svg class="title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="2" y="4.5" width="20" height="15" rx="2.5"/>
+        <path d="M10.2 11.4v-1.1a1.8 1.8 0 0 1 3.6 0v1.1"/>
+        <rect x="9" y="11.4" width="6" height="4.6" rx="1.2"/>
+      </svg>
+    </h1>
+    <p class="subtitle">Einfarbige Sperrbildschirme mit fortlaufender Ger&auml;tenummer und Schullogo &ndash; als SVG oder PNG im ZIP-Archiv</p>
+  </header>
+
+  <main>
+
+    <section class="panel">
+      <span data-icon="geraet" class="panel-icon"></span>
+      <h2>Format &amp; Farben</h2>
+      <p class="hint">Die Aufl&ouml;sung bestimmt die Gr&ouml;&szlig;e der erzeugten Bilder, die Ausrichtung ordnet
+      ihre beiden Werte an: im Querformat liegt die l&auml;ngere Kante waagerecht, im Hochformat senkrecht.
+      Alles wird im Browser gerechnet &ndash; nichts verl&auml;sst dieses Ger&auml;t.</p>
+
+      <div class="setting-group">
+        <div class="setting-label">Aufl&ouml;sung</div>
+        <label class="radio-row">
+          <input type="radio" name="aufloesung" value="ohneHomebutton" checked>
+          <span>2360 &times; 1640 &ndash; iPads ohne Home-Button</span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="aufloesung" value="mitHomebutton">
+          <span>2160 &times; 1620 &ndash; iPads mit Home-Button</span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="aufloesung" value="eigen">
+          <span>Benutzerdefiniert</span>
+        </label>
+        <div class="setting-sub" id="eigenZeile">
+          <label for="eigenBreite">Breite:</label>
+          <input type="number" id="eigenBreite" value="2360" min="16" max="10000" step="1">
+          <label for="eigenHoehe">H&ouml;he:</label>
+          <input type="number" id="eigenHoehe" value="1640" min="16" max="10000" step="1">
+          <span class="hinweis-klein">Pixel</span>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-label">Ausrichtung</div>
+        <label class="radio-row">
+          <input type="radio" name="ausrichtung" value="quer" checked>
+          <span>Querformat</span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="ausrichtung" value="hoch">
+          <span>Hochformat</span>
+        </label>
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-label">Farben</div>
+        <div class="feld-zeile">
+          <label for="hintergrundFarbe">Hintergrund:</label>
+          <input type="color" id="hintergrundFarbe" value="#33693f">
+          <input type="text" id="hintergrundHex" class="hex-feld" value="#33693f" spellcheck="false"
+                 aria-label="Hintergrundfarbe als Hex-Wert">
+        </div>
+        <div class="feld-zeile">
+          <label for="schriftFarbe">Schrift:</label>
+          <input type="color" id="schriftFarbe" value="#ffffff">
+          <input type="text" id="schriftHex" class="hex-feld" value="#ffffff" spellcheck="false"
+                 aria-label="Schriftfarbe als Hex-Wert">
+          <span class="hinweis-klein">Das Logo wird unver&auml;ndert &uuml;bernommen &ndash; f&uuml;r einen dunklen
+          Hintergrund also eine helle Bilddatei w&auml;hlen.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <!-- Motiv: Nummernzeichen (die Laufnummer der Geräte) -->
+      <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9.8 3.5L7.6 20.5"/>
+        <path d="M16.4 3.5l-2.2 17"/>
+        <path d="M4.6 9h15"/>
+        <path d="M3.9 15h15"/>
+      </svg>
+      <h2>Beschriftung</h2>
+      <p class="hint">Links steht immer das Wort <code>iPad</code>, rechts die Laufnummer. Erzeugt wird ein
+      Sperrbildschirm je Nummer von der Start- bis zur Endnummer.</p>
+
+      <div class="setting-group">
+        <div class="setting-label">Laufnummer</div>
+        <div class="feld-zeile">
+          <label for="praefix">Pr&auml;fix:</label>
+          <input type="text" id="praefix" value="" size="10" spellcheck="false" autocomplete="off">
+          <span class="hinweis-klein">steht unver&auml;ndert vor der Nummer &ndash; <code>C&nbsp;</code> mit
+          Leerzeichen am Ende ergibt <code>C 13</code></span>
+        </div>
+        <div class="feld-zeile">
+          <label for="startNummer">Start:</label>
+          <input type="number" id="startNummer" value="1" min="0" max="99999" step="1">
+          <label for="endNummer">Ende:</label>
+          <input type="number" id="endNummer" value="15" min="0" max="99999" step="1">
+        </div>
+        <label class="radio-row">
+          <input type="checkbox" id="fuehrendeNullen" checked>
+          <span>Laufnummer mit f&uuml;hrenden Nullen auff&uuml;llen (01, 02, &hellip; 15)</span>
+        </label>
+      </div>
+
+      <div id="nummernMeldung"></div>
+    </section>
+
+    <section class="panel">
+      <span data-icon="bild" class="panel-icon"></span>
+      <h2>Logo</h2>
+      <p class="hint">Das Logo steht mittig im unteren Drittel. Ohne Logo bleibt die Fl&auml;che dort frei.</p>
+
+      <input type="file" id="logoInput" class="file-input" accept=".svg,.png,.jpg,.jpeg,.webp">
+      <div class="upload-box" id="logoZone">
+        <span data-icon="bild" class="upload-icon"></span>
+        <div class="upload-text"><strong>Logo hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
+        <div class="upload-hint">Formate: .svg, .png, .jpg, .webp &ndash; am besten freigestellt (transparent)</div>
+      </div>
+      <div class="file-list" id="logoListe"></div>
+
+      <div id="logoMeldung"></div>
+    </section>
+
+    <section class="panel">
+      <span data-icon="auge" class="panel-icon"></span>
+      <h2>Vorschau</h2>
+
+      <div class="stats" id="statistik"></div>
+      <div class="vorschau-gitter" id="vorschauGitter"></div>
+    </section>
+
+    <section class="panel">
+      <span data-icon="download" class="panel-icon"></span>
+      <h2>Herunterladen</h2>
+      <p class="hint">Alle Sperrbildschirme kommen zusammen in ein ZIP-Archiv.</p>
+
+      <div class="setting-group">
+        <div class="setting-label">Dateiformat</div>
+        <label class="radio-row">
+          <input type="radio" name="format" value="png" checked>
+          <span>PNG &ndash; fertiges Pixelbild in der eingestellten Aufl&ouml;sung</span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="format" value="svg">
+          <span>SVG &ndash; verlustfrei skalierbar, zum Weiterbearbeiten (Schrift ist eingebettet)</span>
+        </label>
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-label">Zus&auml;tzlich</div>
+        <label class="radio-row">
+          <input type="checkbox" id="mitHintergrundbild" checked>
+          <span>Einfarbiges Hintergrundbild ohne Text und Logo erzeugen</span>
+        </label>
+      </div>
+
+      <div class="row">
+        <button id="erzeugenBtn" class="btn-primary" type="button">
+          <span data-icon="download" class="inline-icon"></span>Sperrbildschirme als ZIP herunterladen
+        </button>
+      </div>
+      <div id="erzeugenMeldung"></div>
+    </section>
+
+  </main>
+
+</body>
+</html>

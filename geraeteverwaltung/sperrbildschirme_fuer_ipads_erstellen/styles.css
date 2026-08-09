@@ -1,0 +1,94 @@
+/* Tool-spezifische Ergänzungen – Grunddesign siehe assets/toolhub.css */
+
+.row {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+/* Beschriftung und Eingabefeld nebeneinander (ohne die Einrückung von .setting-sub,
+ * die dort zu einer darüberstehenden Option gehört) */
+.feld-zeile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.hinweis-klein {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Meldungen brauchen Luft zum Element darüber (leer: kein Abstand) */
+#nummernMeldung:not(:empty),
+#logoMeldung:not(:empty),
+#erzeugenMeldung:not(:empty) {
+  margin-top: 18px;
+}
+
+/* ----- Farbwahl ----- */
+
+input[type="color"] {
+  width: 46px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  cursor: pointer;
+}
+
+/* Der Farbwert ist eine technische Angabe – in Festbreitenschrift bleibt die Feldbreite
+ * bei jedem Wert gleich */
+.hex-feld {
+  width: 8em;
+  font-family: "Consolas", "Menlo", "DejaVu Sans Mono", monospace;
+  text-transform: lowercase;
+}
+
+/* ----- Vorschau ----- */
+
+/* Die Auflösung ist zu lang für die Ziffernhöhe der übrigen Karten */
+.stat-card.klein .value {
+  font-size: 1.35rem;
+  padding: 0.35em 0;
+}
+
+.vorschau-gitter {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+}
+
+.vorschau {
+  margin: 0;
+}
+
+/* Rahmen und abgerundete Ecken deuten das Gerät an; ohne sie verschwämme ein heller
+ * Sperrbildschirm mit dem Panel dahinter */
+.vorschau-bild {
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.vorschau-bild svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.vorschau figcaption {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+}
