@@ -23,6 +23,9 @@ if (typeof require !== 'undefined' && typeof toolhubNormalisiereFach === 'undefi
 //    Parallelkurse und bleiben erhalten.
 //  - fachNormalisieren: Fachkürzel in der Kursbezeichnung werden anhand von
 //    fachkuerzel.csv (aus assets/) vereinheitlicht.
+//  - kursPraefix: den Kursbezeichnungen wird "Kurs " vorangestellt.
+//  - bereitschaftKlasse: in GPU001 erhalten Bereitschaftsstunden (Fach "BER") dieselbe
+//    Kennung als Klasse, sonst zeigt IServ sie mangels Klasse nicht an.
 
 const FELD_UNR = 0;
 const FELD_KLASSE = 4;
@@ -32,6 +35,7 @@ const FELD_SCHUELERGRUPPE = 41;
 
 // GPU001: eine Zeile pro Unterrichtsnummer, Kopplungszeile (Lehrer/Fach) und Einzelstunde.
 const GPU001_UNR = 0;
+const GPU001_KLASSE = 1;
 const GPU001_LEHRER = 2;
 const GPU001_FACH = 3;
 const GPU001_TAG = 5;
@@ -39,6 +43,14 @@ const GPU001_STUNDE = 6;
 
 const OBERSTUFEN_KLASSEN = new Set(['11', '12']);
 const WOCHENTAGE = [null, 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+// Fach der Bereitschaftsstunden. Sie stehen in Untis ohne Klasse; IServ zeigt Stunden
+// ohne Klasse aber nicht an, deshalb kann dieselbe Kennung als künstliche Klasse dienen.
+const BEREITSCHAFT = 'BER';
+
+// Vorangestellte Kennzeichnung der Kursbezeichnungen, damit Kurse in IServ auf einen
+// Blick von Klassen zu unterscheiden sind.
+const KURS_PRAEFIX = 'Kurs ';
 
 // Zerlegt eine CSV-Zeile in ihre Roh-Felder (inkl. Anführungszeichen),
 // damit die Zeile später unverändert wieder zusammengesetzt werden kann.
@@ -92,6 +104,27 @@ function parseGPU001(text) {
         map.get(key).add(unquote(raw[GPU001_TAG]) + ',' + unquote(raw[GPU001_STUNDE]));
     }
     return map;
+}
+
+// Trägt bei Bereitschaftsstunden (Fach "BER") dieselbe Kennung als Klasse ein.
+// Untis lässt die Klasse dort leer; IServ zeigt Stunden ohne Klasse jedoch nicht an.
+function transformiereGPU001(text, optionen = {}) {
+    const { bereitschaftKlasse = false } = optionen;
+    if (!bereitschaftKlasse) return { inhalt: text, geaenderteZeilen: 0 };
+
+    const zeilenumbruch = text.includes('\r\n') ? '\r\n' : '\n';
+    let geaenderteZeilen = 0;
+    const ausgabe = text.split(/\r?\n/).map((line) => {
+        if (line.trim() === '') return line;
+        const raw = splitRaw(line);
+        if (raw.length <= GPU001_FACH) return line;
+        if (unquote(raw[GPU001_FACH]).toUpperCase() !== BEREITSCHAFT) return line;
+        raw[GPU001_KLASSE] = quote(BEREITSCHAFT);
+        geaenderteZeilen++;
+        return raw.join(',');
+    });
+
+    return { inhalt: ausgabe.join(zeilenumbruch), geaenderteZeilen };
 }
 
 // Baut die Zeitangabe eines Kurses aus seinen Einzelstunden, z. B. "Di 1.+2." oder
@@ -186,6 +219,7 @@ function normalisiereGPU002(text, optionen = {}) {
     const {
         nurKlassenuebergreifend = false,
         fachNormalisieren = false,
+        kursPraefix = false,
         fachMap = null,
         gpu001Map = null,
     } = optionen;
@@ -222,7 +256,9 @@ function normalisiereGPU002(text, optionen = {}) {
             mapping.set(alt, { neu: null, unterschieden: false, entfernt: true });
             continue;
         }
-        const basis = basisName(zeilenGruppe, fachNormalisieren ? fachMap : null);
+        // Der Präfix gehört zum Basis-Namen, damit Zeitangabe und laufende Nummer
+        // dahinter stehen ("Kurs 11-12 Lat Se (Di 1.+2.)").
+        const basis = (kursPraefix ? KURS_PRAEFIX : '') + basisName(zeilenGruppe, fachNormalisieren ? fachMap : null);
         if (!basisZuAlt.has(basis)) basisZuAlt.set(basis, []);
         basisZuAlt.get(basis).push(alt);
     }
@@ -390,6 +426,7 @@ if (typeof document !== 'undefined') {
     let gpu001Text = null;
     let gpu001Bytes = null; // Original für das ZIP-Archiv
     let ergebnis = null;
+    let gpu001Ergebnis = null;
     let erkannteKodierung = null;
     let fachMap = null;
 
@@ -404,6 +441,8 @@ if (typeof document !== 'undefined') {
     const mappingBody = document.getElementById('mappingBody');
     const optKlassenuebergreifend = document.getElementById('optKlassenuebergreifend');
     const optFachNormalisieren = document.getElementById('optFachNormalisieren');
+    const optKursPraefix = document.getElementById('optKursPraefix');
+    const optBereitschaft = document.getElementById('optBereitschaft');
     const fachCsvFallback = document.getElementById('fachCsvFallback');
     const fachCsvInput = document.getElementById('fachCsvInput');
 
@@ -439,6 +478,8 @@ if (typeof document !== 'undefined') {
     fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
     optKlassenuebergreifend.addEventListener('change', aktualisiere);
     optFachNormalisieren.addEventListener('change', aktualisiere);
+    optKursPraefix.addEventListener('change', aktualisiere);
+    optBereitschaft.addEventListener('change', aktualisiere);
 
     // Unterscheidet GPU001 (9 Felder) und GPU002 (47 Felder) anhand der Spaltenzahl;
     // der Dateiname dient nur als Rückfallebene.
@@ -497,9 +538,13 @@ if (typeof document !== 'undefined') {
                     'über ihre Unterrichtszeiten unterschieden, und der ZIP-Download ist noch nicht möglich.');
             }
             warnDiv.textContent = hinweise.join(' ');
+            gpu001Ergebnis = gpu001Text !== null
+                ? transformiereGPU001(gpu001Text, { bereitschaftKlasse: optBereitschaft.checked })
+                : null;
             ergebnis = normalisiereGPU002(gpu002Text, {
                 nurKlassenuebergreifend: optKlassenuebergreifend.checked,
                 fachNormalisieren: optFachNormalisieren.checked,
+                kursPraefix: optKursPraefix.checked,
                 fachMap,
                 gpu001Map: gpu001Text !== null ? parseGPU001(gpu001Text) : null,
             });
@@ -524,7 +569,11 @@ if (typeof document !== 'undefined') {
             `behalten: <strong>${behalten.length}</strong> (umbenannt: ${geaendert.length}, ` +
             `mit Unterscheidungszusatz: ${unterschieden.length}) &middot; ` +
             `entfernt: <strong>${entfernt.length}</strong> (${ergebnis.entfernteZeilen} Zeilen)</p>` +
-            `<p>Erkannte Kodierung: ${erkannteKodierung} (GPU002 im ZIP als UTF-8, GPU001 unverändert)</p>`;
+            (gpu001Ergebnis && gpu001Ergebnis.geaenderteZeilen > 0
+                ? `<p>GPU001: <strong>${gpu001Ergebnis.geaenderteZeilen}</strong> Bereitschaftsstunden ` +
+                  `der Klasse <code>${BEREITSCHAFT}</code> zugeordnet</p>`
+                : '') +
+            `<p>Erkannte Kodierung: ${erkannteKodierung} (Ausgabe im ZIP als UTF-8)</p>`;
 
         unterschieden.sort((a, b) => a[1].neu.localeCompare(b[1].neu, 'de'));
         normal.sort((a, b) => a[1].neu.localeCompare(b[1].neu, 'de'));
@@ -548,8 +597,12 @@ if (typeof document !== 'undefined') {
 
     downloadBtn.addEventListener('click', () => {
         if (!ergebnis || !gpu001Bytes) return;
+        // Unveränderte GPU001 unangetastet durchreichen, nur bei Bedarf neu kodieren.
+        const gpu001Daten = gpu001Ergebnis && gpu001Ergebnis.geaenderteZeilen > 0
+            ? new TextEncoder().encode(gpu001Ergebnis.inhalt)
+            : gpu001Bytes;
         const zip = erzeugeZip([
-            { name: 'GPU001.TXT', daten: gpu001Bytes },
+            { name: 'GPU001.TXT', daten: gpu001Daten },
             { name: 'GPU002.TXT', daten: new TextEncoder().encode(ergebnis.inhalt) },
         ]);
         toolhubDownload(new Blob([zip], { type: 'application/zip' }), 'untis_iserv_import.zip');
@@ -563,6 +616,6 @@ if (typeof module !== 'undefined' && module.exports) {
         parseFachKuerzelCSV: toolhubParseFachkuerzelCsv,
         normalisiereFach: toolhubNormalisiereFach,
         istEinKlassenKurs,
-        parseGPU001, zeitAngabe, erzeugeZip, crc32,
+        parseGPU001, transformiereGPU001, zeitAngabe, erzeugeZip, crc32,
     };
 }

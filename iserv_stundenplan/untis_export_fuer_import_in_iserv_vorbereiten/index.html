@@ -62,6 +62,17 @@
                     Bitte manuell ausw&auml;hlen (toolhub/assets/fachkuerzel.csv):
                     <input type="file" id="fachCsvInput" accept=".csv,.CSV">
                 </div>
+                <label>
+                    <input type="checkbox" id="optKursPraefix" checked>
+                    Pr&auml;fix <code>Kurs&nbsp;</code> voranstellen
+                    (z.&nbsp;B. <code>Kurs 08-10 Spa Ben</code>) &ndash; unterscheidet Kurse in IServ von Klassen
+                </label>
+                <label>
+                    <input type="checkbox" id="optBereitschaft">
+                    Bereitschaftsstunden der Klasse <code>BER</code> zuordnen
+                    (in GPU001 erhalten Datens&auml;tze mit dem Fach <code>BER</code> dieselbe Kennung als Klasse;
+                    ohne Klasse zeigt IServ diese Stunden nicht an)
+                </label>
             </div>
 
             <div id="warnung" class="warnung"></div>
