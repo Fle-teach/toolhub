@@ -42,7 +42,8 @@
   width: 6em;
 }
 
-.spalte-start {
+.spalte-start,
+.spalte-ende {
   width: 11em;
 }
 

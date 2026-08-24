@@ -40,24 +40,43 @@
       <code>WLAN-Adresse</code> &ndash; also der gew&ouml;hnliche Export des Anmeldeformulars. Mehrere Dateien
       werden zusammen ausgewertet; alles bleibt lokal im Browser.</p>
 
-      <input type="file" id="dateiInput" class="file-input" accept=".csv,.txt,.xlsx,.xls,.xlsm" multiple>
-      <div class="upload-box" id="dateiZone">
-        <span data-icon="tabelle" class="upload-icon"></span>
-        <div class="upload-text"><strong>Tabellen hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
-        <div class="upload-hint">Formate: .csv (Trennzeichen wird erkannt), .xlsx, .xls, .xlsm &ndash; mehrere Dateien m&ouml;glich</div>
+      <div class="upload-grid">
+        <div>
+          <input type="file" id="dateiInput" class="file-input" accept=".csv,.txt,.xlsx,.xls,.xlsm" multiple>
+          <div class="upload-box" id="dateiZone">
+            <span data-icon="tabelle" class="upload-icon"></span>
+            <div class="upload-text"><strong>Anmeldelisten hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
+            <div class="upload-hint">Formate: .csv (Trennzeichen wird erkannt), .xlsx, .xls, .xlsm &ndash; mehrere Dateien m&ouml;glich</div>
+          </div>
+          <div class="file-list" id="dateiListe"></div>
+          <div id="ladeMeldung"></div>
+        </div>
+        <div>
+          <input type="file" id="vorhandeneInput" class="file-input" accept=".csv,.txt,.xlsx,.xls,.xlsm" multiple>
+          <div class="upload-box" id="vorhandeneZone">
+            <span data-icon="liste" class="upload-icon"></span>
+            <div class="upload-text"><strong>Vorhandene Routereintr&auml;ge</strong> (optional)</div>
+            <div class="upload-hint">Spalten <code>Name</code>, <code>MAC</code>, <code>IP</code> &ndash; der Bestand aus dem Router</div>
+          </div>
+          <div class="file-list" id="vorhandeneListe"></div>
+          <div id="vorhandeneMeldung"></div>
+        </div>
       </div>
-      <div class="file-list" id="dateiListe"></div>
 
-      <div id="ladeMeldung"></div>
+      <p class="hint">Mit dem Bestand entstehen Eintr&auml;ge nur f&uuml;r WLAN-Adressen, die noch nicht im
+      Router stehen. Hat eine Import-ID ein neues Ger&auml;t, &uuml;bernimmt der neue Eintrag die IP, die sie
+      bisher belegt hat; alle &uuml;brigen belegten Adressen werden bei der Vergabe ausgelassen.</p>
     </section>
 
     <section class="panel">
       <span data-icon="einstellungen" class="panel-icon"></span>
       <h2>Jahr &amp; IP-Bereiche</h2>
-      <p class="hint">Die IPs werden je Jahrgang fortlaufend ab der Start-IP vergeben. Ein Bereich endet
-      eine Adresse vor der n&auml;chsth&ouml;heren Start-IP; der oberste Bereich endet am Ende seines
-      Adressblocks. Adressen, die auf <code>.0</code>, <code>.254</code> oder <code>.255</code> enden, werden
-      dabei &uuml;bersprungen.</p>
+      <p class="hint">Die IPs werden je Jahrgang fortlaufend ab der Start-IP vergeben. Ein Jahrgang darf
+      mehrere Bereiche haben; sie werden von der niedrigsten Adresse an aufgef&uuml;llt. Die End-IP ist
+      freiwillig: Bleibt sie leer, endet der Bereich eine Adresse vor der n&auml;chsth&ouml;heren Start-IP
+      &ndash; der oberste am Ende seines Adressblocks. Adressen, die auf <code>.0</code>, <code>.254</code>
+      oder <code>.255</code> enden, werden &uuml;bersprungen, ebenso alle Adressen, die laut Bestand schon
+      belegt sind.</p>
 
       <div class="setting-group">
         <div class="setting-label">Jahr im Hostnamen</div>
@@ -70,14 +89,14 @@
       </div>
 
       <div class="setting-group">
-        <div class="setting-label">Start-IPs der Jahrg&auml;nge</div>
+        <div class="setting-label">IP-Bereiche der Jahrg&auml;nge</div>
         <div class="table-wrap">
           <table id="bereicheTabelle">
             <thead>
               <tr>
                 <th>Jahrgang</th>
                 <th>Start-IP</th>
-                <th>Bereich</th>
+                <th>End-IP</th>
                 <th>Adressen</th>
                 <th><span class="sr-only">Entfernen</span></th>
               </tr>
@@ -86,7 +105,7 @@
           </table>
         </div>
         <div class="row">
-          <button id="bereichHinzufuegenBtn" class="btn-secondary btn-small" type="button">Jahrgang hinzuf&uuml;gen</button>
+          <button id="bereichHinzufuegenBtn" class="btn-secondary btn-small" type="button">Bereich hinzuf&uuml;gen</button>
           <button id="bereicheZuruecksetzenBtn" class="btn-secondary btn-small" type="button">Standardwerte</button>
         </div>
         <div id="bereicheMeldung"></div>
@@ -118,7 +137,7 @@
         <path d="M9 9v11"/>
         <path d="M15 9v11"/>
       </svg>
-      <h2>Routereintr&auml;ge</h2>
+      <h2>Neue Routereintr&auml;ge</h2>
       <div class="stats" id="statistik"></div>
       <div id="warnungen"></div>
       <div class="row">
@@ -134,6 +153,32 @@
             </tr>
           </thead>
           <tbody id="ergebnisKoerper"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="ueberholtPanel">
+      <!-- Motiv: Eintrag, der durch einen neuen ersetzt wird -->
+      <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="13" height="7" rx="1.5"/>
+        <path d="M5.5 6.2l8.5 2.6"/>
+        <rect x="8" y="13" width="13" height="7" rx="1.5"/>
+        <path d="M10.5 16.5h6"/>
+      </svg>
+      <h2>&Uuml;berholte Eintr&auml;ge im Router</h2>
+      <p class="hint">Diese Import-IDs haben ein neues Ger&auml;t gemeldet. Der neue Eintrag &uuml;bernimmt
+      ihre bisherige IP &ndash; der alte Eintrag muss daf&uuml;r im Router entfernt werden, sonst ist die
+      Adresse doppelt vergeben.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Import-ID</th>
+              <th>Zu entfernen</th>
+              <th>Neu</th>
+            </tr>
+          </thead>
+          <tbody id="ueberholtKoerper"></tbody>
         </table>
       </div>
     </section>
