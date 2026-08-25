@@ -214,6 +214,44 @@ function istEinKlassenKurs(zeilen) {
     return !OBERSTUFEN_KLASSEN.has([...klassen][0]);
 }
 
+// Sucht Schülergruppen, die vermutlich versehentlich mehrfach vergeben wurden.
+//
+// Die Schülergruppe benennt in Untis die Menge der teilnehmenden Schülerinnen und Schüler.
+// Stehen unter demselben Namen mehrere Unterrichte, deren Lehrkräfte sich nicht überschneiden,
+// können das nicht dieselben Personen sein – beim Anlegen wurde der Name dann von einem anderen
+// Kurs übernommen. Das Tool fasst solche Kurse weiterhin zusammen (die Datei ist maßgeblich),
+// meldet sie aber, damit der Fehler in Untis behoben werden kann.
+//
+// Ausgenommen sind Kurse genau einer Klasse: dort steht die Lerngruppe durch die Klasse fest,
+// mehrere Lehrkräfte zu verschiedenen Zeiten sind also normal (z. B. geteilter Fachunterricht).
+function findeNamenskonflikt(zeilenGruppe, gpu001Map) {
+    if (istEinKlassenKurs(zeilenGruppe)) return null;
+
+    const proUnterricht = new Map(); // U-Nr -> Menge der Lehrkräfte
+    for (const z of zeilenGruppe) {
+        if (!proUnterricht.has(z.unr)) proUnterricht.set(z.unr, new Set());
+        if (z.lehrer !== '' && z.lehrer !== '?') proUnterricht.get(z.unr).add(z.lehrer);
+    }
+    if (proUnterricht.size < 2) return null;
+
+    // Ein Kurs, der mehrmals pro Woche stattfindet, steht ebenfalls auf mehreren Unterrichten –
+    // dort unterrichtet aber jeweils dieselbe Person. Erst gänzlich getrennte Lehrkräfte
+    // (kein gemeinsamer Name) belegen, dass es verschiedene Kurse sein müssen.
+    const mengen = [...proUnterricht.values()];
+    const getrennt = mengen.some((a, i) => mengen.slice(i + 1).some(
+        (b) => a.size > 0 && b.size > 0 && [...a].every((lehrer) => !b.has(lehrer))));
+    if (!getrennt) return null;
+
+    const unterrichte = [...proUnterricht.entries()]
+        .map(([unr, lehrer]) => ({
+            unr,
+            lehrer: [...lehrer].sort((a, b) => a.localeCompare(b, 'de')),
+            zeit: gpu001Map ? zeitAngabe(zeilenGruppe.filter((z) => z.unr === unr), gpu001Map) : '',
+        }))
+        .sort((a, b) => Number(a.unr) - Number(b.unr));
+    return { unterrichte };
+}
+
 // Kernfunktion: berechnet Umbenennung/Filterung und gibt Datei-Inhalt + Mapping zurück.
 function normalisiereGPU002(text, optionen = {}) {
     const {
@@ -249,12 +287,18 @@ function normalisiereGPU002(text, optionen = {}) {
     }
 
     // 2. Ein-Klassen-Kurse bestimmen und Basis-Namen der verbleibenden Kurse berechnen.
-    const mapping = new Map(); // alte Bezeichnung -> { neu, unterschieden, entfernt }
+    const mapping = new Map(); // alte Bezeichnung -> { neu, unterschieden, entfernt, konflikt }
     const basisZuAlt = new Map(); // Basis-Name -> alte Bezeichnungen
+    const namenskonflikte = [];
     for (const [alt, zeilenGruppe] of gruppen) {
         if (nurKlassenuebergreifend && istEinKlassenKurs(zeilenGruppe)) {
-            mapping.set(alt, { neu: null, unterschieden: false, entfernt: true });
+            mapping.set(alt, { neu: null, unterschieden: false, entfernt: true, konflikt: null });
             continue;
+        }
+        const konflikt = findeNamenskonflikt(zeilenGruppe, gpu001Map);
+        if (konflikt) {
+            konflikt.gruppe = alt;
+            namenskonflikte.push(konflikt);
         }
         // Der Präfix gehört zum Basis-Namen, damit Zeitangabe und laufende Nummer
         // dahinter stehen ("Kurs 11-12 Lat Se (Di 1.+2.)").
@@ -297,7 +341,12 @@ function normalisiereGPU002(text, optionen = {}) {
                 neu = kandidat + ' ' + nummer;
             }
             vergeben.add(neu);
-            mapping.set(alt, { neu, unterschieden: alte.length > 1, entfernt: false });
+            mapping.set(alt, {
+                neu,
+                unterschieden: alte.length > 1,
+                entfernt: false,
+                konflikt: namenskonflikte.find((k) => k.gruppe === alt) ?? null,
+            });
         });
     }
 
@@ -321,9 +370,12 @@ function normalisiereGPU002(text, optionen = {}) {
         ausgabe.push(raw.join(','));
     });
 
+    namenskonflikte.sort((a, b) => a.gruppe.localeCompare(b.gruppe, 'de'));
+
     return {
         inhalt: ausgabe.join(zeilenumbruch),
         mapping,
+        namenskonflikte,
         anzahlZeilen: parsed.filter((p) => p !== null).length,
         anzahlOhneGruppe: parsed.filter((p) => p !== null && p.gruppe === '').length,
         entfernteZeilen,
@@ -438,6 +490,7 @@ if (typeof document !== 'undefined') {
     const warnDiv = document.getElementById('warnung');
     const resultsDiv = document.getElementById('results');
     const statsDiv = document.getElementById('stats');
+    const konfliktDiv = document.getElementById('konflikte');
     const mappingBody = document.getElementById('mappingBody');
     const optKlassenuebergreifend = document.getElementById('optKlassenuebergreifend');
     const optFachNormalisieren = document.getElementById('optFachNormalisieren');
@@ -554,20 +607,54 @@ if (typeof document !== 'undefined') {
         }
     }
 
+    // Meldet Schülergruppen, die in Untis mehrfach vergeben wurden. Solche Kurse landen
+    // beim Import als ein einziger Kurs – der Fehler gehört in Untis behoben, nicht hier.
+    function zeigeKonflikte() {
+        const konflikte = ergebnis.namenskonflikte;
+        if (konflikte.length === 0) {
+            konfliktDiv.innerHTML = '';
+            return;
+        }
+
+        const liste = konflikte.map((k) => {
+            const unterrichte = k.unterrichte.map((u) => {
+                const lehrer = u.lehrer.join(', ') || 'ohne Lehrkraft';
+                const zeit = u.zeit === '' ? 'nicht verplant' : u.zeit;
+                return `<span class="unterricht">Unterricht ${toolhubEscapeHtml(u.unr)}: ` +
+                    `${toolhubEscapeHtml(lehrer)} (${toolhubEscapeHtml(zeit)})</span>`;
+            }).join('');
+            return `<li><span class="gruppe">${toolhubEscapeHtml(k.gruppe)}</span> ` +
+                `&rarr; ${toolhubEscapeHtml(ergebnis.mapping.get(k.gruppe).neu)}${unterrichte}</li>`;
+        }).join('');
+
+        konfliktDiv.innerHTML =
+            `<p>${toolhubIcon('warnung', 'msg-icon')}<strong>${konflikte.length} ` +
+            `${konflikte.length === 1 ? 'Schülergruppe ist' : 'Schülergruppen sind'} mehrfach vergeben.</strong> ` +
+            'Die folgenden Unterrichte tragen jeweils denselben Namen, werden aber von ganz ' +
+            'unterschiedlichen Lehrkräften gehalten &ndash; dieselben Schülerinnen und Schüler ' +
+            'können das nicht sein. Vermutlich wurde die Schülergruppe beim Anlegen in Untis von ' +
+            'einem anderen Kurs übernommen. Sie werden hier zu je einem Kurs zusammengefasst; ' +
+            'zum Trennen muss die Schülergruppe in Untis korrigiert werden.</p>' +
+            `<ul>${liste}</ul>`;
+    }
+
     function zeigeErgebnis() {
         const eintraege = [...ergebnis.mapping.entries()];
         const behalten = eintraege.filter(([, e]) => !e.entfernt);
         const entfernt = eintraege.filter(([, e]) => e.entfernt);
         const geaendert = behalten.filter(([alt, e]) => alt !== e.neu);
-        const unterschieden = behalten.filter(([, e]) => e.unterschieden);
-        const normal = behalten.filter(([, e]) => !e.unterschieden);
+        // Reihenfolge der Vorschau: erst die Konflikte, dann die per Zeitangabe
+        // unterschiedenen Kurse, dann der Rest, zuletzt die entfernten.
+        const konflikt = behalten.filter(([, e]) => e.konflikt);
+        const unterschieden = behalten.filter(([, e]) => e.unterschieden && !e.konflikt);
+        const normal = behalten.filter(([, e]) => !e.unterschieden && !e.konflikt);
 
         statsDiv.innerHTML =
             `<p>Datenzeilen: <strong>${ergebnis.anzahlZeilen}</strong> ` +
             `(davon ${ergebnis.anzahlOhneGruppe} ohne Kursbezeichnung, bleiben unverändert)</p>` +
             `<p>Kurse: <strong>${eintraege.length}</strong> &middot; ` +
             `behalten: <strong>${behalten.length}</strong> (umbenannt: ${geaendert.length}, ` +
-            `mit Unterscheidungszusatz: ${unterschieden.length}) &middot; ` +
+            `mit Unterscheidungszusatz: ${behalten.filter(([, e]) => e.unterschieden).length}) &middot; ` +
             `entfernt: <strong>${entfernt.length}</strong> (${ergebnis.entfernteZeilen} Zeilen)</p>` +
             (gpu001Ergebnis && gpu001Ergebnis.geaenderteZeilen > 0
                 ? `<p>GPU001: <strong>${gpu001Ergebnis.geaenderteZeilen}</strong> Bereitschaftsstunden ` +
@@ -575,14 +662,18 @@ if (typeof document !== 'undefined') {
                 : '') +
             `<p>Erkannte Kodierung: ${erkannteKodierung} (Ausgabe im ZIP als UTF-8)</p>`;
 
+        zeigeKonflikte();
+
+        konflikt.sort((a, b) => a[1].neu.localeCompare(b[1].neu, 'de'));
         unterschieden.sort((a, b) => a[1].neu.localeCompare(b[1].neu, 'de'));
         normal.sort((a, b) => a[1].neu.localeCompare(b[1].neu, 'de'));
         entfernt.sort((a, b) => a[0].localeCompare(b[0], 'de'));
 
         mappingBody.innerHTML = '';
-        for (const [alt, e] of [...unterschieden, ...normal, ...entfernt]) {
+        for (const [alt, e] of [...konflikt, ...unterschieden, ...normal, ...entfernt]) {
             const tr = document.createElement('tr');
             if (e.entfernt) tr.className = 'entfernt';
+            else if (e.konflikt) tr.className = 'konflikt';
             else if (e.unterschieden) tr.className = 'unterschieden';
             const tdAlt = document.createElement('td');
             tdAlt.textContent = alt;
@@ -615,7 +706,7 @@ if (typeof module !== 'undefined' && module.exports) {
         normalisiereGPU002, klassenTeil, basisName, splitRaw, unquote,
         parseFachKuerzelCSV: toolhubParseFachkuerzelCsv,
         normalisiereFach: toolhubNormalisiereFach,
-        istEinKlassenKurs,
+        istEinKlassenKurs, findeNamenskonflikt,
         parseGPU001, transformiereGPU001, zeitAngabe, erzeugeZip, crc32,
     };
 }

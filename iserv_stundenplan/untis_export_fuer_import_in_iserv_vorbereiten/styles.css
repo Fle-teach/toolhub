@@ -95,6 +95,47 @@
     display: none;
 }
 
+/* Hinweis auf mehrfach vergebene Schülergruppen: eigene Farbe, damit er sich von den
+ * Bedienhinweisen (.warnung) abhebt – hier stimmen die Quelldaten nicht. */
+.konflikt-box {
+    position: relative;
+    background: color-mix(in srgb, #e0803a 14%, transparent);
+    border: 1px solid color-mix(in srgb, #e0803a 50%, transparent);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin: 0 0 20px;
+    font-size: 0.92rem;
+}
+
+.konflikt-box:empty {
+    display: none;
+}
+
+.konflikt-box p {
+    margin: 0 0 10px;
+}
+
+.konflikt-box ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.konflikt-box li + li {
+    margin-top: 8px;
+}
+
+.konflikt-box .gruppe {
+    font-family: var(--mono, monospace);
+    font-weight: 600;
+}
+
+/* Die Unterrichte einer Gruppe: eingerückt, damit die Lehrkräfte untereinander stehen */
+.konflikt-box .unterricht {
+    display: block;
+    color: var(--text-muted);
+    margin-left: 2px;
+}
+
 /* Grunddesign in toolhub.css; hier nur der Abstand nach oben */
 .error {
     margin: 16px 0 0;
@@ -150,6 +191,12 @@
     background: color-mix(in srgb, #d69e2e 20%, transparent);
 }
 
+/* Steht nach .unterschieden, damit ein Konflikt die Gelb-Markierung übertrumpft:
+ * ein falsch zusammengefasster Kurs ist die wichtigere Meldung. */
+.mapping tr.konflikt td {
+    background: color-mix(in srgb, #e0803a 20%, transparent);
+}
+
 .mapping tr.entfernt td {
     background: color-mix(in srgb, #e05656 15%, transparent);
     color: var(--text-muted);
@@ -168,6 +215,12 @@
 
 .legende .marker {
     background: color-mix(in srgb, #d69e2e 20%, transparent);
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.legende .marker-konflikt {
+    background: color-mix(in srgb, #e0803a 20%, transparent);
     padding: 1px 6px;
     border-radius: 4px;
 }
