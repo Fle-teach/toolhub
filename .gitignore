@@ -4,3 +4,10 @@
 # Serienbrief-Testdaten mit echten Personendaten – gehören nicht ins Repository
 allgemein/serienbrief/beispiele/LEGs/
 allgemein/serienbrief/beispiele/LFV/
+iserv_stundenplan/untis_export_fuer_import_in_iserv_vorbereiten/beispiele/problem_sport_11/input/GPU001.TXT
+.gitignore
+.gitignore
+.gitignore
+iserv_stundenplan/untis_export_fuer_import_in_iserv_vorbereiten/beispiele/problem_sport_11/output_entpackt/GPU002.TXT
+iserv_stundenplan/untis_export_fuer_import_in_iserv_vorbereiten/beispiele/problem_sport_11/input/GPU002.TXT
+iserv_stundenplan/untis_export_fuer_import_in_iserv_vorbereiten/beispiele/problem_sport_11/output_entpackt/GPU001.TXT

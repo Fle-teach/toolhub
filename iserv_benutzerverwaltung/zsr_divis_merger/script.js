@@ -217,6 +217,9 @@ let teacherList = [];
 let courseList = []; // Übersicht aller angelegten Kurse (für den Kursliste-Export)
 let mergedData = [];
 let filteredElternImportOutput = [];
+// Schüler ohne ZSR-Datensatz: je Eintrag { divisRow, status, zsrId }
+// status: 'open' | 'assigned' | 'ignored'
+let unmatchedStudents = [];
 
 // ===== UTILITY FUNKTIONEN =====
 
@@ -959,7 +962,10 @@ async function mergeStudentData(zsrData, divisData) {
         .sort((a, b) => b.levenshteinDistance - a.levenshteinDistance);
     
     updateProgress(95, 'Tabellen werden erstellt...');
-    
+
+    // Schüler ohne ZSR-Datensatz für die manuelle Nachbearbeitung vormerken
+    unmatchedStudents = noZsrFound.map(divisRow => ({ divisRow, status: 'open', zsrId: '' }));
+
     // Tabellen befüllen
     await populateTables(nameDeviations, noZsrFound, excludedRecords, excludedZsrRecords);
     
@@ -1003,20 +1009,14 @@ async function populateTables(nameDeviations, noZsrFound, excludedRecords, exclu
         document.getElementById('nameDeviationContainer').style.display = 'block';
     }
     
-    // Kein ZSR gefunden
-    if (noZsrFound.length > 0) {
+    // Kein ZSR gefunden – je Zeile ZSR-ID von Hand eintragen oder Schüler ignorieren
+    if (unmatchedStudents.length > 0) {
         const tbody = document.getElementById('noZsrFoundBody');
-        noZsrFound.forEach(item => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${item["Zusammengesetzter-Nachname-DiViS"]}</td>
-                <td>${item["Vorname-DiViS"]}</td>
-                <td>${item["Geburtsdatum-DiViS"]}</td>
-                <td>${item["Klassenname-DiViS"]}</td>
-            `;
-            tbody.appendChild(row);
+        unmatchedStudents.forEach((entry, index) => {
+            tbody.appendChild(buildUnmatchedRow(entry, index));
         });
         document.getElementById('noZsrFoundContainer').style.display = 'block';
+        updateUnmatchedSummary();
     }
     
     // Ausgeschlossene Datensätze (durch besseren Match ersetzt)
@@ -1042,6 +1042,9 @@ async function populateTables(nameDeviations, noZsrFound, excludedRecords, exclu
         const tbody = document.getElementById('excludedZsrRecordsBody');
         excludedZsrRecords.forEach(item => {
             const row = document.createElement('tr');
+            // ID am Element, damit die Zeile verschwinden kann, sobald diese
+            // ZSR-ID von Hand einem Schüler zugeordnet wird
+            row.dataset.zsrId = item["ZSR-ID-ZSR"];
             row.innerHTML = `
                 <td>${item["Auskunftssperre Leibund Leben-ZSR"] || ''}</td>
                 <td>${item["Auskunftssperre Adoptionspflege-ZSR"] || ''}</td>
@@ -1054,6 +1057,194 @@ async function populateTables(nameDeviations, noZsrFound, excludedRecords, exclu
         });
         document.getElementById('excludedZsrRecordsContainer').style.display = 'block';
     }
+}
+
+// ===== MANUELLE ZSR-ZUORDNUNG =====
+// Schüler ohne ZSR-Datensatz kommen sonst in keinen Export. Deshalb lässt sich
+// je Zeile eine ZSR-ID von Hand eintragen oder der Schüler bewusst ignorieren.
+
+// ZSR-IDs sind sechsstellig im Wechsel Buchstabe/Ziffer (z. B. C6H2R9); daraus
+// berechnet calculateInitPW das Initialpasswort. Abweichende Eingaben werden
+// angenommen, aber gemeldet – es zählt, was in der ZSR tatsächlich steht.
+const ZSR_ID_PATTERN = /^([A-Z]\d){3}$/;
+
+// Beschriftung der Statusspalte; die Status selbst heißen 'open'|'assigned'|'ignored'
+const UNMATCHED_LABELS = { open: 'offen', assigned: 'zugeordnet', ignored: 'ignoriert' };
+
+function buildUnmatchedRow(entry, index) {
+    const row = document.createElement('tr');
+    row.dataset.index = index;
+    const item = entry.divisRow;
+    row.innerHTML = `
+        <td>${toolhubEscapeHtml(item["Zusammengesetzter-Nachname-DiViS"])}</td>
+        <td>${toolhubEscapeHtml(item["Vorname-DiViS"])}</td>
+        <td>${toolhubEscapeHtml(item["Geburtsdatum-DiViS"])}</td>
+        <td>${toolhubEscapeHtml(item["Klassenname-DiViS"])}</td>
+        <td class="cell-zsr-id"></td>
+        <td class="cell-status"></td>
+    `;
+    fillUnmatchedRow(row, entry, index);
+    return row;
+}
+
+// Füllt die beiden Aktionsspalten passend zum Status der Zeile.
+function fillUnmatchedRow(row, entry, index) {
+    const idCell = row.querySelector('.cell-zsr-id');
+    const statusCell = row.querySelector('.cell-status');
+    row.classList.toggle('done', entry.status !== 'open');
+
+    if (entry.status === 'open') {
+        idCell.innerHTML = `
+            <span class="zsr-manual">
+                <input type="text" maxlength="10" placeholder="C6H2R9"
+                       aria-label="ZSR-ID von Hand eintragen" value="${toolhubEscapeHtml(entry.zsrId)}">
+                <button type="button" class="btn-mini" data-action="assign">Übernehmen</button>
+            </span>
+        `;
+        statusCell.innerHTML = `
+            <span class="zsr-status open">${UNMATCHED_LABELS.open}</span>
+            <button type="button" class="btn-mini" data-action="ignore">Ignorieren</button>
+        `;
+
+        // Enter im Eingabefeld übernimmt die ID – schneller bei mehreren Zeilen
+        const input = idCell.querySelector('input');
+        input.addEventListener('keydown', event => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                assignManualZsrId(index, input.value);
+            }
+        });
+        idCell.querySelector('[data-action="assign"]')
+            .addEventListener('click', () => assignManualZsrId(index, input.value));
+        statusCell.querySelector('[data-action="ignore"]')
+            .addEventListener('click', () => ignoreUnmatchedStudent(index));
+    } else {
+        idCell.textContent = entry.status === 'assigned' ? entry.zsrId : '–';
+        statusCell.innerHTML = `
+            <span class="zsr-status ${entry.status}">${UNMATCHED_LABELS[entry.status]}</span>
+            <button type="button" class="btn-mini" data-action="undo">Rückgängig</button>
+        `;
+        statusCell.querySelector('[data-action="undo"]')
+            .addEventListener('click', () => undoUnmatchedDecision(index));
+    }
+}
+
+// Ein von Hand zugeordneter ZSR-Datensatz ist nicht mehr "ohne DiViS-Match" –
+// sonst widersprächen sich die beiden Tabellen.
+function toggleUnmatchedZsrRow(zsrId, visible) {
+    const row = document.querySelector(`#excludedZsrRecordsBody tr[data-zsr-id="${CSS.escape(zsrId)}"]`);
+    if (row) row.style.display = visible ? '' : 'none';
+}
+
+function refreshUnmatchedRow(index) {
+    const row = document.querySelector(`#noZsrFoundBody tr[data-index="${index}"]`);
+    if (row) fillUnmatchedRow(row, unmatchedStudents[index], index);
+    updateUnmatchedSummary();
+}
+
+// Weist einem Schüler von Hand eine ZSR-ID zu und nimmt ihn in die Exporte auf.
+function assignManualZsrId(index, rawId) {
+    const entry = unmatchedStudents[index];
+    const zsrId = (rawId || '').trim().toUpperCase();
+
+    if (!zsrId) {
+        showAlert('Bitte zuerst eine ZSR-ID eintragen.', 'error');
+        return;
+    }
+
+    // Doppelte ZSR-IDs würden im IServ-Import zwei Schüler vermischen
+    if (mergedData.some(record => record["ZSR-ID-ZSR"] === zsrId)) {
+        showAlert(`Die ZSR-ID "${zsrId}" ist bereits einem anderen Schüler zugeordnet.`, 'error');
+        return;
+    }
+
+    if (!ZSR_ID_PATTERN.test(zsrId)) {
+        showAlert(`Die ZSR-ID "${zsrId}" weicht vom üblichen Muster ab (z. B. C6H2R9). Sie wurde übernommen – bitte prüfen, ob das Initialpasswort brauchbar ist.`, 'warning');
+    }
+
+    const record = {
+        ...entry.divisRow,
+        "ZSR-ID-ZSR": zsrId,
+        "InitPW": calculateInitPW(zsrId),
+        // Name und Geburtsdatum stammen hier aus DiViS, da es keinen ZSR-Satz gibt
+        "Zusammengesetzter-Nachname-ZSR": entry.divisRow["Zusammengesetzter-Nachname-DiViS"],
+        "Nachname-ZSR": entry.divisRow["Nachname-DiViS"],
+        "Vorname-ZSR": entry.divisRow["Vorname-DiViS"],
+        "Geburtsdatum-ZSR": entry.divisRow["Geburtsdatum-DiViS"],
+        "Levenshtein-Distanz": 0,
+        "Von-Hand-zugeordnet": true,
+        "Gruppen": ""
+    };
+
+    // Kursgruppen nachtragen: Der Schüler war beim Kurs-Matching noch nicht dabei.
+    // Der Index in processElectiveData entsteht aus der übergebenen Liste, es
+    // werden also nur die Gruppen dieses einen Schülers gesetzt.
+    if (electiveData && electiveData.length > 0) {
+        processElectiveData(electiveData, [record]);
+    }
+
+    mergedData.push(record);
+    entry.status = 'assigned';
+    entry.zsrId = zsrId;
+    toggleUnmatchedZsrRow(zsrId, false);
+
+    refreshUnmatchedRow(index);
+    refreshAfterManualChange();
+    showAlert(`${record["Vorname-DiViS"]} ${record["Zusammengesetzter-Nachname-DiViS"]} wurde mit der ZSR-ID ${zsrId} übernommen.`, 'success');
+}
+
+function ignoreUnmatchedStudent(index) {
+    const entry = unmatchedStudents[index];
+    entry.status = 'ignored';
+    entry.zsrId = '';
+    refreshUnmatchedRow(index);
+}
+
+// Nimmt eine Entscheidung zurück; zugeordnete Schüler fallen wieder aus den Exporten.
+function undoUnmatchedDecision(index) {
+    const entry = unmatchedStudents[index];
+
+    if (entry.status === 'assigned') {
+        const position = mergedData.findIndex(record => record["ZSR-ID-ZSR"] === entry.zsrId);
+        if (position !== -1) mergedData.splice(position, 1);
+        toggleUnmatchedZsrRow(entry.zsrId, true);
+        entry.status = 'open';
+        refreshUnmatchedRow(index);
+        refreshAfterManualChange();
+        return;
+    }
+
+    entry.status = 'open';
+    refreshUnmatchedRow(index);
+}
+
+// Elterndaten und Statistik hängen an mergedData und müssen deshalb neu aufgebaut
+// werden. Die Eltern-Tabellen werden vorher geleert, sonst stünden Zeilen doppelt.
+async function refreshAfterManualChange() {
+    ['deletedRecords', 'inconsistency', 'emailInconsistency'].forEach(name => {
+        const container = document.getElementById(name + 'Container');
+        if (container) {
+            container.style.display = 'none';
+            container.querySelector('tbody').innerHTML = '';
+        }
+    });
+
+    await processParentData(mergedData);
+    document.getElementById('progressContainer').style.display = 'none';
+    updateStats(zsrData.length, divisData.length, mergedData.length);
+}
+
+// Meldet in der Tabellenüberschrift, wie viele Schüler noch keine Entscheidung haben.
+function updateUnmatchedSummary() {
+    const count = status => unmatchedStudents.filter(entry => entry.status === status).length;
+    const open = count('open');
+
+    const header = document.querySelector('#noZsrFoundContainer .table-header');
+    if (!header) return;
+
+    header.textContent = open > 0
+        ? `Kein ZSR-Datensatz gefunden – ${open} von ${unmatchedStudents.length} noch offen`
+        : `Kein ZSR-Datensatz gefunden – alle ${unmatchedStudents.length} bearbeitet (${count('assigned')} zugeordnet, ${count('ignored')} ignoriert)`;
 }
 
 // ===== ELTERN-DATENVERARBEITUNG =====
@@ -1339,6 +1530,13 @@ function escapeCSVValue(value) {
 }
 
 function generateSchuelerExport(mergedData) {
+    // Offene Fälle blockieren den Export nicht, sollen aber auffallen:
+    // Diese Schüler fehlen in der Datei, bis sie zugeordnet oder ignoriert sind.
+    const openCases = unmatchedStudents.filter(entry => entry.status === 'open').length;
+    if (openCases > 0) {
+        showAlert(`Achtung: ${openCases} Schüler ohne ZSR-Datensatz sind noch offen und fehlen in dieser Datei. Bitte in der Tabelle "Kein ZSR-Datensatz gefunden" eine ZSR-ID eintragen oder die Schüler ignorieren.`, 'warning');
+    }
+
     const exportData = mergedData.map(record => ({
         "ZSR-ID-ZSR": record["ZSR-ID-ZSR"],
         "Klasse/Information": record["Klasse/Information"],
@@ -1790,9 +1988,14 @@ document.getElementById('processButton').addEventListener('click', async functio
             kurslisteBtn.disabled = courseList.length === 0;
         }
         
-        // Schülerimport automatisch downloaden
-        generateSchuelerExport(mergedData);
-        
+        // Kein automatischer Download: Der Schülerimport wird erst auf Knopfdruck
+        // erzeugt, damit offene Fälle vorher geklärt werden können.
+        if (unmatchedStudents.length > 0) {
+            showAlert(`${unmatchedStudents.length} Schüler haben keinen ZSR-Datensatz. Bitte in der Tabelle "Kein ZSR-Datensatz gefunden" je Schüler eine ZSR-ID eintragen oder ihn ignorieren – danach die Import-Dateien herunterladen.`, 'warning');
+        } else {
+            showAlert('Verarbeitung fertig. Die Import-Dateien lassen sich jetzt über die Schaltflächen herunterladen.', 'info');
+        }
+
         hideLoading();
         
     } catch (error) {
@@ -1837,6 +2040,27 @@ if (clearAlertsButton) {
 }
 
 // Drag-and-drop übernimmt die gemeinsame Upload-Komponente (toolhub.js)
+
+// === DEBUGGING-MODUS ===
+// Blendet Auswertungen ein, die nur bei der Fehlersuche interessieren
+// (zurzeit die Tabelle "Durch besseren Match ersetzt"). Die Wahl bleibt wie beim
+// Design im localStorage stehen und gilt für weitere Besuche.
+const DEBUG_STORAGE_KEY = 'zsr-divis-merger-debug';
+
+function setDebugMode(on) {
+    document.body.classList.toggle('debug-mode', on);
+    const toggle = document.getElementById('debugToggle');
+    if (toggle) toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+    localStorage.setItem(DEBUG_STORAGE_KEY, on ? 'an' : 'aus');
+}
+
+const debugToggle = document.getElementById('debugToggle');
+if (debugToggle) {
+    setDebugMode(localStorage.getItem(DEBUG_STORAGE_KEY) === 'an');
+    debugToggle.addEventListener('click', function() {
+        setDebugMode(!document.body.classList.contains('debug-mode'));
+    });
+}
 
 // === CLEANUP ===
 window.addEventListener('beforeunload', function() {
