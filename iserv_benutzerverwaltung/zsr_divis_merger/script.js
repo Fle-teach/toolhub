@@ -4,6 +4,9 @@ const CONFIG = {
     DIVIS_HEADER_ROW: 0,
     DIVIS_DATA_START_ROW: 1,
     BATCH_SIZE: 50, // Verarbeitung in 50er-Batches für bessere Performance
+    // Ab dieser Namensdistanz gilt ein Treffer als unsicher, sofern sich mehrere
+    // ZSR-Datensätze dasselbe Geburtsdatum teilen
+    UNCERTAIN_MATCH_DISTANCE: 3,
     
     REQUIRED_ZSR_COLUMNS: ['ZSR-ID', 'Nachname', 'Vorname', 'Geburtsdatum'],
     REQUIRED_DIVIS_COLUMNS: ['Nachname', 'Namenszusatz', 'Vorname', 'Rufname', 'Geburtsdatum', 'Klassenname'],
@@ -220,6 +223,8 @@ let filteredElternImportOutput = [];
 // Schüler ohne ZSR-Datensatz: je Eintrag { divisRow, status, zsrId }
 // status: 'open' | 'assigned' | 'ignored'
 let unmatchedStudents = [];
+// Zusammengeführte Datensätze mit mehrdeutigem Geburtsdatum und schwachem Namenstreffer
+let uncertainMatches = [];
 
 // ===== UTILITY FUNKTIONEN =====
 
@@ -378,7 +383,12 @@ function removeLineBreaks(value) {
     return value ? value.replace(/[\r\n]+/g, ' ').trim() : value;
 }
 
+// Hinweismeldungen erscheinen nur im Debugging-Modus. Ausgenommen sind Fehler:
+// Sie melden, dass eine gerade ausgelöste Aktion nicht ausgeführt wurde – ohne
+// sie bliebe z. B. eine abgelehnte ZSR-ID kommentarlos liegen.
 function showAlert(message, type = 'info') {
+    if (type !== 'error' && !document.body.classList.contains('debug-mode')) return;
+
     const alertsContainer = document.getElementById('alerts');
     const alert = document.createElement('div');
     alert.className = `alert alert-${type}`;
@@ -843,7 +853,6 @@ async function mergeStudentData(zsrData, divisData) {
     updateProgress(20, 'Beginne Daten-Matching...');
     
     const mergedData = [];
-    const excludedRecords = []; // Datensätze, die durch bessere ersetzt wurden
     const noZsrFound = [];
     
     // BATCH-PROCESSING für bessere Performance
@@ -883,29 +892,20 @@ async function mergeStudentData(zsrData, divisData) {
             
             if (bestMatch) {
                 // Prüfen auf Duplikate (gleiche ZSR-ID)
-                const existingIndex = mergedData.findIndex(record => 
+                const existingIndex = mergedData.findIndex(record =>
                     record["ZSR-ID-ZSR"] === bestMatch.zsrRow["ZSR-ID-ZSR"]
                 );
-                
+
                 if (existingIndex !== -1) {
                     const existingDistance = mergedData[existingIndex]["Levenshtein-Distanz"];
+                    // Beide Schüler beanspruchen denselben ZSR-Satz; der schlechtere
+                    // Treffer geht leer aus und wird wie ein Schüler ohne ZSR-Datensatz
+                    // behandelt – sonst verschwände er stillschweigend aus dem Export.
                     if (existingDistance > bestMatch.totalDistance) {
-                        // Der neue Match ist besser - alten zu excludedRecords hinzufügen
-                        excludedRecords.push({
-                            ...mergedData[existingIndex],
-                            "Ersetzt-durch-besseren-Match": true,
-                            "Ursprüngliche-Distanz": existingDistance,
-                            "Bessere-Distanz": bestMatch.totalDistance
-                        });
+                        noZsrFound.push(divisPartOf(mergedData[existingIndex]));
                         mergedData[existingIndex] = { ...bestMatch.zsrRow, ...divisRow, "Levenshtein-Distanz": bestMatch.totalDistance };
                     } else {
-                        // Der bestehende Match ist besser - neuen zu excludedRecords hinzufügen
-                        excludedRecords.push({
-                            ...divisRow,
-                            "Ersetzt-durch-besseren-Match": true,
-                            "Ursprüngliche-Distanz": bestMatch.totalDistance,
-                            "Bessere-Distanz": existingDistance
-                        });
+                        noZsrFound.push(divisRow);
                     }
                 } else {
                     mergedData.push({ ...bestMatch.zsrRow, ...divisRow, "Levenshtein-Distanz": bestMatch.totalDistance });
@@ -939,11 +939,6 @@ async function mergeStudentData(zsrData, divisData) {
         }
     }
     
-    // ZSR-Datensätze ohne Match finden
-    const excludedZsrRecords = zsrData.filter(zsrRow => 
-        !mergedData.some(merged => merged["ZSR-ID-ZSR"] === zsrRow["ZSR-ID-ZSR"])
-    );
-    
     updateProgress(90, 'Sammle Namensabweichungen...');
     
     // WICHTIG: Namensabweichungen nur für die finalen, tatsächlich verwendeten Datensätze sammeln
@@ -966,8 +961,16 @@ async function mergeStudentData(zsrData, divisData) {
     // Schüler ohne ZSR-Datensatz für die manuelle Nachbearbeitung vormerken
     unmatchedStudents = noZsrFound.map(divisRow => ({ divisRow, status: 'open', zsrId: '' }));
 
+    // Unsichere Zuordnungen: Mehrere ZSR-Datensätze teilen sich das Geburtsdatum,
+    // und der gewählte Treffer weicht im Namen deutlich ab – hier kann die
+    // automatische Wahl danebenliegen.
+    uncertainMatches = mergedData.filter(record => {
+        const candidates = zsrByBirthdate.get(record["Geburtsdatum-DiViS"]) || [];
+        return candidates.length > 1 && record["Levenshtein-Distanz"] > CONFIG.UNCERTAIN_MATCH_DISTANCE;
+    });
+
     // Tabellen befüllen
-    await populateTables(nameDeviations, noZsrFound, excludedRecords, excludedZsrRecords);
+    await populateTables(nameDeviations, mergedData);
     
     updateProgress(100, 'Verarbeitung abgeschlossen!');
     
@@ -987,7 +990,9 @@ async function mergeStudentData(zsrData, divisData) {
 
 // ===== TABELLEN-FUNKTIONEN =====
 
-async function populateTables(nameDeviations, noZsrFound, excludedRecords, excludedZsrRecords) {
+// mergedRecords wird durchgereicht, weil mergeStudentData beim ersten Aufbau noch
+// auf seiner lokalen Liste arbeitet – die globale mergedData ist dann leer.
+async function populateTables(nameDeviations, mergedRecords) {
     // Namensabweichungen (nur finale, verwendete Datensätze)
     if (nameDeviations.length > 0) {
         const tbody = document.getElementById('nameDeviationBody');
@@ -1019,44 +1024,156 @@ async function populateTables(nameDeviations, noZsrFound, excludedRecords, exclu
         updateUnmatchedSummary();
     }
     
-    // Ausgeschlossene Datensätze (durch besseren Match ersetzt)
-    if (excludedRecords.length > 0) {
-        const tbody = document.getElementById('excludedRecordsBody');
-        excludedRecords.forEach(item => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${item["Zusammengesetzter-Nachname-DiViS"] || ''}</td>
-                <td>${item["Vorname-DiViS"] || ''}</td>
-                <td>${item["Geburtsdatum-DiViS"] || ''}</td>
-                <td>${item["Klassenname-DiViS"] || ''}</td>
-                <td>${item["Ursprüngliche-Distanz"] || ''}</td>
-                <td>${item["Bessere-Distanz"] || ''}</td>
-            `;
-            tbody.appendChild(row);
-        });
-        document.getElementById('excludedRecordsContainer').style.display = 'block';
+    renderUncertainMatches(mergedRecords);
+    renderZsrWithoutMatch(mergedRecords);
+}
+
+// Die Tabelle "ZSR-Datensätze ohne DiViS-Match" wird komplett neu aufgebaut,
+// weil sich durch manuelle Zuordnungen und getauschte Treffer ändert, welche
+// ZSR-Datensätze noch übrig sind.
+function renderZsrWithoutMatch(mergedRecords = mergedData) {
+    const tbody = document.getElementById('excludedZsrRecordsBody');
+    tbody.innerHTML = '';
+
+    const withoutMatch = zsrData.filter(zsrRow =>
+        !mergedRecords.some(merged => merged["ZSR-ID-ZSR"] === zsrRow["ZSR-ID-ZSR"])
+    );
+
+    withoutMatch.forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${toolhubEscapeHtml(item["Auskunftssperre Leibund Leben-ZSR"] || '')}</td>
+            <td>${toolhubEscapeHtml(item["Auskunftssperre Adoptionspflege-ZSR"] || '')}</td>
+            <td>${toolhubEscapeHtml(item["ZSR-ID-ZSR"])}</td>
+            <td>${toolhubEscapeHtml(item["Nachname-ZSR"])}</td>
+            <td>${toolhubEscapeHtml(item["Vorname-ZSR"])}</td>
+            <td>${toolhubEscapeHtml(item["Geburtsdatum-ZSR"])}</td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    document.getElementById('excludedZsrRecordsContainer').style.display =
+        withoutMatch.length > 0 ? 'block' : 'none';
+}
+
+// ===== UNSICHERE ZUORDNUNGEN =====
+// Teilen sich mehrere ZSR-Datensätze ein Geburtsdatum, entscheidet allein der
+// Namensvergleich – bei großer Distanz kann die automatische Wahl danebenliegen.
+// Hier lässt sich die Zuordnung auf einen anderen Datensatz mit demselben
+// Geburtsdatum legen.
+
+// Alle ZSR-Felder eines zusammengeführten Datensatzes (inkl. Initialpasswort)
+const isZsrField = key => key.endsWith('-ZSR') || key === 'InitPW';
+
+function zsrPartOf(record) {
+    const part = {};
+    Object.keys(record).forEach(key => { if (isZsrField(key)) part[key] = record[key]; });
+    return part;
+}
+
+// Nur die DiViS-Seite – für Schüler, die ihren ZSR-Satz an einen besseren Treffer verlieren
+function divisPartOf(record) {
+    const part = {};
+    Object.keys(record).forEach(key => {
+        if (!isZsrField(key) && key !== 'Levenshtein-Distanz') part[key] = record[key];
+    });
+    return part;
+}
+
+// Setzt einen anderen ZSR-Datensatz in einen bestehenden Datensatz ein und
+// berechnet die Namensdistanz neu. Vorher werden die alten ZSR-Felder entfernt,
+// damit aus verschieden aufgebauten ZSR-Dateien nichts stehen bleibt.
+function applyZsrPart(record, zsrPart) {
+    Object.keys(record).forEach(key => { if (isZsrField(key)) delete record[key]; });
+    Object.keys(zsrPart).forEach(key => { if (isZsrField(key)) record[key] = zsrPart[key]; });
+    record["Levenshtein-Distanz"] =
+        levenshtein(record["Vorname-ZSR"] || '', record["Vorname-DiViS"] || '') +
+        levenshtein(record["Zusammengesetzter-Nachname-ZSR"] || '', record["Zusammengesetzter-Nachname-DiViS"] || '');
+}
+
+function renderUncertainMatches(mergedRecords = mergedData) {
+    const container = document.getElementById('uncertainMatchContainer');
+    const tbody = document.getElementById('uncertainMatchBody');
+    tbody.innerHTML = '';
+
+    if (uncertainMatches.length === 0) {
+        container.style.display = 'none';
+        return;
     }
-    
-    // ZSR ohne Match
-    if (excludedZsrRecords.length > 0) {
-        const tbody = document.getElementById('excludedZsrRecordsBody');
-        excludedZsrRecords.forEach(item => {
-            const row = document.createElement('tr');
-            // ID am Element, damit die Zeile verschwinden kann, sobald diese
-            // ZSR-ID von Hand einem Schüler zugeordnet wird
-            row.dataset.zsrId = item["ZSR-ID-ZSR"];
-            row.innerHTML = `
-                <td>${item["Auskunftssperre Leibund Leben-ZSR"] || ''}</td>
-                <td>${item["Auskunftssperre Adoptionspflege-ZSR"] || ''}</td>
-                <td>${item["ZSR-ID-ZSR"]}</td>
-                <td>${item["Nachname-ZSR"]}</td>
-                <td>${item["Vorname-ZSR"]}</td>
-                <td>${item["Geburtsdatum-ZSR"]}</td>
-            `;
-            tbody.appendChild(row);
-        });
-        document.getElementById('excludedZsrRecordsContainer').style.display = 'block';
+
+    uncertainMatches.forEach((record, index) => {
+        const distance = record["Levenshtein-Distanz"];
+        const resolved = distance <= CONFIG.UNCERTAIN_MATCH_DISTANCE;
+        const row = document.createElement('tr');
+        row.dataset.index = index;
+        row.innerHTML = `
+            <td>${toolhubEscapeHtml(record["Zusammengesetzter-Nachname-DiViS"])}</td>
+            <td>${toolhubEscapeHtml(record["Vorname-DiViS"])}</td>
+            <td>${toolhubEscapeHtml(record["Geburtsdatum-DiViS"])}</td>
+            <td>${toolhubEscapeHtml(record["Klassenname-DiViS"])}</td>
+            <td>${toolhubEscapeHtml(`${record["Zusammengesetzter-Nachname-ZSR"]}, ${record["Vorname-ZSR"]} (${record["ZSR-ID-ZSR"]})`)}</td>
+            <td><span class="distance ${resolved ? 'ok' : 'weak'}">${distance}</span></td>
+            <td class="cell-choice"></td>
+        `;
+
+        // Auswahl aller ZSR-Datensätze mit demselben Geburtsdatum
+        const select = document.createElement('select');
+        select.className = 'zsr-choice';
+        select.setAttribute('aria-label', 'Anderen ZSR-Datensatz zuordnen');
+        zsrData
+            .filter(zsrRow => zsrRow["Geburtsdatum-ZSR"] === record["Geburtsdatum-DiViS"])
+            .forEach(zsrRow => {
+                const option = document.createElement('option');
+                option.value = zsrRow["ZSR-ID-ZSR"];
+                const holder = mergedRecords.find(other =>
+                    other !== record && other["ZSR-ID-ZSR"] === zsrRow["ZSR-ID-ZSR"]);
+                option.textContent =
+                    `${zsrRow["Zusammengesetzter-Nachname-ZSR"]}, ${zsrRow["Vorname-ZSR"]} (${zsrRow["ZSR-ID-ZSR"]})` +
+                    (holder ? ` – zurzeit bei ${holder["Vorname-DiViS"]} ${holder["Zusammengesetzter-Nachname-DiViS"]}` : '');
+                option.selected = zsrRow["ZSR-ID-ZSR"] === record["ZSR-ID-ZSR"];
+                select.appendChild(option);
+            });
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn-mini';
+        button.textContent = 'Zuordnen';
+        button.addEventListener('click', () => reassignZsrMatch(index, select.value));
+
+        const cell = row.querySelector('.cell-choice');
+        cell.appendChild(select);
+        cell.appendChild(button);
+        tbody.appendChild(row);
+    });
+
+    container.style.display = 'block';
+}
+
+// Legt die Zuordnung eines Schülers auf einen anderen ZSR-Datensatz. Hängt dieser
+// bereits an einem anderen Schüler, tauschen beide – so lassen sich vertauschte
+// Geschwister mit gleichem Geburtsdatum in einem Schritt richtigstellen.
+function reassignZsrMatch(index, newZsrId) {
+    const record = uncertainMatches[index];
+    if (!record || record["ZSR-ID-ZSR"] === newZsrId) return;
+
+    const newZsrRow = zsrData.find(zsrRow => zsrRow["ZSR-ID-ZSR"] === newZsrId);
+    if (!newZsrRow) {
+        showAlert(`Der ZSR-Datensatz "${newZsrId}" wurde nicht gefunden.`, 'error');
+        return;
     }
+
+    const holder = mergedData.find(other => other !== record && other["ZSR-ID-ZSR"] === newZsrId);
+    const previousZsr = zsrPartOf(record);
+
+    applyZsrPart(record, newZsrRow);
+    if (holder) applyZsrPart(holder, previousZsr);
+
+    refreshAfterManualChange();
+
+    const name = `${record["Vorname-DiViS"]} ${record["Zusammengesetzter-Nachname-DiViS"]}`;
+    showAlert(holder
+        ? `${name} und ${holder["Vorname-DiViS"]} ${holder["Zusammengesetzter-Nachname-DiViS"]} haben ihre ZSR-Datensätze getauscht.`
+        : `${name} ist jetzt dem ZSR-Datensatz ${newZsrId} zugeordnet.`, 'success');
 }
 
 // ===== MANUELLE ZSR-ZUORDNUNG =====
@@ -1129,13 +1246,6 @@ function fillUnmatchedRow(row, entry, index) {
     }
 }
 
-// Ein von Hand zugeordneter ZSR-Datensatz ist nicht mehr "ohne DiViS-Match" –
-// sonst widersprächen sich die beiden Tabellen.
-function toggleUnmatchedZsrRow(zsrId, visible) {
-    const row = document.querySelector(`#excludedZsrRecordsBody tr[data-zsr-id="${CSS.escape(zsrId)}"]`);
-    if (row) row.style.display = visible ? '' : 'none';
-}
-
 function refreshUnmatchedRow(index) {
     const row = document.querySelector(`#noZsrFoundBody tr[data-index="${index}"]`);
     if (row) fillUnmatchedRow(row, unmatchedStudents[index], index);
@@ -1186,7 +1296,6 @@ function assignManualZsrId(index, rawId) {
     mergedData.push(record);
     entry.status = 'assigned';
     entry.zsrId = zsrId;
-    toggleUnmatchedZsrRow(zsrId, false);
 
     refreshUnmatchedRow(index);
     refreshAfterManualChange();
@@ -1207,7 +1316,6 @@ function undoUnmatchedDecision(index) {
     if (entry.status === 'assigned') {
         const position = mergedData.findIndex(record => record["ZSR-ID-ZSR"] === entry.zsrId);
         if (position !== -1) mergedData.splice(position, 1);
-        toggleUnmatchedZsrRow(entry.zsrId, true);
         entry.status = 'open';
         refreshUnmatchedRow(index);
         refreshAfterManualChange();
@@ -1218,9 +1326,13 @@ function undoUnmatchedDecision(index) {
     refreshUnmatchedRow(index);
 }
 
-// Elterndaten und Statistik hängen an mergedData und müssen deshalb neu aufgebaut
-// werden. Die Eltern-Tabellen werden vorher geleert, sonst stünden Zeilen doppelt.
+// Elterndaten, Statistik und die abhängigen Tabellen hängen an mergedData und
+// müssen nach jeder Änderung neu aufgebaut werden. Die Eltern-Tabellen werden
+// vorher geleert, sonst stünden Zeilen doppelt.
 async function refreshAfterManualChange() {
+    renderZsrWithoutMatch();
+    renderUncertainMatches();
+
     ['deletedRecords', 'inconsistency', 'emailInconsistency'].forEach(name => {
         const container = document.getElementById(name + 'Container');
         if (container) {
@@ -1234,7 +1346,9 @@ async function refreshAfterManualChange() {
     updateStats(zsrData.length, divisData.length, mergedData.length);
 }
 
-// Meldet in der Tabellenüberschrift, wie viele Schüler noch keine Entscheidung haben.
+// Meldet in der Tabellenüberschrift, wie viele Schüler noch keine Entscheidung
+// haben. Der Zusatz ist farblich abgesetzt: warnend, solange etwas offen ist,
+// bestätigend, sobald alle bearbeitet sind.
 function updateUnmatchedSummary() {
     const count = status => unmatchedStudents.filter(entry => entry.status === status).length;
     const open = count('open');
@@ -1242,9 +1356,11 @@ function updateUnmatchedSummary() {
     const header = document.querySelector('#noZsrFoundContainer .table-header');
     if (!header) return;
 
-    header.textContent = open > 0
-        ? `Kein ZSR-Datensatz gefunden – ${open} von ${unmatchedStudents.length} noch offen`
-        : `Kein ZSR-Datensatz gefunden – alle ${unmatchedStudents.length} bearbeitet (${count('assigned')} zugeordnet, ${count('ignored')} ignoriert)`;
+    const badge = open > 0
+        ? `<span class="header-badge open">${open} von ${unmatchedStudents.length} noch offen</span>`
+        : `<span class="header-badge done">alle ${unmatchedStudents.length} bearbeitet (${count('assigned')} zugeordnet, ${count('ignored')} ignoriert)</span>`;
+
+    header.innerHTML = `Kein ZSR-Datensatz gefunden ${badge}`;
 }
 
 // ===== ELTERN-DATENVERARBEITUNG =====
@@ -1374,12 +1490,12 @@ async function checkParentInconsistencies(parentData, deletedRecords) {
                     // Nur vergleichen, wenn das Geschlecht übereinstimmt ('' erlaubt für ältere/unspezifizierte Daten)
                     if (record1.geschlecht && record2.geschlecht && record1.geschlecht !== record2.geschlecht) continue;
 
-                    // Inkonsistenz wenn unterschiedliche Namen oder Adressen bei verschiedenen Kindern
-                    if (record1.kindID !== record2.kindID && 
-                        (record1.vorname !== record2.vorname || 
-                         record1.nachname !== record2.nachname || 
-                         record1.adresse !== record2.adresse)) {
-                        
+                    // Inkonsistenz nur bei unterschiedlichen Namen zu verschiedenen Kindern;
+                    // abweichende Adressen bleiben hier außen vor
+                    if (record1.kindID !== record2.kindID &&
+                        (record1.vorname !== record2.vorname ||
+                         record1.nachname !== record2.nachname)) {
+
                         inconsistencies.push({
                             zsr_id_kind1: record1.kindID,
                             vorname_kind1: record1.vorname_kind,
@@ -1391,9 +1507,7 @@ async function checkParentInconsistencies(parentData, deletedRecords) {
                             vorname1: record1.vorname,
                             nachname1: record1.nachname,
                             vorname2: record2.vorname,
-                            nachname2: record2.nachname,
-                            adresse1: record1.adresse,
-                            adresse2: record2.adresse
+                            nachname2: record2.nachname
                         });
                     }
                 }
@@ -1418,8 +1532,6 @@ async function checkParentInconsistencies(parentData, deletedRecords) {
                 <td>${item.nachname1}</td>
                 <td>${item.vorname2}</td>
                 <td>${item.nachname2}</td>
-                <td>${item.adresse1}</td>
-                <td>${item.adresse2}</td>
             `;
             tbody.appendChild(row);
         });
@@ -2052,6 +2164,13 @@ function setDebugMode(on) {
     const toggle = document.getElementById('debugToggle');
     if (toggle) toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
     localStorage.setItem(DEBUG_STORAGE_KEY, on ? 'an' : 'aus');
+
+    // Beim Ausschalten bereits sichtbare Hinweise entfernen; Fehler bleiben stehen
+    if (!on) {
+        document.querySelectorAll('#alerts .alert:not(.alert-error)').forEach(alert => alert.remove());
+        const clearBtn = document.getElementById('clearAlertsButton');
+        if (clearBtn && !document.querySelector('#alerts .alert')) clearBtn.style.display = 'none';
+    }
 }
 
 const debugToggle = document.getElementById('debugToggle');
