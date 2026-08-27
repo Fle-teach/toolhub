@@ -252,6 +252,45 @@ function findeNamenskonflikt(zeilenGruppe, gpu001Map) {
     return { unterrichte };
 }
 
+// Sucht Unterrichte, die mehrere Klassen umfassen, aber keine Schülergruppe tragen.
+//
+// Ohne Schülergruppe kann IServ nicht erkennen, dass die Kopplungszeilen eine gemeinsame
+// Lerngruppe bilden: Der Unterricht erscheint dann in jeder beteiligten Klasse einzeln statt
+// als ein Kurs. Richtig ist das nur, wenn wirklich alle Schülerinnen und Schüler dieser
+// Klassen teilnehmen; bei Wahl- und Förderkursen (Orchester, Band, Förderunterricht) fehlt
+// die Schülergruppe dagegen versehentlich.
+//
+// Zusammengefasst wird je Unterricht und Fach: Steht dieselbe Stunde mit einer noch nicht
+// besetzten Lehrkraft ("?") ein zweites Mal in der Kopplung, ist das derselbe Kurs.
+function findeFehlendeGruppen(parsed, gpu001Map) {
+    const proUnterricht = new Map(); // "U-Nr|Fach" -> Angaben des Kurses
+    for (const p of parsed) {
+        if (!p || p.gruppe !== '' || p.klasse === '') continue;
+        const schluessel = p.unr + '|' + p.fach;
+        if (!proUnterricht.has(schluessel)) {
+            proUnterricht.set(schluessel, {
+                unr: p.unr, fach: p.fach, klassen: new Set(), lehrer: new Set(), zeilen: [],
+            });
+        }
+        const eintrag = proUnterricht.get(schluessel);
+        eintrag.klassen.add(p.klasse);
+        if (p.lehrer !== '' && p.lehrer !== '?') eintrag.lehrer.add(p.lehrer);
+        eintrag.zeilen.push(p);
+    }
+
+    return [...proUnterricht.values()]
+        .filter((e) => e.klassen.size > 1)
+        .map((e) => ({
+            unr: e.unr,
+            fach: e.fach,
+            lehrer: [...e.lehrer].sort((a, b) => a.localeCompare(b, 'de')),
+            klassen: [...e.klassen].sort((a, b) => a.localeCompare(b, 'de', { numeric: true })),
+            zeit: gpu001Map ? zeitAngabe(e.zeilen, gpu001Map) : '',
+        }))
+        // Je mehr Klassen betroffen sind, desto eindeutiger der Fehler – diese zuerst.
+        .sort((a, b) => b.klassen.length - a.klassen.length || Number(a.unr) - Number(b.unr));
+}
+
 // Kernfunktion: berechnet Umbenennung/Filterung und gibt Datei-Inhalt + Mapping zurück.
 function normalisiereGPU002(text, optionen = {}) {
     const {
@@ -376,6 +415,7 @@ function normalisiereGPU002(text, optionen = {}) {
         inhalt: ausgabe.join(zeilenumbruch),
         mapping,
         namenskonflikte,
+        fehlendeGruppen: findeFehlendeGruppen(parsed, gpu001Map),
         anzahlZeilen: parsed.filter((p) => p !== null).length,
         anzahlOhneGruppe: parsed.filter((p) => p !== null && p.gruppe === '').length,
         entfernteZeilen,
@@ -607,35 +647,66 @@ if (typeof document !== 'undefined') {
         }
     }
 
-    // Meldet Schülergruppen, die in Untis mehrfach vergeben wurden. Solche Kurse landen
-    // beim Import als ein einziger Kurs – der Fehler gehört in Untis behoben, nicht hier.
+    // Meldet Auffälligkeiten der Quelldaten. Beide Fälle sind Eingabefehler in Untis und
+    // dort zu beheben – das Tool kann sie nur benennen, nicht auflösen.
     function zeigeKonflikte() {
         const konflikte = ergebnis.namenskonflikte;
-        if (konflikte.length === 0) {
+        const fehlende = ergebnis.fehlendeGruppen;
+        if (konflikte.length === 0 && fehlende.length === 0) {
             konfliktDiv.innerHTML = '';
             return;
         }
 
-        const liste = konflikte.map((k) => {
-            const unterrichte = k.unterrichte.map((u) => {
-                const lehrer = u.lehrer.join(', ') || 'ohne Lehrkraft';
-                const zeit = u.zeit === '' ? 'nicht verplant' : u.zeit;
-                return `<span class="unterricht">Unterricht ${toolhubEscapeHtml(u.unr)}: ` +
-                    `${toolhubEscapeHtml(lehrer)} (${toolhubEscapeHtml(zeit)})</span>`;
-            }).join('');
-            return `<li><span class="gruppe">${toolhubEscapeHtml(k.gruppe)}</span> ` +
-                `&rarr; ${toolhubEscapeHtml(ergebnis.mapping.get(k.gruppe).neu)}${unterrichte}</li>`;
-        }).join('');
+        let html = '';
 
-        konfliktDiv.innerHTML =
-            `<p>${toolhubIcon('warnung', 'msg-icon')}<strong>${konflikte.length} ` +
-            `${konflikte.length === 1 ? 'Schülergruppe ist' : 'Schülergruppen sind'} mehrfach vergeben.</strong> ` +
-            'Die folgenden Unterrichte tragen jeweils denselben Namen, werden aber von ganz ' +
-            'unterschiedlichen Lehrkräften gehalten &ndash; dieselben Schülerinnen und Schüler ' +
-            'können das nicht sein. Vermutlich wurde die Schülergruppe beim Anlegen in Untis von ' +
-            'einem anderen Kurs übernommen. Sie werden hier zu je einem Kurs zusammengefasst; ' +
-            'zum Trennen muss die Schülergruppe in Untis korrigiert werden.</p>' +
-            `<ul>${liste}</ul>`;
+        // Fall 1: derselbe Name auf mehreren Kursen – sie werden zusammengefasst.
+        if (konflikte.length > 0) {
+            const liste = konflikte.map((k) => {
+                const unterrichte = k.unterrichte.map((u) => {
+                    const lehrer = u.lehrer.join(', ') || 'ohne Lehrkraft';
+                    const zeit = u.zeit === '' ? 'nicht verplant' : u.zeit;
+                    return `<span class="unterricht">Unterricht ${toolhubEscapeHtml(u.unr)}: ` +
+                        `${toolhubEscapeHtml(lehrer)} (${toolhubEscapeHtml(zeit)})</span>`;
+                }).join('');
+                return `<li><span class="gruppe">${toolhubEscapeHtml(k.gruppe)}</span> ` +
+                    `&rarr; ${toolhubEscapeHtml(ergebnis.mapping.get(k.gruppe).neu)}${unterrichte}</li>`;
+            }).join('');
+
+            html +=
+                `<p>${toolhubIcon('warnung', 'msg-icon')}<strong>${konflikte.length} ` +
+                `${konflikte.length === 1 ? 'Schülergruppe ist' : 'Schülergruppen sind'} mehrfach vergeben.</strong> ` +
+                'Die folgenden Unterrichte tragen jeweils denselben Namen, werden aber von ganz ' +
+                'unterschiedlichen Lehrkräften gehalten &ndash; dieselben Schülerinnen und Schüler ' +
+                'können das nicht sein. Vermutlich wurde die Schülergruppe beim Anlegen in Untis von ' +
+                'einem anderen Kurs übernommen. Sie werden hier zu je einem Kurs zusammengefasst; ' +
+                'zum Trennen muss die Schülergruppe in Untis korrigiert werden.</p>' +
+                `<ul>${liste}</ul>`;
+        }
+
+        // Fall 2: klassenübergreifender Unterricht ohne Namen – er zerfällt in Einzelklassen.
+        if (fehlende.length > 0) {
+            const liste = fehlende.map((f) => {
+                const lehrer = f.lehrer.join(', ') || 'ohne Lehrkraft';
+                const zeit = f.zeit === '' ? 'nicht verplant' : f.zeit;
+                return `<li><span class="gruppe">${toolhubEscapeHtml(f.fach)}</span> ` +
+                    `bei ${toolhubEscapeHtml(lehrer)} ` +
+                    `<span class="unterricht">Unterricht ${toolhubEscapeHtml(f.unr)} (${toolhubEscapeHtml(zeit)}) ` +
+                    `&ndash; ${f.klassen.length} Klassen: ${toolhubEscapeHtml(f.klassen.join(', '))}</span></li>`;
+            }).join('');
+
+            html +=
+                `<p>${toolhubIcon('warnung', 'msg-icon')}<strong>${fehlende.length} ` +
+                `klassenübergreifende${fehlende.length === 1 ? 'r Unterricht hat' : ' Unterrichte haben'} ` +
+                'keine Schülergruppe.</strong> ' +
+                'IServ kann dann nicht erkennen, dass es sich um eine gemeinsame Lerngruppe handelt: ' +
+                'Der Unterricht erscheint in <em>jeder</em> beteiligten Klasse einzeln statt als ein Kurs. ' +
+                'Richtig ist das nur, wenn tatsächlich alle Schülerinnen und Schüler dieser Klassen ' +
+                'teilnehmen &ndash; bei Wahl- und Förderkursen muss in Untis eine Schülergruppe ' +
+                'eingetragen werden.</p>' +
+                `<ul>${liste}</ul>`;
+        }
+
+        konfliktDiv.innerHTML = html;
     }
 
     function zeigeErgebnis() {
@@ -706,7 +777,7 @@ if (typeof module !== 'undefined' && module.exports) {
         normalisiereGPU002, klassenTeil, basisName, splitRaw, unquote,
         parseFachKuerzelCSV: toolhubParseFachkuerzelCsv,
         normalisiereFach: toolhubNormalisiereFach,
-        istEinKlassenKurs, findeNamenskonflikt,
+        istEinKlassenKurs, findeNamenskonflikt, findeFehlendeGruppen,
         parseGPU001, transformiereGPU001, zeitAngabe, erzeugeZip, crc32,
     };
 }

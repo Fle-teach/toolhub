@@ -115,6 +115,11 @@
     margin: 0 0 10px;
 }
 
+/* Abstand zwischen den beiden Meldungsarten (mehrfach vergebene bzw. fehlende Gruppen) */
+.konflikt-box ul + p {
+    margin-top: 16px;
+}
+
 .konflikt-box ul {
     margin: 0;
     padding-left: 18px;
