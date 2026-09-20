@@ -1,61 +1,12 @@
 /* =========================================================================
-   Vornamen → Geschlecht  (lokales Wörterbuch + Heuristik, keine Online-API)
+   Vornamen → Geschlecht
+
+   Das Wörterbuch samt Heuristik steht in assets/toolhub-geschlecht.js, weil auch
+   der Sitzplan es braucht; gemerkte Korrekturen gelten deshalb toolhub-weit.
    ========================================================================= */
-const MALE_NAMES = `Lukas Jonas Felix Maximilian Paul Leon Finn Elias Noah Ben Luis Henri Henry Moritz David
-Jakob Jacob Anton Emil Theo Theodor Oskar Oscar Julian Tim Niklas Nikolas Philipp Philip Jan Samuel Erik Erich
-Matteo Adrian Fabian Linus Tom Tobias Simon Jonathan Daniel Michael Sebastian Alexander Aaron Hannes Mats Mattis
-Carl Karl Konstantin Constantin Vincent Valentin Benedikt Benjamin Jannik Joel Levi Leo Liam Milan Nico Nick Marlon
-Lennard Lennart Bennet Bennett Frederik Friedrich Florian Marius Johann Johannes Georg Gustav Wilhelm Heinrich Ludwig
-Otto Bruno Til Till Bastian Christian Stefan Stephan Thomas Andreas Martin Peter Klaus Hans Robert Richard Raphael
-Rafael Gabriel Damian Dominik Marvin Kevin Justin Colin Collin Ole Jasper Casper Kasimir Korbinian Quirin Xaver Sven
-Lars Malte Arne Bjarne Hauke Thaddäus Maximus Maxim Maxi Maximilian Ferdinand Friedemann Lorenz Mathis Mathias Matthias`
-    .split(/\s+/).filter(Boolean);
-
-const FEMALE_NAMES = `Anna Mia Emma Hannah Hanna Lena Lea Leah Marie Sophia Sofia Lara Clara Klara Johanna Charlotte Emilia
-Lina Mathilda Mathilde Frieda Frida Greta Ida Paula Nele Neele Luisa Louisa Sophie Sofie Amelie Nora Pauline Helena
-Maja Maya Carla Karla Romy Ella Marlene Lilly Lilli Lily Mila Lia Stella Theresa Therese Teresa Elisa Elisabeth Magdalena
-Franziska Katharina Catharina Julia Juliana Laura Sarah Sara Vanessa Jana Nina Lisa Melina Selina Celina Alina Annika
-Antonia Valentina Viktoria Victoria Carlotta Josephine Josefine Henriette Friederike Wilhelmina Mathea Thea Tabea Rosa
-Rosalie Fiona Zoe Zoé Isabel Isabella Isabelle Annabell Annabelle Leonie Leoni Melissa Hanne Merle Smilla Lotta Linnea
-Liv Ronja Mara Marit Maila Mailin Cosima Eleni Helene Eva Anni Anne Christina Christine Sabine Susanne Petra Andrea Maria
-Amalia Amelia Emely Emily Marlene Martha Marta Hedi Hedwig Else Elke Birte Femke Imke Wiebke Svea Solveig`
-    .split(/\s+/).filter(Boolean);
-
-// Bewusst mehrdeutige Vornamen → Nutzer muss entscheiden
-const AMBIGUOUS_NAMES = `Luca Luka Kim Toni Tony Sascha Sasha Alex Eike Noa Sam Robin Maxime Nikita`
-    .split(/\s+/).filter(Boolean);
-
-const NAME_DICT = (() => {
-    const d = new Map();
-    MALE_NAMES.forEach(n => d.set(n.toLowerCase(), 'm'));
-    FEMALE_NAMES.forEach(n => d.set(n.toLowerCase(), 'w'));
-    AMBIGUOUS_NAMES.forEach(n => d.set(n.toLowerCase(), 'ambig'));
-    return d;
-})();
-
-const LS_KEY = 'wpb_gender_overrides';
-function loadOverrides() { try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch { return {}; } }
-function saveOverride(name, g) {
-    const o = loadOverrides(); o[name.toLowerCase()] = g;
-    try { localStorage.setItem(LS_KEY, JSON.stringify(o)); } catch {}
-}
-
-// Liefert { g:'m'|'w'|null, conf:'sicher'|'unsicher'|'mehrdeutig' }
 function guessGender(vorname) {
-    const raw = (vorname || '').trim();
-    if (!raw) return { g: null, conf: 'mehrdeutig' };
-    // gemerkte manuelle Korrektur hat Vorrang
-    const ov = loadOverrides()[raw.toLowerCase()];
-    if (ov === 'm' || ov === 'w') return { g: ov, conf: 'sicher' };
-    // Doppelnamen: ersten Bestandteil verwenden
-    const first = raw.split(/[\s\-]+/)[0].toLowerCase();
-    const hit = NAME_DICT.get(first) || NAME_DICT.get(raw.toLowerCase());
-    if (hit === 'm') return { g: 'm', conf: 'sicher' };
-    if (hit === 'w') return { g: 'w', conf: 'sicher' };
-    if (hit === 'ambig') return { g: null, conf: 'mehrdeutig' };
-    // Heuristik für Unbekannte (markiert als unsicher)
-    if (/(a|e|ine|ina|ie)$/.test(first)) return { g: 'w', conf: 'unsicher' };
-    return { g: 'm', conf: 'unsicher' };
+    const { geschlecht, sicherheit } = toolhubGeschlechtRaten(vorname);
+    return { g: geschlecht, conf: sicherheit };
 }
 
 /* =========================================================================
@@ -434,7 +385,7 @@ function renderGenderTable() {
             const s = state.students.find(x => x.id === sel.dataset.id);
             s.geschlecht = sel.value || null;
             s.conf = sel.value ? 'sicher' : 'mehrdeutig';
-            if (sel.value) saveOverride(s.vorname, sel.value);
+            if (sel.value) toolhubGeschlechtMerken(s.vorname, sel.value);
             renderGenderStats();
             updateGenderGate();
             // Zeilenfarbe anpassen

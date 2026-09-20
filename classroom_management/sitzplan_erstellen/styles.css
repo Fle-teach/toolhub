@@ -1,0 +1,509 @@
+/* Sitzplan erstellen – nur tool-eigenes CSS; Grunddesign siehe assets/toolhub.css */
+
+h3.block-title {
+  font-size: 1.05rem;
+  margin: 24px 0 10px;
+}
+
+.inline-tip {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 18px 0 0;
+}
+
+/* ===== Spaltenzuordnung ===== */
+
+.zuordnung-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  gap: 10px 18px;
+}
+
+.zuordnung-feld {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.zuordnung-feld label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.zuordnung-feld.fehlt select {
+  border-color: var(--err);
+}
+
+/* ===== Werkzeugleiste des Raum-Editors ===== */
+
+.werkzeuge {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 26px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.werkzeug-gruppe {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.werkzeug-gruppe > label,
+.werkzeug-titel {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.werkzeug-gruppe input[type="number"] {
+  width: 68px;
+}
+
+.mal {
+  color: var(--text-muted);
+}
+
+/* ===== Der Raum =====
+ *
+ * Ein Rasterfeld ist genau ein Sitzplatz. Die Feldmaße stehen als Variablen am
+ * .raum, damit dieselbe Darstellung am Bildschirm, im Druck und beim Spiegeln
+ * (Lehrersicht) verwendet werden kann.
+ *
+ * Felder sind breiter als tief: Ein Tisch ist im Klassenraum ebenso breiter als
+ * tief, und ein Name braucht die Breite.
+ */
+
+.raum-buehne {
+  overflow-x: auto;
+  padding: 4px 0 8px;
+}
+
+.raum {
+  --feld-x: 108px;
+  --feld-y: 62px;
+  width: fit-content;
+  min-width: 100%;
+}
+
+.tafel {
+  width: calc(var(--breite) * var(--feld-x));
+  max-width: 100%;
+  margin: 0 auto 18px;
+  padding: 7px 0;
+  text-align: center;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--accent-text);
+  background: var(--accent);
+  border-radius: 6px;
+}
+
+.raum-flaeche {
+  position: relative;
+  width: calc(var(--breite) * var(--feld-x));
+  height: calc(var(--tiefe) * var(--feld-y));
+  margin: 0 auto;
+  /* Das Raster als schwache Hilfslinie – ohne sie ist beim Verschieben nicht zu
+     erkennen, wohin ein Tisch einrastet. */
+  background-image:
+    linear-gradient(to right, var(--card-border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--card-border) 1px, transparent 1px);
+  background-size: var(--feld-x) var(--feld-y);
+  border: 1px dashed var(--card-border);
+  border-radius: 8px;
+}
+
+/* Gespiegelte Ansicht: der ganze Raum wird umgeklappt, die Beschriftungen werden
+   einzeln zurückgedreht, damit sie lesbar bleiben. */
+.raum.gespiegelt .raum-flaeche { transform: scaleX(-1); }
+.raum.gespiegelt .platz-inhalt { transform: scaleX(-1); }
+
+.tisch {
+  position: absolute;
+  left: calc(var(--x) * var(--feld-x));
+  top: calc(var(--y) * var(--feld-y));
+  width: calc(var(--spalten) * var(--feld-x));
+  height: calc(var(--reihen) * var(--feld-y));
+  padding: 3px;
+  display: grid;
+  grid-template-columns: repeat(var(--spalten), 1fr);
+  grid-template-rows: repeat(var(--reihen), 1fr);
+  gap: 3px;
+  background: var(--link-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+}
+
+.raum-editor .tisch {
+  cursor: grab;
+  touch-action: none;   /* sonst scrollt das Ziehen die Seite statt den Tisch */
+}
+
+.raum-editor .tisch.zieht {
+  cursor: grabbing;
+  z-index: 5;
+  border-color: var(--accent);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+/* Stelle, an der ein gezogener Tisch nicht abgelegt werden kann */
+.raum-editor .tisch.ungueltig {
+  border-color: var(--err);
+  background: color-mix(in srgb, var(--err) 18%, transparent);
+}
+
+.platz {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 5px;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  font-size: 0.82rem;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.platz-inhalt {
+  min-width: 0;
+  width: 100%;
+}
+
+.platz .name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.platz .nachname {
+  font-weight: 700;
+}
+
+.platz .zusatz {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.platz.leer {
+  color: var(--text-muted);
+  background: transparent;
+  border-style: dashed;
+}
+
+/* Geschlecht: nicht über Rosa/Blau, sondern über die Kontur und das Zeichen –
+   die Kategoriefarbe bleibt damit das einzige Farbsignal der Seite. */
+.platz.g-m { border-left: 3px solid var(--info-col); }
+.platz.g-w { border-left: 3px solid var(--warn-col); }
+
+.platz .zeichen {
+  margin-right: 3px;
+  color: var(--text-muted);
+}
+
+.platz.verstoss {
+  border-color: var(--err);
+  background: color-mix(in srgb, var(--err) 14%, var(--card-bg));
+}
+
+.platz.fest {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.platz.fest::after {
+  content: "";
+  position: absolute;
+  inset: auto 3px 3px auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.raum-plan .platz {
+  position: relative;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.raum-plan .platz.zieht {
+  opacity: 0.5;
+}
+
+.raum-plan .platz.ziel {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--card-bg));
+}
+
+/* Knöpfe am Tisch (drehen, entfernen) – nur im Editor und nur beim Überfahren */
+.tisch-knoepfe {
+  position: absolute;
+  top: -11px;
+  right: -8px;
+  display: none;
+  gap: 4px;
+  z-index: 6;
+}
+
+.raum-editor .tisch:hover .tisch-knoepfe,
+.raum-editor .tisch:focus-within .tisch-knoepfe {
+  display: flex;
+}
+
+.tisch-knopf {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--card-border);
+  border-radius: 50%;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tisch-knopf:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ===== Regeln ===== */
+
+.regel-zeile {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 12px 0;
+}
+
+.regel-zeile > label {
+  min-width: 190px;
+  font-size: 0.92rem;
+}
+
+.regel-zeile input[type="text"] {
+  min-width: 260px;
+}
+
+.regel-hinweis {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+select.haerte {
+  min-width: 86px;
+}
+
+.paar-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.paar-liste:empty::before {
+  content: "Noch keine Vorgabe.";
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.paar-zeile {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--link-bg);
+}
+
+.paar-zeile select.person {
+  max-width: 220px;
+}
+
+.paar-weg {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.paar-weg:hover {
+  color: var(--err);
+}
+
+/* ===== Sitzplan erzeugen ===== */
+
+.fortschritt {
+  height: 6px;
+  margin: 4px 0 14px;
+  border-radius: 3px;
+  background: var(--link-bg);
+  overflow: hidden;
+  display: none;
+}
+
+.fortschritt.laeuft {
+  display: block;
+}
+
+.fortschritt-balken {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.12s linear;
+}
+
+.ansicht-optionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin: 14px 0 6px;
+  font-size: 0.9rem;
+}
+
+.ansicht-optionen label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+/* Schüler, für die kein Platz mehr da war */
+.uebrige {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.uebrige:empty {
+  display: none;
+}
+
+.uebrige .titel {
+  width: 100%;
+  font-size: 0.85rem;
+  color: var(--err);
+}
+
+.uebrige .person {
+  padding: 4px 10px;
+  border: 1px solid var(--err);
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+/* Zeilenfarben der Geschlechts-Prüfung */
+tr.unsicher { background: color-mix(in srgb, var(--warn-col) 14%, transparent); }
+tr.mehrdeutig { background: color-mix(in srgb, var(--err) 14%, transparent); }
+
+/* ===== Druck =====
+ *
+ * Gedruckt wird allein der Plan, quer auf DIN A4. Zwei Dinge sind dafür nötig:
+ *
+ * Erstens die Farben. Papier ist weiß – im dunklen Design wäre die Schrift sonst
+ * hell auf hell. Deshalb bekommt der Ausdruck die Werte des hellen Designs, und zwar
+ * über dieselben Variablen, aus denen sich auch die Bildschirmdarstellung bedient.
+ *
+ * Zweitens die Feldmaße: In Millimetern statt in Bildschirmpixeln füllt der Raum die
+ * Seite, statt am Rand abgeschnitten zu werden. Die Obergrenzen verhindern, dass ein
+ * kleiner Raum ins Riesenhafte wächst.
+ */
+@page {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+@media print {
+  body {
+    background: #fff;
+    color: #1a2433;
+    --text: #1a2433;
+    --text-muted: #5c6b7f;
+    --card-bg: #ffffff;
+    --card-border: #c7d0dc;
+    --link-bg: #eef1f7;
+    --info-col: #3b4cca;
+    --warn-col: #8a6100;
+    --err: #c0392b;
+  }
+
+  body.cat-classroom_management {
+    --accent: #a21caf;
+    --accent-text: #ffffff;
+  }
+
+  .back-link,
+  .theme-toggle,
+  header,
+  #meldung,
+  .panel:not(#planPanel),
+  #planPanel .button-group,
+  #planPanel .fortschritt,
+  #planPanel .ansicht-optionen,
+  #planPanel .hint,
+  #planPanel > h2,
+  #planPanel .panel-icon,
+  #planMeldung {
+    display: none !important;
+  }
+
+  #planPanel {
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+    background: none;
+  }
+
+  .raum-buehne { overflow: visible; }
+
+  /* Das Hilfsraster gehört zum Einrichten, nicht auf das ausgehängte Blatt */
+  .raum-flaeche {
+    background: none;
+    border: none;
+  }
+
+  .raum {
+    --feld-x: min(calc(275mm / var(--breite)), 38mm);
+    --feld-y: min(calc(160mm / var(--tiefe)), 24mm);
+  }
+
+  .platz { font-size: 9pt; }
+  .platz .zusatz { font-size: 7.5pt; }
+
+  .druck-titel {
+    display: block;
+    margin: 0 0 6mm;
+    font-size: 13pt;
+    font-weight: 700;
+    text-align: center;
+  }
+}
+
+/* Die Überschrift des Ausdrucks steht nur im Ausdruck */
+.druck-titel {
+  display: none;
+}

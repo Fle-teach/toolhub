@@ -114,6 +114,19 @@ main {
   .cat-allgemein:hover .card-icon rect:nth-of-type(3) { animation-delay: 0.16s; }
   .cat-allgemein:hover .card-icon rect:nth-of-type(4) { animation-delay: 0.24s; }
 
+  /* Classroom Management: der Raum füllt sich – die Tische besetzen sich reihenweise
+   * von vorn nach hinten, die Tafel bleibt stehen. Sie sind die einzigen <rect> in
+   * .tische, deshalb reicht :nth-of-type() statt vier gleichlautender Klassen.
+   * `pochen` braucht kein `backwards`: sein erstes Bild ist schon der Ruhezustand. */
+  .cat-classroom_management:hover .card-icon .tische rect {
+    transform-box: fill-box;      /* jeder Tisch geht um seine eigene Mitte auf */
+    transform-origin: 50% 50%;
+    animation: pochen 0.5s ease-in-out;
+  }
+  .cat-classroom_management:hover .card-icon .tische rect:nth-of-type(2) { animation-delay: 0.07s; }
+  .cat-classroom_management:hover .card-icon .tische rect:nth-of-type(3) { animation-delay: 0.18s; }
+  .cat-classroom_management:hover .card-icon .tische rect:nth-of-type(4) { animation-delay: 0.25s; }
+
   /* Förderkoordination: die Keimblätter entfalten sich aus dem Stiel */
   .cat-foerderkoordination:hover .card-icon .blatt-links,
   .cat-foerderkoordination:hover .card-icon .blatt-rechts {

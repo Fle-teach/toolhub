@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sitzplan erstellen &ndash; toolhub</title>
+  <link rel="stylesheet" href="../../assets/toolhub.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="../../assets/toolhub.js"></script>
+  <!-- Bibliotheken lokal eingebunden -> Tool funktioniert auch offline -->
+  <script src="../../assets/vendor/papaparse.min.js" defer></script>
+  <script src="../../assets/vendor/xlsx.full.min.js" defer></script>
+  <script src="../../assets/toolhub-io.js" defer></script>
+  <script src="../../assets/toolhub-xlsx.js" defer></script>
+  <script src="../../assets/toolhub-geschlecht.js" defer></script>
+  <script src="raum.js" defer></script>
+  <script src="verteilung.js" defer></script>
+  <script src="export.js" defer></script>
+  <script src="liste.js" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body class="cat-classroom_management">
+
+  <header>
+    <h1>Sitzplan erstellen<span data-icon="sitzplan" class="title-icon"></span></h1>
+    <p class="subtitle">Schülerliste einlesen, Tische stellen und die Sitzordnung nach eigenen Regeln erzeugen</p>
+  </header>
+
+  <main>
+
+    <div id="meldung"></div>
+
+    <!-- Schritt 1: Schülerliste -->
+    <section class="panel">
+      <span data-icon="klassenraum" class="panel-icon"></span>
+      <h2>1 &middot; Sch&uuml;lerliste einlesen</h2>
+      <p class="hint">Erwartet werden die Spalten <code>Nachname</code> und <code>Vorname</code>, wahlweise
+        zus&auml;tzlich <code>Klasse</code> und <code>Geschlecht</code>. Die Spalten werden an der Kopfzeile
+        erkannt und lassen sich darunter anpassen. Es werden keine Daten hochgeladen &ndash; alles l&auml;uft
+        lokal in diesem Browser.</p>
+
+      <input type="file" id="listeDatei" class="file-input" accept=".csv,.xlsx,.xls,.xlsm">
+      <div class="upload-box" id="listeZone">
+        <span data-icon="tabelle" class="upload-icon"></span>
+        <div class="upload-text"><strong>CSV- oder Excel-Datei hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
+        <div class="upload-hint">CSV, XLSX, XLS oder XLSM &ndash; gelesen wird das erste Tabellenblatt</div>
+      </div>
+      <div class="file-list" id="listeListe"></div>
+
+      <div id="zuordnungBereich" class="hidden">
+        <h3 class="block-title">Spaltenzuordnung</h3>
+        <div class="zuordnung-grid" id="zuordnungGrid"></div>
+      </div>
+
+      <p class="inline-tip">Oder einen fr&uuml;her gesicherten Sitzplan weiterbearbeiten &ndash; er enth&auml;lt
+        Sch&uuml;ler, Raum, Regeln und die Sitzordnung.</p>
+      <div class="button-group">
+        <button type="button" class="btn-secondary" id="ladenBtn">
+          <span data-icon="upload" class="inline-icon"></span>Sitzplan laden (JSON)
+        </button>
+        <input type="file" id="ladenDatei" class="file-input" accept=".json">
+      </div>
+    </section>
+
+    <!-- Schritt 2: Geschlecht -->
+    <section class="panel section" id="geschlechtPanel">
+      <span data-icon="person" class="panel-icon"></span>
+      <h2>2 &middot; Geschlecht pr&uuml;fen</h2>
+      <p class="hint">Wo die Liste nichts angibt, wird das Geschlecht aus dem Vornamen geschlossen.
+        Das ist eine Vorbelegung, keine Auskunft &ndash; bitte durchsehen. Gelb hinterlegte Zeilen sind
+        nur &uuml;ber die Namensendung erschlossen, rote Zeilen brauchen zwingend eine Entscheidung.
+        Was hier richtiggestellt wird, merkt sich das toolhub f&uuml;r das n&auml;chste Mal.</p>
+
+      <div class="stats">
+        <div class="stat-card"><h3>Jungen</h3><div class="value" id="zahlJungen">0</div></div>
+        <div class="stat-card"><h3>M&auml;dchen</h3><div class="value" id="zahlMaedchen">0</div></div>
+        <div class="stat-card"><h3>ohne Angabe</h3><div class="value" id="zahlOffen">0</div></div>
+      </div>
+
+      <div id="geschlechtMeldung"></div>
+      <div class="table-wrap">
+        <table id="geschlechtTabelle">
+          <thead><tr><th>Nachname</th><th>Vorname</th><th>Klasse</th><th>Herkunft</th><th>Geschlecht</th></tr></thead>
+          <tbody id="geschlechtKoerper"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Schritt 3: Raum -->
+    <section class="panel section" id="raumPanel">
+      <!-- Motiv: Tisch mit Pfeilen in alle Richtungen (Tische anordnen) -->
+      <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="8" y="9.5" width="8" height="5" rx="1.5"/>
+        <path d="M12 7V3.2"/><path d="M10.3 4.9L12 3.2l1.7 1.7"/>
+        <path d="M12 17v3.8"/><path d="M10.3 19.1L12 20.8l1.7-1.7"/>
+        <path d="M5.8 12H2"/><path d="M3.7 10.3L2 12l1.7 1.7"/>
+        <path d="M18.2 12H22"/><path d="M20.3 10.3L22 12l-1.7 1.7"/>
+      </svg>
+      <h2>3 &middot; Raum einrichten</h2>
+      <p class="hint">Eine Vorlage w&auml;hlen und anpassen: Tische lassen sich mit der Maus verschieben,
+        drehen und entfernen. Jedes Rasterfeld ist ein Sitzplatz; G&auml;nge entstehen, indem Felder frei
+        bleiben. Die Tafel steht oben &ndash; daran h&auml;ngen die Regeln &bdquo;weit vorne&ldquo; und
+        &bdquo;nicht in der letzten Reihe&ldquo;.</p>
+
+      <div class="werkzeuge">
+        <div class="werkzeug-gruppe">
+          <label for="vorlage">Vorlage</label>
+          <select id="vorlage"></select>
+          <button type="button" class="btn-secondary btn-small" id="vorlageBtn">&uuml;bernehmen</button>
+        </div>
+        <div class="werkzeug-gruppe">
+          <span class="werkzeug-titel">Tisch hinzuf&uuml;gen</span>
+          <button type="button" class="btn-secondary btn-small" data-tisch="1x1">Einzeln</button>
+          <button type="button" class="btn-secondary btn-small" data-tisch="2x1">2er</button>
+          <button type="button" class="btn-secondary btn-small" data-tisch="3x1">3er</button>
+          <button type="button" class="btn-secondary btn-small" data-tisch="2x2">4er-Gruppe</button>
+          <button type="button" class="btn-secondary btn-small" data-tisch="3x2">6er-Gruppe</button>
+        </div>
+        <div class="werkzeug-gruppe">
+          <label for="raumBreite">Raum</label>
+          <input type="number" id="raumBreite" min="1" max="20" value="8" title="Pl&auml;tze nebeneinander">
+          <span class="mal">&times;</span>
+          <input type="number" id="raumTiefe" min="1" max="15" value="4" title="Reihen hintereinander">
+          <button type="button" class="btn-secondary btn-small" id="zuschneidenBtn">zuschneiden</button>
+          <button type="button" class="btn-secondary btn-small" id="leerenBtn">alle Tische entfernen</button>
+        </div>
+      </div>
+
+      <div class="raum-buehne">
+        <div class="raum raum-editor" id="raumEditor">
+          <div class="tafel">Tafel</div>
+          <div class="raum-flaeche"></div>
+        </div>
+      </div>
+      <div id="raumStatus"></div>
+    </section>
+
+    <!-- Schritt 4: Regeln -->
+    <section class="panel section" id="regelnPanel">
+      <span data-icon="einstellungen" class="panel-icon"></span>
+      <h2>4 &middot; Regeln</h2>
+      <p class="hint">Eine <strong>weiche</strong> Regel wird so gut wie m&ouml;glich erf&uuml;llt, eine
+        <strong>harte</strong> hat Vorrang vor allen weichen. Wo sich harte Regeln widersprechen, sagt der
+        Bericht unter dem Plan, welche nicht aufgeht.</p>
+
+      <div class="regel-zeile">
+        <label for="verteilung">Ausgangsverteilung</label>
+        <select id="verteilung">
+          <option value="zufall">zuf&auml;llig</option>
+          <option value="alphabetisch">alphabetisch nach Nachname</option>
+          <option value="klassenweise">nach Klasse, darin alphabetisch</option>
+        </select>
+        <span class="regel-hinweis">Startpunkt der Optimierung; ohne weitere Regeln bleibt sie so stehen</span>
+      </div>
+
+      <div class="regel-zeile">
+        <label for="muster">Geschlechtermuster</label>
+        <select id="muster">
+          <option value="keins">keins</option>
+          <option value="jm">Junge &ndash; M&auml;dchen abwechselnd</option>
+          <option value="jjmm">Junge &ndash; Junge &ndash; M&auml;dchen &ndash; M&auml;dchen</option>
+          <option value="tisch_gemischt">je Tisch ausgewogen</option>
+          <option value="tisch_gleich">gleichgeschlechtliche Tische</option>
+        </select>
+        <select class="haerte" id="musterHaerte">
+          <option value="weich">weich</option>
+          <option value="hart">hart</option>
+        </select>
+        <span class="regel-hinweis">Sch&uuml;ler ohne Geschlechtsangabe bleiben aus dem Muster heraus</span>
+      </div>
+
+      <div class="regel-zeile" id="klassenZeile">
+        <label for="klassen">Klassen &amp; Kurse</label>
+        <select id="klassen">
+          <option value="egal">egal</option>
+          <option value="mischen">mischen (nicht nebeneinander)</option>
+          <option value="zusammen">zusammenhalten (nebeneinander)</option>
+        </select>
+        <select class="haerte" id="klassenHaerte">
+          <option value="weich">weich</option>
+          <option value="hart">hart</option>
+        </select>
+        <span class="regel-hinweis">nur sinnvoll, wenn die Liste mehrere Klassen enth&auml;lt</span>
+      </div>
+
+      <div class="regel-zeile">
+        <label for="vordereReihen">&bdquo;Weit vorne&ldquo; hei&szlig;t</label>
+        <input type="number" id="vordereReihen" min="1" max="6" value="2">
+        <span class="regel-hinweis">Reihen ab der Tafel; gilt f&uuml;r die Sitzw&uuml;nsche unten</span>
+        <select class="haerte" id="wuenscheHaerte">
+          <option value="weich">weich</option>
+          <option value="hart">hart</option>
+        </select>
+        <span class="regel-hinweis">H&auml;rte der Sitzw&uuml;nsche und des Alleinsitzens</span>
+      </div>
+
+      <h3 class="block-title">Zusammensitzen</h3>
+      <p class="hint">Paare oder Gruppen, die beieinander sitzen sollen.</p>
+      <div id="zusammenListe" class="paar-liste"></div>
+      <div class="button-group">
+        <button type="button" class="btn-secondary btn-small" id="zusammenPlus">
+          <span data-icon="person" class="inline-icon"></span>Paar hinzuf&uuml;gen
+        </button>
+      </div>
+
+      <h3 class="block-title">Auseinandersetzen</h3>
+      <p class="hint">Paare oder Gruppen, die nicht beieinander sitzen sollen.</p>
+      <div id="getrenntListe" class="paar-liste"></div>
+      <div class="button-group">
+        <button type="button" class="btn-secondary btn-small" id="getrenntPlus">
+          <span data-icon="person" class="inline-icon"></span>Paar hinzuf&uuml;gen
+        </button>
+      </div>
+
+      <details class="advanced-panel" id="wuenschePanel">
+        <summary>Sitzw&uuml;nsche einzelner Sch&uuml;ler</summary>
+        <div class="advanced-content">
+          <p class="hint">Wer weit vorne sitzen muss, wer nicht in die letzte Reihe soll und wer einen
+            freien Platz neben sich braucht. Ein fester Platz wird im Plan per Klick auf den Platz gesetzt.</p>
+          <div class="table-wrap">
+            <table id="wuenscheTabelle">
+              <thead><tr><th>Sch&uuml;ler</th><th>Klasse</th><th>Sitzplatz</th><th>allein</th><th>fester Platz</th></tr></thead>
+              <tbody id="wuenscheKoerper"></tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- Schritt 5: Sitzplan -->
+    <section class="panel section" id="planPanel">
+      <span data-icon="sitzplan" class="panel-icon"></span>
+      <h2>5 &middot; Sitzplan</h2>
+
+      <div class="button-group">
+        <button type="button" class="btn-primary" id="erzeugenBtn">
+          <span data-icon="sitzplan" class="inline-icon"></span>Sitzplan erzeugen
+        </button>
+        <button type="button" class="btn-secondary" id="weiterBtn">
+          <span data-icon="start" class="inline-icon"></span>Weiter optimieren
+        </button>
+        <button type="button" class="btn-secondary" id="stoppBtn">
+          <span data-icon="stopp" class="inline-icon"></span>Beenden
+        </button>
+      </div>
+      <div class="fortschritt" id="fortschritt"><div class="fortschritt-balken" id="fortschrittBalken"></div></div>
+      <div id="planMeldung"></div>
+
+      <div class="ansicht-optionen">
+        <label><input type="checkbox" id="lehrersicht"> aus Sicht der Lehrkraft (gespiegelt)</label>
+        <label><input type="checkbox" id="zeigeGeschlecht" checked> Geschlecht kennzeichnen</label>
+        <label><input type="checkbox" id="zeigeKlasse" checked> Klasse anzeigen</label>
+        <label><input type="checkbox" id="zeigeVerstoesse" checked> Verst&ouml;&szlig;e hervorheben</label>
+      </div>
+      <p class="hint">Zwei Sch&uuml;ler tauschen: einen Platz auf den anderen ziehen. Ein Klick auf einen
+        Platz heftet den Sch&uuml;ler fest &ndash; beim n&auml;chsten Erzeugen bleibt er sitzen.</p>
+
+      <div class="druck-titel" id="druckTitel"></div>
+      <div class="raum-buehne">
+        <div class="raum raum-plan" id="raumPlan">
+          <div class="tafel">Tafel</div>
+          <div class="raum-flaeche"></div>
+        </div>
+      </div>
+
+      <div id="uebrigeSchueler" class="uebrige"></div>
+    </section>
+
+    <!-- Schritt 6: Ausgabe -->
+    <section class="panel section" id="exportPanel">
+      <span data-icon="download" class="panel-icon"></span>
+      <h2>6 &middot; Ausgeben</h2>
+      <p class="hint">Gedruckt wird nur der Plan, quer auf DIN&nbsp;A4 &ndash; die Ansichtseinstellungen aus
+        Schritt&nbsp;5 gelten dabei mit.</p>
+      <div class="button-group">
+        <button type="button" class="btn-primary" id="druckenBtn">
+          <span data-icon="download" class="inline-icon"></span>Drucken / als PDF sichern
+        </button>
+        <button type="button" class="btn-secondary" id="bildBtn">
+          <span data-icon="download" class="inline-icon"></span>Als Bild sichern (PNG)
+        </button>
+        <button type="button" class="btn-secondary" id="sichernBtn">
+          <span data-icon="download" class="inline-icon"></span>Sitzplan sichern (JSON)
+        </button>
+      </div>
+      <div class="regel-zeile">
+        <label for="planTitel">&Uuml;berschrift</label>
+        <input type="text" id="planTitel" placeholder="z.&nbsp;B. Klasse 7b &ndash; Raum 214">
+      </div>
+    </section>
+
+  </main>
+
+</body>
+</html>

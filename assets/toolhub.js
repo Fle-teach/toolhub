@@ -65,6 +65,17 @@ const TOOLHUB_ICONS = {
     '<rect x="13.5" y="3.5" width="7" height="7" rx="1.8"/>' +
     '<rect x="3.5" y="13.5" width="7" height="7" rx="1.8"/>' +
     '<rect x="13.5" y="13.5" width="7" height="7" rx="1.8"/>',
+  // Klassenraum von oben: Tafel an der Stirnseite, davor vier Tische. Auf der
+  // Startseite besetzen sich die Tische von vorn nach hinten (`pochen`); dafür stehen
+  // sie in einer eigenen Gruppe, damit die Tafel nicht mitzählt.
+  klassenraum:
+    '<rect x="6" y="3" width="12" height="2.8" rx="1"/>' +
+    '<g class="tische">' +
+      '<rect x="2.8" y="9.5" width="7.4" height="3.6" rx="1"/>' +
+      '<rect x="13.8" y="9.5" width="7.4" height="3.6" rx="1"/>' +
+      '<rect x="2.8" y="16.6" width="7.4" height="3.6" rx="1"/>' +
+      '<rect x="13.8" y="16.6" width="7.4" height="3.6" rx="1"/>' +
+    '</g>',
   // Setzling / Wachstum. Beide Keimblätter setzen bei (12,12) am Stiel an – dort liegt
   // auch der Drehpunkt, um den sie sich auf der Startseite entfalten.
   setzling:
@@ -176,6 +187,11 @@ const TOOLHUB_ICONS = {
   brief:
     '<rect x="3" y="5" width="18" height="14" rx="2"/>' +
     '<path d="M3.6 6.6l7.2 5.1a2 2 0 0 0 2.4 0l7.2-5.1"/>',
+  // Tisch mit zwei Plätzen, von oben (Sitzordnung: wer sitzt neben wem)
+  sitzplan:
+    '<rect x="3.5" y="4.5" width="17" height="5.5" rx="1.5"/>' +
+    '<circle cx="7.5" cy="16.5" r="2.5"/>' +
+    '<circle cx="16.5" cy="16.5" r="2.5"/>',
   // Textdokument mit umgeknickter Ecke (DOCX/ODT)
   dokument:
     '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>' +

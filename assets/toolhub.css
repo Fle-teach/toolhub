@@ -143,6 +143,7 @@
  */
 
 .cat-allgemein               { --accent: #22d3ee; --accent-text: #06303a; }
+.cat-classroom_management    { --accent: #e879f9; --accent-text: #3b0a42; }
 .cat-foerderkoordination     { --accent: #2dd4bf; --accent-text: #06302a; }
 .cat-geraeteverwaltung       { --accent: #a3e635; --accent-text: #1f2937; }
 .cat-iserv_benutzerverwaltung { --accent: #60a5fa; --accent-text: #0f2b4d; }
@@ -153,6 +154,7 @@
 .cat-klassenzusammensetzung  { --accent: #a78bfa; --accent-text: #241250; }
 
 :root[data-theme="light"] .cat-allgemein                { --accent: #0e7490; --accent-text: #ffffff; }
+:root[data-theme="light"] .cat-classroom_management     { --accent: #a21caf; --accent-text: #ffffff; }
 :root[data-theme="light"] .cat-foerderkoordination      { --accent: #0d9488; --accent-text: #ffffff; }
 :root[data-theme="light"] .cat-geraeteverwaltung        { --accent: #4d7c0f; --accent-text: #ffffff; }
 :root[data-theme="light"] .cat-iserv_benutzerverwaltung { --accent: #2b6cb0; --accent-text: #ffffff; }

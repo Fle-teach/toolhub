@@ -38,6 +38,14 @@ const TOOLHUB_KATEGORIEN = [
     ]
   },
   {
+    id: 'classroom_management',
+    name: 'Classroom Management',
+    icon: 'klassenraum',
+    tools: [
+      { name: 'Sitzplan erstellen', ordner: 'sitzplan_erstellen' }
+    ]
+  },
+  {
     id: 'foerderkoordination',
     name: 'Förderkoordination',
     icon: 'setzling',
