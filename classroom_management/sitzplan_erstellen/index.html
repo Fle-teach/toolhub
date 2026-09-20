@@ -65,11 +65,14 @@
     <!-- Schritt 2: Geschlecht -->
     <section class="panel section" id="geschlechtPanel">
       <span data-icon="person" class="panel-icon"></span>
-      <h2>2 &middot; Geschlecht pr&uuml;fen</h2>
+      <h2>2 &middot; Sch&uuml;ler pr&uuml;fen</h2>
       <p class="hint">Wo die Liste nichts angibt, wird das Geschlecht aus dem Vornamen geschlossen.
         Das ist eine Vorbelegung, keine Auskunft &ndash; bitte durchsehen. Gelb hinterlegte Zeilen sind
         nur &uuml;ber die Namensendung erschlossen, rote Zeilen brauchen zwingend eine Entscheidung.
         Was hier richtiggestellt wird, merkt sich das toolhub f&uuml;r das n&auml;chste Mal.</p>
+      <p class="hint">Im <strong>Rufnamen</strong> steht, wie das Kind tats&auml;chlich angesprochen wird
+        (&bdquo;Max&ldquo; statt &bdquo;Maximilian&ldquo;). Er tritt im Sitzplan an die Stelle des Vornamens;
+        bleibt er leer, wird der Vorname angezeigt.</p>
 
       <div class="stats">
         <div class="stat-card"><h3>Jungen</h3><div class="value" id="zahlJungen">0</div></div>
@@ -80,7 +83,7 @@
       <div id="geschlechtMeldung"></div>
       <div class="table-wrap">
         <table id="geschlechtTabelle">
-          <thead><tr><th>Nachname</th><th>Vorname</th><th>Klasse</th><th>Herkunft</th><th>Geschlecht</th></tr></thead>
+          <thead><tr><th>Nachname</th><th>Vorname</th><th>Rufname</th><th>Klasse</th><th>Herkunft</th><th>Geschlecht</th></tr></thead>
           <tbody id="geschlechtKoerper"></tbody>
         </table>
       </div>
@@ -97,16 +100,25 @@
         <path d="M18.2 12H22"/><path d="M20.3 10.3L22 12l-1.7 1.7"/>
       </svg>
       <h2>3 &middot; Raum einrichten</h2>
-      <p class="hint">Eine Vorlage w&auml;hlen und anpassen: Tische lassen sich mit der Maus verschieben,
-        drehen und entfernen. Jedes Rasterfeld ist ein Sitzplatz; G&auml;nge entstehen, indem Felder frei
-        bleiben. Die Tafel steht oben &ndash; daran h&auml;ngen die Regeln &bdquo;weit vorne&ldquo; und
-        &bdquo;nicht in der letzten Reihe&ldquo;.</p>
+      <p class="hint">Zuerst den Raum ausmessen, dann eine Vorlage hineinlegen: Sie f&uuml;llt genau die
+        eingestellte Fl&auml;che, eine U-Form l&auml;uft also wirklich an den W&auml;nden entlang. Danach
+        anpassen &ndash; Tische lassen sich mit der Maus verschieben, drehen und entfernen. Jedes
+        Rasterfeld ist ein Sitzplatz; G&auml;nge entstehen, indem Felder frei bleiben. Die Tafel steht
+        oben &ndash; daran h&auml;ngen die Regeln &bdquo;weit vorne&ldquo; und &bdquo;nicht in der letzten
+        Reihe&ldquo;.</p>
 
       <div class="werkzeuge">
         <div class="werkzeug-gruppe">
+          <label for="raumBreite">Raum</label>
+          <input type="number" id="raumBreite" min="1" max="20" value="9" title="Pl&auml;tze nebeneinander">
+          <span class="mal">&times;</span>
+          <input type="number" id="raumTiefe" min="1" max="15" value="4" title="Reihen hintereinander">
+          <span class="regel-hinweis">Pl&auml;tze nebeneinander &times; Reihen</span>
+        </div>
+        <div class="werkzeug-gruppe">
           <label for="vorlage">Vorlage</label>
           <select id="vorlage"></select>
-          <button type="button" class="btn-secondary btn-small" id="vorlageBtn">&uuml;bernehmen</button>
+          <button type="button" class="btn-secondary btn-small" id="vorlageBtn">in den Raum legen</button>
         </div>
         <div class="werkzeug-gruppe">
           <span class="werkzeug-titel">Tisch hinzuf&uuml;gen</span>
@@ -117,11 +129,7 @@
           <button type="button" class="btn-secondary btn-small" data-tisch="3x2">6er-Gruppe</button>
         </div>
         <div class="werkzeug-gruppe">
-          <label for="raumBreite">Raum</label>
-          <input type="number" id="raumBreite" min="1" max="20" value="8" title="Pl&auml;tze nebeneinander">
-          <span class="mal">&times;</span>
-          <input type="number" id="raumTiefe" min="1" max="15" value="4" title="Reihen hintereinander">
-          <button type="button" class="btn-secondary btn-small" id="zuschneidenBtn">zuschneiden</button>
+          <button type="button" class="btn-secondary btn-small" id="zuschneidenBtn">auf Tische zuschneiden</button>
           <button type="button" class="btn-secondary btn-small" id="leerenBtn">alle Tische entfernen</button>
         </div>
       </div>
@@ -247,7 +255,8 @@
       <div id="planMeldung"></div>
 
       <div class="ansicht-optionen">
-        <label><input type="checkbox" id="lehrersicht"> aus Sicht der Lehrkraft (gespiegelt)</label>
+        <label><input type="checkbox" id="lehrersicht"> aus Sicht der Lehrkraft (um 180&deg; gedreht)</label>
+        <label><input type="checkbox" id="zeigeNachname" checked> Nachname anzeigen</label>
         <label><input type="checkbox" id="zeigeGeschlecht" checked> Geschlecht kennzeichnen</label>
         <label><input type="checkbox" id="zeigeKlasse" checked> Klasse anzeigen</label>
         <label><input type="checkbox" id="zeigeVerstoesse" checked> Verst&ouml;&szlig;e hervorheben</label>

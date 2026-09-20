@@ -66,8 +66,11 @@ function sitzplanRundesRechteck(ctx, x, y, breite, hoehe, radius) {
 
 /*
  * Zeichnet den Plan auf ein neues <canvas> und gibt es zurück.
- * Die Lehrersicht spiegelt die Plätze waagerecht – gerechnet wird das beim Setzen der
- * Koordinaten, nicht über eine Transformation, sonst stünde auch die Schrift spiegelverkehrt.
+ *
+ * Die Lehrersicht dreht den Raum um 180°: Die Tafel rückt nach unten, dorthin, wo die
+ * Lehrkraft steht, und sowohl links/rechts als auch vorn/hinten kehren sich um.
+ * Gerechnet wird das beim Setzen der Koordinaten und nicht über eine Transformation
+ * der Leinwand – sonst stünde auch die Schrift auf dem Kopf.
  */
 function sitzplanZeichneBild(zustand, einstellungen) {
   const { raum, geo, schueler, belegung } = zustand;
@@ -94,8 +97,12 @@ function sitzplanZeichneBild(zustand, einstellungen) {
     ctx.fillText(einstellungen.titel, breite / 2, rand + 8);
   }
 
+  const gedreht = einstellungen.lehrersicht;
+  // Gedreht steht die Tafel unten, sonst oben; die Sitzfläche nimmt die andere Hälfte
+  const obenY = gedreht ? rand + kopf : rand + kopf + tafel + 12;
+  const tafelY = gedreht ? obenY + raum.tiefe * feldY + 12 : rand + kopf;
+
   // Tafel als Bezugspunkt: Ohne sie ist einem Blatt Papier nicht anzusehen, wo vorne ist
-  const tafelY = rand + kopf;
   ctx.fillStyle = f.akzent;
   sitzplanRundesRechteck(ctx, rand, tafelY, raum.breite * feldX, tafel - 12, 6);
   ctx.fill();
@@ -103,16 +110,15 @@ function sitzplanZeichneBild(zustand, einstellungen) {
   ctx.font = '600 17px "Open Sans", Arial, sans-serif';
   ctx.fillText('T A F E L', breite / 2, tafelY + (tafel - 12) / 2);
 
-  const obenY = tafelY + tafel + 12;
-  const spiegeln = einstellungen.lehrersicht;
   const nachPlatzId = new Map(geo.plaetze.map((platz, i) => [platz.id, i]));
 
   raum.tische.forEach((tisch) => {
-    const tischX = spiegeln ? raum.breite - (tisch.x + tisch.spalten) : tisch.x;
+    const tischX = gedreht ? raum.breite - (tisch.x + tisch.spalten) : tisch.x;
+    const tischY = gedreht ? raum.tiefe - (tisch.y + tisch.reihen) : tisch.y;
     ctx.fillStyle = f.flaeche;
     ctx.strokeStyle = f.linie;
     ctx.lineWidth = 1.5;
-    sitzplanRundesRechteck(ctx, rand + tischX * feldX, obenY + tisch.y * feldY,
+    sitzplanRundesRechteck(ctx, rand + tischX * feldX, obenY + tischY * feldY,
       tisch.spalten * feldX, tisch.reihen * feldY, 10);
     ctx.fill();
     ctx.stroke();
@@ -120,9 +126,10 @@ function sitzplanZeichneBild(zustand, einstellungen) {
     for (let index = 0; index < tisch.spalten * tisch.reihen; index++) {
       const spalte = index % tisch.spalten;
       const reihe = Math.floor(index / tisch.spalten);
-      const zeigeSpalte = spiegeln ? tisch.spalten - 1 - spalte : spalte;
+      const zeigeSpalte = gedreht ? tisch.spalten - 1 - spalte : spalte;
+      const zeigeReihe = gedreht ? tisch.reihen - 1 - reihe : reihe;
       const x = rand + (tischX + zeigeSpalte) * feldX + 8;
-      const y = obenY + (tisch.y + reihe) * feldY + 8;
+      const y = obenY + (tischY + zeigeReihe) * feldY + 8;
       const w = feldX - 16;
       const h = feldY - 16;
 
@@ -153,13 +160,23 @@ function sitzplanZeichneBild(zustand, einstellungen) {
 
       const mitte = x + w / 2;
       const zeigeKlasse = einstellungen.zeigeKlasse && person.klasse;
+      const zeigeNachname = einstellungen.zeigeNachname && person.nachname;
       const versatz = zeigeKlasse ? -8 : 0;
 
+      /*
+       * Der Rufname trägt den Platz: zuerst und hervorgehoben, weil er die Anrede im
+       * Unterricht ist. Ohne Nachname darunter rückt er in die Mitte des Platzes,
+       * sonst stünde er unmotiviert im oberen Drittel.
+       */
       ctx.fillStyle = f.text;
       ctx.font = '700 18px "Open Sans", Arial, sans-serif';
-      ctx.fillText(sitzplanKuerzen(ctx, person.nachname, w - 18), mitte, y + h / 2 - 11 + versatz);
-      ctx.font = '400 17px "Open Sans", Arial, sans-serif';
-      ctx.fillText(sitzplanKuerzen(ctx, person.vorname, w - 18), mitte, y + h / 2 + 10 + versatz);
+      const name = person.rufname || person.vorname || person.nachname;
+      ctx.fillText(sitzplanKuerzen(ctx, name, w - 18),
+        mitte, y + h / 2 + (zeigeNachname ? -11 : 0) + versatz);
+      if (zeigeNachname) {
+        ctx.font = '400 17px "Open Sans", Arial, sans-serif';
+        ctx.fillText(sitzplanKuerzen(ctx, person.nachname, w - 18), mitte, y + h / 2 + 10 + versatz);
+      }
       if (zeigeKlasse) {
         ctx.fillStyle = f.leise;
         ctx.font = '400 13px "Open Sans", Arial, sans-serif';
@@ -183,6 +200,7 @@ async function sitzplanAlsBild(zustand) {
   const leinwand = sitzplanZeichneBild(zustand, {
     titel,
     lehrersicht: document.getElementById('lehrersicht').checked,
+    zeigeNachname: document.getElementById('zeigeNachname').checked,
     zeigeGeschlecht: document.getElementById('zeigeGeschlecht').checked,
     zeigeKlasse: document.getElementById('zeigeKlasse').checked
   });
@@ -203,6 +221,10 @@ async function sitzplanAlsBild(zustand) {
 
 const SITZPLAN_DATEIVERSION = 1;
 
+// Die Schalter aus Schritt 5. Sie gehören zum Plan: Wer ihn ohne Nachnamen und aus
+// Sicht der Lehrkraft aufgesetzt hat, will ihn beim nächsten Mal wieder so vorfinden.
+const SITZPLAN_ANSICHT = ['lehrersicht', 'zeigeNachname', 'zeigeGeschlecht', 'zeigeKlasse', 'zeigeVerstoesse'];
+
 function sitzplanSichern(zustand) {
   if (!zustand.raum) return;
   const sitzordnung = {};
@@ -212,6 +234,9 @@ function sitzplanSichern(zustand) {
     });
   }
 
+  const ansicht = {};
+  SITZPLAN_ANSICHT.forEach((id) => { ansicht[id] = document.getElementById(id).checked; });
+
   const daten = {
     version: SITZPLAN_DATEIVERSION,
     erzeugt: new Date().toISOString(),
@@ -219,6 +244,7 @@ function sitzplanSichern(zustand) {
     schueler: zustand.schueler,
     raum: zustand.raum,
     regeln: zustand.regeln,
+    ansicht,
     sitzordnung
   };
 
@@ -234,7 +260,8 @@ async function sitzplanLaden(zustand, datei) {
   }
 
   zustand.schueler = daten.schueler.map((person) => ({
-    platzwunsch: 'egal', allein: false, festerPlatz: null, herkunft: 'datei', sicherheit: 'sicher',
+    rufname: '', platzwunsch: 'egal', allein: false, festerPlatz: null,
+    herkunft: 'datei', sicherheit: 'sicher',
     ...person
   }));
   Object.assign(zustand.regeln, daten.regeln || {});
@@ -269,8 +296,14 @@ async function sitzplanLaden(zustand, datei) {
   document.getElementById('klassenHaerte').value = zustand.regeln.klassenHart ? 'hart' : 'weich';
   document.getElementById('vordereReihen').value = zustand.regeln.vordereReihen;
   document.getElementById('wuenscheHaerte').value = zustand.regeln.wuenscheHart ? 'hart' : 'weich';
+  // Ältere Speicherstände kennen den Abschnitt nicht – dann bleiben die Schalter, wie sie sind
+  SITZPLAN_ANSICHT.forEach((id) => {
+    if (daten.ansicht && typeof daten.ansicht[id] === 'boolean') {
+      document.getElementById(id).checked = daten.ansicht[id];
+    }
+  });
 
-  geschlechtZeichnen();
+  schuelerZeichnen();
   regelnZeichnen();
   if (zustand.belegung) planBerichten(); else planZeichnen();
   toolhubMessage('meldung',

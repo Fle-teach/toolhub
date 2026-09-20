@@ -109,83 +109,116 @@ function raumAbstand(a, b) {
 /* ---------------------------------------------------------------------------
  * Vorlagen
  *
- * Die meisten Anordnungen sind Blöcke gleicher Tische in Zeilen und Spalten – dafür
- * genügt ein Bauplan statt ausgeschriebener Koordinaten. Die Raumgröße ergibt sich
- * aus den Tischen, damit keine leere Fläche mitgeschleppt wird.
+ * Eine Vorlage füllt den Raum, der gerade eingestellt ist – sie bringt keine eigene
+ * Größe mit. So beschreibt man erst den Raum, den man vor sich hat (etwa 11 Plätze
+ * breit, 6 Reihen tief), und bekommt darin eine U-Form, die auch wirklich an den
+ * Wänden entlangläuft, statt mitten im Zimmer zu enden.
+ *
+ * Was nicht mehr hineinpasst, entfällt; für eine Vorlage, die im gesetzten Raum gar
+ * nichts unterbringen kann, bleibt der Raum leer und der Hinweis unter dem Plan sagt
+ * es. Die meisten Anordnungen sind Blöcke gleicher Tische – dafür genügt ein Bauplan
+ * statt ausgeschriebener Koordinaten.
  * ------------------------------------------------------------------------ */
 
-function raumBloecke(spalten, reihen, anzahlX, anzahlY, gangX = 1, gangY = 0) {
+const SITZPLAN_RAUM_STANDARD = { breite: 9, tiefe: 4 };
+
+/*
+ * Gleiche Tische in Zeilen und Spalten, so oft sie hineinpassen.
+ *
+ *   spalten/reihen   Maße eines einzelnen Tisches in Feldern
+ *   gangX/gangY      freie Felder zwischen zwei Tischen
+ *
+ * Waagerecht wird zentriert (der Rest verteilt sich auf beide Seitengänge),
+ * senkrecht nicht: Tische stehen ab der ersten Reihe, freier Platz bleibt hinten.
+ */
+function raumBloecke(breite, tiefe, spalten, reihen, gangX = 1, gangY = 0) {
   const schrittX = spalten + gangX;
   const schrittY = reihen + gangY;
+  const anzahlX = Math.floor((breite + gangX) / schrittX);
+  const anzahlY = Math.floor((tiefe + gangY) / schrittY);
+
   const tische = [];
-  for (let ry = 0; ry < anzahlY; ry++) {
-    for (let rx = 0; rx < anzahlX; rx++) {
-      tische.push(raumTischNeu(rx * schrittX, ry * schrittY, spalten, reihen));
+  if (anzahlX > 0 && anzahlY > 0) {
+    const versatzX = Math.floor((breite - (anzahlX * schrittX - gangX)) / 2);
+    for (let ry = 0; ry < anzahlY; ry++) {
+      for (let rx = 0; rx < anzahlX; rx++) {
+        tische.push(raumTischNeu(versatzX + rx * schrittX, ry * schrittY, spalten, reihen));
+      }
     }
   }
-  return {
-    breite: anzahlX * schrittX - gangX,
-    tiefe: anzahlY * schrittY - gangY,
-    tische
-  };
+  return { breite, tiefe, tische };
+}
+
+// Durchgehende Reihen: je Reihe ein Tisch über die volle Raumbreite
+function raumReihen(breite, tiefe) {
+  const tische = [];
+  for (let y = 0; y < tiefe; y++) tische.push(raumTischNeu(0, y, breite, 1));
+  return { breite, tiefe, tische };
+}
+
+/*
+ * Eine Kante des Hufeisens mit Tischen zu je `laenge` Plätzen füllen. Der Rest am
+ * Ende bekommt einen kürzeren Tisch, damit die Kante durchgehend besetzt ist.
+ */
+function raumKante(tische, von, bis, laenge, senkrecht, quer) {
+  for (let i = von; i <= bis; i += laenge) {
+    const stueck = Math.min(laenge, bis - i + 1);
+    tische.push(senkrecht ? raumTischNeu(quer, i, 1, stueck) : raumTischNeu(i, quer, stueck, 1));
+  }
 }
 
 /*
  * U-Form: Die offene Seite zeigt zur Tafel, geschlossen wird hinten. Die Seitenflügel
- * sind senkrechte Tische (1 Spalte, mehrere Reihen), die hintere Kante waagerechte.
+ * laufen an den Wänden entlang, die hintere Kante schließt zwischen ihnen ab.
+ * `doppelt` legt ein zweites, kleineres U hinein.
  */
-function raumHufeisen(doppelt) {
-  const breite = 13;
-  const tiefe = 7;
-  const tische = [
-    raumTischNeu(0, 1, 1, 5),                 // linker Flügel
-    raumTischNeu(breite - 1, 1, 1, 5),        // rechter Flügel
-    raumTischNeu(1, tiefe - 1, 3, 1),         // hintere Kante
-    raumTischNeu(4, tiefe - 1, 3, 1),
-    raumTischNeu(7, tiefe - 1, 3, 1),
-    raumTischNeu(10, tiefe - 1, 2, 1)
-  ];
-  if (doppelt) {
-    tische.push(
-      raumTischNeu(2, 2, 1, 3),               // innerer Flügel links
-      raumTischNeu(breite - 3, 2, 1, 3),      // innerer Flügel rechts
-      raumTischNeu(3, tiefe - 2, 3, 1),       // innere hintere Kante
-      raumTischNeu(6, tiefe - 2, 3, 1)
-    );
-  }
+function raumHufeisen(breite, tiefe, doppelt) {
+  const tische = [];
+  const u = (rand) => {
+    const links = rand;
+    const rechts = breite - 1 - rand;
+    const hinten = tiefe - 1 - rand;
+    // Unter diesen Maßen bleibt von einem U nichts übrig, was diesen Namen verdient
+    if (rechts - links < 2 || hinten - rand < 1) return;
+    raumKante(tische, rand, hinten - 1, 5, true, links);          // linker Flügel
+    raumKante(tische, rand, hinten - 1, 5, true, rechts);         // rechter Flügel
+    raumKante(tische, links + 1, rechts - 1, 3, false, hinten);   // hintere Kante
+  };
+  u(0);
+  if (doppelt) u(2);
   return { breite, tiefe, tische };
 }
 
 const SITZPLAN_VORLAGEN = [
   { id: 'frontal_2er', name: 'Frontalreihen, 2er-Tische',
-    hinweis: 'Drei Blöcke, vier Reihen – die verbreitetste Anordnung',
-    erzeugen: () => raumBloecke(2, 1, 3, 4) },
+    hinweis: 'die verbreitetste Anordnung',
+    erzeugen: (b, t) => raumBloecke(b, t, 2, 1) },
   { id: 'frontal_3er', name: 'Frontalreihen, 3er-Tische',
-    hinweis: 'Drei Blöcke, drei Reihen',
-    erzeugen: () => raumBloecke(3, 1, 3, 3) },
+    hinweis: 'breitere Blöcke, weniger Gänge',
+    erzeugen: (b, t) => raumBloecke(b, t, 3, 1) },
   { id: 'gruppen_4er', name: 'Gruppentische (4er)',
-    hinweis: 'Sechs Inseln zu je vier Plätzen, je zwei gegenüber',
-    erzeugen: () => raumBloecke(2, 2, 3, 2, 1, 1) },
+    hinweis: 'Inseln zu je vier Plätzen, je zwei gegenüber',
+    erzeugen: (b, t) => raumBloecke(b, t, 2, 2, 1, 1) },
   { id: 'gruppen_6er', name: 'Gruppentische (6er)',
-    hinweis: 'Sechs Inseln zu je sechs Plätzen, je drei gegenüber',
-    erzeugen: () => raumBloecke(3, 2, 3, 2, 1, 1) },
+    hinweis: 'Inseln zu je sechs Plätzen, je drei gegenüber',
+    erzeugen: (b, t) => raumBloecke(b, t, 3, 2, 1, 1) },
   { id: 'kino', name: 'Durchgehende Reihen',
-    hinweis: 'Vier Reihen ohne Mittelgang',
-    erzeugen: () => raumBloecke(8, 1, 1, 4) },
+    hinweis: 'Reihen über die volle Raumbreite, ohne Mittelgang',
+    erzeugen: (b, t) => raumReihen(b, t) },
   { id: 'u_form', name: 'U-Form',
-    hinweis: 'Zur Tafel hin offen – alle sehen einander',
-    erzeugen: () => raumHufeisen(false) },
+    hinweis: 'an den Wänden entlang, zur Tafel hin offen',
+    erzeugen: (b, t) => raumHufeisen(b, t, false) },
   { id: 'doppel_u', name: 'Doppeltes U',
-    hinweis: 'U-Form mit zweiter Reihe innen, für große Lerngruppen',
-    erzeugen: () => raumHufeisen(true) },
+    hinweis: 'U-Form mit zweitem U darin, für große Lerngruppen',
+    erzeugen: (b, t) => raumHufeisen(b, t, true) },
   { id: 'einzel', name: 'Einzeltische (Klassenarbeit)',
-    hinweis: 'Alle Plätze einzeln und mit Abstand',
-    erzeugen: () => raumBloecke(1, 1, 5, 5, 1, 1) }
+    hinweis: 'alle Plätze einzeln und mit Abstand',
+    erzeugen: (b, t) => raumBloecke(b, t, 1, 1, 1, 1) }
 ];
 
-function raumAusVorlage(id) {
+function raumAusVorlage(id, breite = SITZPLAN_RAUM_STANDARD.breite, tiefe = SITZPLAN_RAUM_STANDARD.tiefe) {
   const vorlage = SITZPLAN_VORLAGEN.find((v) => v.id === id) || SITZPLAN_VORLAGEN[0];
-  return vorlage.erzeugen();
+  return vorlage.erzeugen(Math.max(1, breite), Math.max(1, tiefe));
 }
 
 /* ---------------------------------------------------------------------------

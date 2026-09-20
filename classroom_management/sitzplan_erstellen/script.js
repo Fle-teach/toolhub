@@ -47,6 +47,23 @@ function schuelerName(person) {
   return `${person.nachname}, ${person.vorname}`.replace(/^, |, $/, '');
 }
 
+/*
+ * Der Name, unter dem ein Kind im Sitzplan steht: der Rufname, sonst der Vorname.
+ * Gemeint ist die Anrede im Unterricht – deshalb steht er zuerst und hervorgehoben,
+ * und der Nachname darunter nur, wenn er gebraucht wird.
+ */
+function schuelerRufname(person) {
+  return person.rufname || person.vorname || person.nachname;
+}
+
+// Die beiden Zahlenfelder des Raum-Werkzeugs als Maßangabe
+function raumMassEingabe() {
+  return {
+    breite: Math.max(1, parseInt($('raumBreite').value, 10) || 1),
+    tiefe: Math.max(1, parseInt($('raumTiefe').value, 10) || 1)
+  };
+}
+
 function klassenVorhanden() {
   return new Set(zustand.schueler.map((s) => s.klasse).filter(Boolean)).size > 1;
 }
@@ -519,9 +536,10 @@ function planZeichnen() {
   const flaeche = el.querySelector('.raum-flaeche');
   if (!zustand.raum) return;
   raumMassSetzen(el);
-  el.classList.toggle('gespiegelt', $('lehrersicht').checked);
+  el.classList.toggle('gedreht', $('lehrersicht').checked);
   flaeche.innerHTML = '';
 
+  const zeigeNachname = $('zeigeNachname').checked;
   const zeigeGeschlecht = $('zeigeGeschlecht').checked;
   const zeigeKlasse = $('zeigeKlasse').checked;
   const zeigeVerstoesse = $('zeigeVerstoesse').checked;
@@ -554,9 +572,9 @@ function planZeichnen() {
         const zeichen = zeigeGeschlecht ? toolhubGeschlechtZeichen(person.geschlecht) : '';
         platzEl.innerHTML =
           '<span class="platz-inhalt">' +
-            `<span class="name nachname">${zeichen ? `<span class="zeichen">${zeichen}</span>` : ''}` +
-            `${toolhubEscapeHtml(person.nachname)}</span>` +
-            `<span class="name">${toolhubEscapeHtml(person.vorname)}</span>` +
+            `<span class="name hauptname">${zeichen ? `<span class="zeichen">${zeichen}</span>` : ''}` +
+            `${toolhubEscapeHtml(schuelerRufname(person))}</span>` +
+            (zeigeNachname && person.nachname ? `<span class="name">${toolhubEscapeHtml(person.nachname)}</span>` : '') +
             (zeigeKlasse && person.klasse ? `<span class="zusatz">${toolhubEscapeHtml(person.klasse)}</span>` : '') +
           '</span>';
         platzEl.title = `${schuelerName(person)} – klicken, um den Platz festzuhalten`;
@@ -678,7 +696,9 @@ function start() {
   $('vorlageBtn').addEventListener('click', () => {
     zustand.schueler.forEach((person) => { person.festerPlatz = null; });
     zustand.belegung = null;
-    raumSetzen(raumAusVorlage($('vorlage').value));
+    // Die Vorlage füllt den Raum, der in den Feldern daneben steht
+    const { breite, tiefe } = raumMassEingabe();
+    raumSetzen(raumAusVorlage($('vorlage').value, breite, tiefe));
   });
 
   document.querySelectorAll('[data-tisch]').forEach((knopf) => {
@@ -693,9 +713,8 @@ function start() {
   });
 
   const groesseAendern = () => {
-    raumGroesseSetzen(zustand.raum,
-      parseInt($('raumBreite').value, 10) || 1,
-      parseInt($('raumTiefe').value, 10) || 1);
+    const { breite, tiefe } = raumMassEingabe();
+    raumGroesseSetzen(zustand.raum, breite, tiefe);
     raumSetzen(zustand.raum);
   };
   $('raumBreite').addEventListener('change', groesseAendern);
@@ -724,7 +743,7 @@ function start() {
   // Der Abbruch liefert das bisher Beste über aufFertig – hier ist nichts weiter zu tun
   $('stoppBtn').addEventListener('click', () => zustand.lauf?.abbrechen());
   planLaeuft(false);
-  ['lehrersicht', 'zeigeGeschlecht', 'zeigeKlasse', 'zeigeVerstoesse']
+  ['lehrersicht', 'zeigeNachname', 'zeigeGeschlecht', 'zeigeKlasse', 'zeigeVerstoesse']
     .forEach((id) => $(id).addEventListener('change', planZeichnen));
   planVerdrahten();
 

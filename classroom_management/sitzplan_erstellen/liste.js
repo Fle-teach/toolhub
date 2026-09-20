@@ -5,7 +5,7 @@
  * Geschlechts. Was danach in `zustand.schueler` steht, ist die einzige Grundlage
  * aller weiteren Schritte:
  *
- *   { id, nachname, vorname, klasse, geschlecht, sicherheit, herkunft,
+ *   { id, nachname, vorname, rufname, klasse, geschlecht, sicherheit, herkunft,
  *     platzwunsch, allein, festerPlatz }
  *
  * `herkunft` merkt sich, woher die Geschlechtsangabe stammt ('datei', 'name' oder
@@ -30,6 +30,9 @@ const SITZPLAN_FELDER = [
     muster: [/^nachname$/i, /^familienname$/i, /^last ?name$/i, /^surname$/i] },
   { id: 'vorname', name: 'Vorname',
     muster: [/^vorname$/i, /^rufname$/i, /^first ?name$/i] },
+  { id: 'rufname', name: 'Rufname',
+    hinweis: 'optional – tritt im Sitzplan an die Stelle des Vornamens',
+    muster: [/^rufname$/i, /^spitzname$/i, /^nickname$/i] },
   { id: 'klasse', name: 'Klasse oder Kurs',
     hinweis: 'optional', muster: [/^klasse$/i, /^kurs$/i, /^lerngruppe$/i, /^gruppe$/i,
       /^zus(ä|ae)tzliche informationen$/i] },
@@ -64,9 +67,14 @@ async function dateiEinlesen(datei) {
 function zuordnungRaten() {
   const { felder, zeilen } = zustand.quelle;
   const zuordnung = {};
+  // Eine Spalte nur einmal vergeben: Enthält eine Liste allein "Rufname" und keinen
+  // Vornamen, ist das der Vorname – und eben kein zusätzlicher Rufname daneben.
+  const vergeben = new Set();
   SITZPLAN_FELDER.forEach((feld) => {
-    const treffer = felder.find((spalte) => feld.muster.some((muster) => muster.test(spalte)));
+    const treffer = felder.find((spalte) =>
+      !vergeben.has(spalte) && feld.muster.some((muster) => muster.test(spalte)));
     zuordnung[feld.id] = treffer || '';
+    if (treffer) vergeben.add(treffer);
   });
 
   /*
@@ -133,6 +141,7 @@ function schuelerUebernehmen() {
   const iGesamt = spalte(zustand.zuordnung.gesamtname);
   const iNach = spalte(zustand.zuordnung.nachname);
   const iVor = spalte(zustand.zuordnung.vorname);
+  const iRufname = spalte(zustand.zuordnung.rufname);
   const iKlasse = spalte(zustand.zuordnung.klasse);
   const iGeschlecht = spalte(zustand.zuordnung.geschlecht);
 
@@ -168,6 +177,7 @@ function schuelerUebernehmen() {
       id: `p${i}`,
       nachname,
       vorname,
+      rufname: iRufname >= 0 ? (zeile[iRufname] || '') : '',
       klasse: iKlasse >= 0 ? (zeile[iKlasse] || '') : '',
       geschlecht: null,
       sicherheit: 'sicher',
@@ -196,6 +206,7 @@ function schuelerUebernehmen() {
     if (frueher) {
       person.platzwunsch = frueher.platzwunsch;
       person.allein = frueher.allein;
+      if (!person.rufname) person.rufname = frueher.rufname || '';
       if (frueher.herkunft === 'hand') {
         person.geschlecht = frueher.geschlecht;
         person.sicherheit = 'sicher';
@@ -212,19 +223,22 @@ function schuelerUebernehmen() {
   // und die ist an einem ausgeblendeten Abschnitt null
   ['geschlechtPanel', 'raumPanel', 'regelnPanel', 'planPanel', 'exportPanel']
     .forEach((id) => abschnittZeigen(id));
-  if (!zustand.raum) raumSetzen(raumAusVorlage('frontal_2er'));
-  geschlechtZeichnen();
+  if (!zustand.raum) {
+    const { breite, tiefe } = raumMassEingabe();
+    raumSetzen(raumAusVorlage('frontal_2er', breite, tiefe));
+  }
+  schuelerZeichnen();
   regelnZeichnen();
   planZuruecksetzen();
 }
 
 /* ---------------------------------------------------------------------------
- * Schritt 2 – Geschlecht prüfen
+ * Schritt 2 – Schüler prüfen (Geschlecht und Rufname)
  * ------------------------------------------------------------------------ */
 
 const HERKUNFT_TEXT = { datei: 'aus der Liste', name: 'aus dem Vornamen', hand: 'von Hand' };
 
-function geschlechtZeichnen() {
+function schuelerZeichnen() {
   const koerper = $('geschlechtKoerper');
   koerper.innerHTML = '';
 
@@ -252,13 +266,28 @@ function geschlechtZeichnen() {
       person.herkunft = 'hand';
       // Die Korrektur merken, damit derselbe Vorname beim nächsten Mal stimmt
       if (auswahl.value) toolhubGeschlechtMerken(person.vorname, auswahl.value);
-      geschlechtZeichnen();
+      schuelerZeichnen();
       planBerichten();
     });
     const zelleAuswahl = document.createElement('td');
     zelleAuswahl.appendChild(auswahl);
 
-    zeile.append(zelle(person.nachname), zelle(person.vorname), zelle(person.klasse || '–'),
+    const ruf = document.createElement('input');
+    ruf.type = 'text';
+    ruf.value = person.rufname || '';
+    ruf.size = 12;
+    ruf.placeholder = person.vorname;
+    ruf.setAttribute('aria-label', `Rufname von ${schuelerName(person)}`);
+    // Auf 'input' und ohne die Tabelle neu zu zeichnen: Sonst verlöre das Feld beim
+    // ersten Tastendruck den Fokus und man könnte nur einen Buchstaben tippen.
+    ruf.addEventListener('input', () => {
+      person.rufname = ruf.value.trim();
+      planZeichnen();
+    });
+    const zelleRuf = document.createElement('td');
+    zelleRuf.appendChild(ruf);
+
+    zeile.append(zelle(person.nachname), zelle(person.vorname), zelleRuf, zelle(person.klasse || '–'),
       zelle(HERKUNFT_TEXT[person.herkunft]), zelleAuswahl);
     koerper.appendChild(zeile);
   });

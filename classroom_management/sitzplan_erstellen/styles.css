@@ -120,10 +120,12 @@ h3.block-title {
   border-radius: 8px;
 }
 
-/* Gespiegelte Ansicht: der ganze Raum wird umgeklappt, die Beschriftungen werden
-   einzeln zurückgedreht, damit sie lesbar bleiben. */
-.raum.gespiegelt .raum-flaeche { transform: scaleX(-1); }
-.raum.gespiegelt .platz-inhalt { transform: scaleX(-1); }
+/* Ansicht aus Sicht der Lehrkraft: Der ganze Raum wird um 180° gedreht – samt Tafel,
+   die dadurch unten landet, also dort, wo die Lehrkraft steht. Die Beschriftungen
+   werden einzeln zurückgedreht, damit sie lesbar bleiben. */
+.raum.gedreht { transform: rotate(180deg); }
+.raum.gedreht .tafel,
+.raum.gedreht .platz-inhalt { transform: rotate(180deg); }
 
 .tisch {
   position: absolute;
@@ -186,7 +188,8 @@ h3.block-title {
   white-space: nowrap;
 }
 
-.platz .nachname {
+/* Der Rufname steht zuerst und trägt den Platz – er ist die Anrede im Unterricht */
+.platz .hauptname {
   font-weight: 700;
 }
 

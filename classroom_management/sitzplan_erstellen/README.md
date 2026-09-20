@@ -13,17 +13,27 @@ Erkannt werden:
 | --- | --- |
 | Nachname | `Nachname`, `Familienname`, `Last Name`, `Surname` |
 | Vorname | `Vorname`, `Rufname`, `First Name` |
+| Rufname | `Rufname`, `Spitzname`, `Nickname` |
 | Name in einer Spalte | `Name`, `Schüler` – nur, wenn dort „Nachname, Vorname“ steht |
 | Klasse oder Kurs | `Klasse`, `Kurs`, `Lerngruppe`, `Gruppe`, `Zusätzliche Informationen` |
 | Geschlecht | `Geschlecht`, `Gender`, `Sex`, `m/w` |
 
 Was nicht erkannt wird, ordnet man unter der Ablagefläche von Hand zu. Nachname und
-Vorname sind Pflicht – oder statt beider die Spalte mit dem Gesamtnamen.
+Vorname sind Pflicht – oder statt beider die Spalte mit dem Gesamtnamen. Eine Spalte
+wird nur einmal vergeben: Enthält eine Liste allein „Rufname“ und keinen Vornamen, ist
+das der Vorname und kein zusätzlicher Rufname daneben.
 
 In der Geschlechtsspalte gelten `m`, `männlich`, `Junge`, `male`, `j`, `1` als männlich
 und `w`, `f`, `weiblich`, `Mädchen`, `female`, `2` als weiblich. Jeder andere Eintrag –
 auch `d` – zählt als *Angabe ohne binäre Festlegung*: Es wird dann **nicht** geraten,
 und der Schüler bleibt aus den geschlechtsbezogenen Mustern heraus.
+
+## Rufname
+
+Im Sitzplan steht, wie das Kind angesprochen wird – „Max“, nicht „Maximilian“. Der
+Rufname kommt aus der Datei oder wird in Schritt 2 eingetragen; bleibt er leer, wird
+der Vorname angezeigt. Er steht auf dem Platz **zuerst und hervorgehoben**, der
+Nachname darunter, und der lässt sich in Schritt 5 ganz abschalten.
 
 ## Geschlecht aus dem Vornamen
 
@@ -42,6 +52,12 @@ alle Tools des toolhubs. Dieselbe Datei nutzt die WPB-Kurseinteilung.
 Der Raum ist ein Raster aus Feldern, **ein Feld ist ein Sitzplatz**. Ein Tisch belegt
 `spalten × reihen` Felder und bringt ebenso viele Plätze mit; Gänge entstehen, indem
 Felder frei bleiben. `y = 0` ist die vorderste Reihe, die Tafel steht darüber.
+
+Zuerst wird der Raum ausgemessen (Plätze nebeneinander × Reihen), dann legt man eine
+Vorlage hinein: Sie **füllt die eingestellte Fläche**, statt eine eigene Größe
+mitzubringen. Eine U-Form läuft damit tatsächlich an den Wänden entlang, und ein
+schmaler Raum bekommt weniger Blöcke statt abgeschnittener Tische. Was nicht mehr
+hineinpasst, entfällt.
 
 Acht Vorlagen (Frontalreihen 2er/3er, Gruppentische 4er/6er, durchgehende Reihen,
 U-Form, doppeltes U, Einzeltische) sind Ausgangspunkte, keine Festlegung: Tische lassen
@@ -80,12 +96,13 @@ davon „beide gleich“ übrig – mehr gibt eine Bank aus zwei Plätzen nicht 
 * **Drucken / PDF** – quer auf DIN A4, nur der Plan, immer auf Weiß (auch aus dem
   dunklen Design heraus)
 * **Bild (PNG)** – auf ein `<canvas>` gezeichnet, unabhängig vom gewählten Design
-* **Sitzplan (JSON)** – Schüler, Raum, Regeln und Sitzordnung; über Schritt 1 wieder
-  ladbar. Die Sitzordnung steht darin als Zuordnung Platz → Schüler, damit ein Stand
+* **Sitzplan (JSON)** – Schüler (samt Rufnamen), Raum, Regeln, Ansichtseinstellungen
+  und Sitzordnung; über Schritt 1 wieder ladbar. Die Sitzordnung steht darin als Zuordnung Platz → Schüler, damit ein Stand
   auch dann noch passt, wenn die Plätze inzwischen anders gezählt werden.
 
-Der Schalter „aus Sicht der Lehrkraft“ spiegelt den Plan waagerecht – so, wie man von
-der Tafel aus in den Raum sieht. Die Beschriftungen bleiben lesbar.
+Der Schalter „aus Sicht der Lehrkraft“ dreht den Plan um 180°: Die Tafel rückt nach
+unten, dorthin, wo die Lehrkraft steht, und sowohl links/rechts als auch vorn/hinten
+kehren sich um. Die Beschriftungen bleiben lesbar.
 
 ## Beispieldaten
 
