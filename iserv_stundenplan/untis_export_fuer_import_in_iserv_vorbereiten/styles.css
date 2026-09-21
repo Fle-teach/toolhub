@@ -38,6 +38,9 @@
 #fileStatus .geladen { color: var(--ok); }
 #fileStatus .fehlt { color: var(--text-muted); }
 
+/* Die GPU009 ist freiwillig – ihr Fehlen ist kein Mangel und wird darum nicht hervorgehoben */
+#fileStatus .optional { color: var(--text-muted); font-weight: 400; }
+
 /* === OPTIONEN === */
 .optionen {
     position: relative;

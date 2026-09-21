@@ -5,7 +5,9 @@ if (typeof require !== 'undefined' && typeof toolhubNormalisiereFach === 'undefi
 }
 
 // Aufbereitung der Untis-Exportdateien GPU001.TXT (Stundenplan) und GPU002.TXT (Unterricht)
-// für den Import in IServ. GPU001 bleibt unverändert; in GPU002 werden die Kursbezeichnungen
+// für den Import in IServ. Eine GPU009.TXT (Pausenaufsichten) kann zusätzlich mitgegeben
+// werden; sie wird unverändert ins ZIP übernommen, damit das Archiv nicht von Hand gepackt
+// werden muss. GPU001 bleibt unverändert; in GPU002 werden die Kursbezeichnungen
 // (Schülergruppen) normalisiert:
 //   <Klasse|Jahrgang|Jahrgangsspanne> <Fachkürzel> <Lehrerkürzel...> <ggf. Zeitangabe>
 //
@@ -517,6 +519,8 @@ if (typeof document !== 'undefined') {
     let gpu002Text = null;
     let gpu001Text = null;
     let gpu001Bytes = null; // Original für das ZIP-Archiv
+    let gpu009Bytes = null; // Pausenaufsichten, unverändert für das ZIP-Archiv
+    let gpu009Zeilen = 0;
     let ergebnis = null;
     let gpu001Ergebnis = null;
     let erkannteKodierung = null;
@@ -574,17 +578,19 @@ if (typeof document !== 'undefined') {
     optKursPraefix.addEventListener('change', aktualisiere);
     optBereitschaft.addEventListener('change', aktualisiere);
 
-    // Unterscheidet GPU001 (9 Felder) und GPU002 (47 Felder) anhand der Spaltenzahl;
-    // der Dateiname dient nur als Rückfallebene.
+    // Unterscheidet die Dateien anhand der Spaltenzahl: GPU002 hat 47 Felder,
+    // GPU001 neun, GPU009 (Pausenaufsichten) sechs. Der Dateiname dient nur als Rückfallebene.
     function erkenneDatei(name, text) {
         const ersteZeile = text.split(/\r?\n/).find((l) => l.trim() !== '');
         if (ersteZeile) {
             const felder = splitRaw(ersteZeile).length;
             if (felder > FELD_SCHUELERGRUPPE) return 'GPU002';
             if (felder >= 7) return 'GPU001';
+            if (felder >= 5) return 'GPU009';
         }
         if (/001/.test(name)) return 'GPU001';
         if (/002/.test(name)) return 'GPU002';
+        if (/009/.test(name)) return 'GPU009';
         return null;
     }
 
@@ -601,8 +607,12 @@ if (typeof document !== 'undefined') {
             } else if (typ === 'GPU001') {
                 gpu001Text = text;
                 gpu001Bytes = new Uint8Array(buffer);
+            } else if (typ === 'GPU009') {
+                // Pausenaufsichten werden nicht verändert, sondern nur durchgereicht.
+                gpu009Bytes = new Uint8Array(buffer);
+                gpu009Zeilen = text.split(/\r?\n/).filter((l) => l.trim() !== '').length;
             } else {
-                errorDiv.textContent = `"${file.name}" wurde nicht als GPU001 oder GPU002 erkannt.`;
+                errorDiv.textContent = `"${file.name}" wurde nicht als GPU001, GPU002 oder GPU009 erkannt.`;
             }
             aktualisiere();
         }
@@ -615,7 +625,10 @@ if (typeof document !== 'undefined') {
             : `${toolhubIcon('kreuz', 'inline-icon fehlt')} fehlt`;
         fileStatus.innerHTML =
             `GPU001.TXT: <strong>${stand(gpu001Text)}</strong> &middot; ` +
-            `GPU002.TXT: <strong>${stand(gpu002Text)}</strong>`;
+            `GPU002.TXT: <strong>${stand(gpu002Text)}</strong> &middot; ` +
+            `GPU009.TXT: <strong>${gpu009Bytes
+                ? `${toolhubIcon('haken', 'inline-icon geladen')} geladen`
+                : '<span class="optional">nicht gewählt (optional)</span>'}</strong>`;
         downloadBtn.disabled = !(gpu001Text && gpu002Text);
 
         if (gpu002Text === null) return;
@@ -731,6 +744,9 @@ if (typeof document !== 'undefined') {
                 ? `<p>GPU001: <strong>${gpu001Ergebnis.geaenderteZeilen}</strong> Bereitschaftsstunden ` +
                   `der Klasse <code>${BEREITSCHAFT}</code> zugeordnet</p>`
                 : '') +
+            (gpu009Bytes
+                ? `<p>GPU009: <strong>${gpu009Zeilen}</strong> Pausenaufsichten, unverändert im ZIP</p>`
+                : '') +
             `<p>Erkannte Kodierung: ${erkannteKodierung} (Ausgabe im ZIP als UTF-8)</p>`;
 
         zeigeKonflikte();
@@ -763,10 +779,12 @@ if (typeof document !== 'undefined') {
         const gpu001Daten = gpu001Ergebnis && gpu001Ergebnis.geaenderteZeilen > 0
             ? new TextEncoder().encode(gpu001Ergebnis.inhalt)
             : gpu001Bytes;
-        const zip = erzeugeZip([
+        const dateien = [
             { name: 'GPU001.TXT', daten: gpu001Daten },
             { name: 'GPU002.TXT', daten: new TextEncoder().encode(ergebnis.inhalt) },
-        ]);
+        ];
+        if (gpu009Bytes) dateien.push({ name: 'GPU009.TXT', daten: gpu009Bytes });
+        const zip = erzeugeZip(dateien);
         toolhubDownload(new Blob([zip], { type: 'application/zip' }), 'untis_iserv_import.zip');
     });
 }

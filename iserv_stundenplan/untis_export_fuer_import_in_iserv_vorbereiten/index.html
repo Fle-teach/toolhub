@@ -16,7 +16,7 @@
 
     <header>
         <h1>UNTIS-Export f&uuml;r IServ-Import vorbereiten<span data-icon="dokument" class="title-icon"></span></h1>
-        <p class="subtitle">IServ-Stundenplan: Kursbezeichnungen in GPU002 normalisieren und beide GPU-Dateien als ZIP-Archiv f&uuml;r den IServ-Import herunterladen</p>
+        <p class="subtitle">IServ-Stundenplan: Kursbezeichnungen in GPU002 normalisieren und die GPU-Dateien als ZIP-Archiv f&uuml;r den IServ-Import herunterladen</p>
     </header>
 
     <main>
@@ -32,14 +32,16 @@
             oder eine Jahrgangsspanne (z.&nbsp;B. <code>08-10</code>) verwendet.
             Kurse, die sonst denselben Namen h&auml;tten, werden &uuml;ber ihre Unterrichtszeiten
             unterschieden (z.&nbsp;B. <code>11-12 Lat Se (Di 1.+2.)</code>).
-            Alle &uuml;brigen Daten bleiben unver&auml;ndert. Zum Schluss werden beide Dateien als
-            ZIP-Archiv f&uuml;r den IServ-Import heruntergeladen.</p>
+            Alle &uuml;brigen Daten bleiben unver&auml;ndert. Zum Schluss werden die Dateien als
+            ZIP-Archiv f&uuml;r den IServ-Import heruntergeladen. Eine <strong>GPU009.TXT</strong>
+            (Pausenaufsichten) kann mit ausgew&auml;hlt werden &ndash; sie wandert unver&auml;ndert
+            mit ins Archiv.</p>
 
             <!-- Die gesamte Box ist ein Label für das Datei-Input: Klick öffnet die Auswahl,
                  Drag-and-drop übernimmt script.js (ids uploadArea/fileInput unverändert) -->
             <label class="upload-box" id="uploadArea" for="fileInput">
                 <span data-icon="dokument" class="upload-icon"></span>
-                <div class="upload-text"><strong>GPU001.TXT und GPU002.TXT hier ablegen</strong> oder klicken zum Ausw&auml;hlen</div>
+                <div class="upload-text"><strong>GPU001.TXT und GPU002.TXT hier ablegen</strong> oder klicken zum Ausw&auml;hlen<br>GPU009.TXT (Pausenaufsichten) optional</div>
                 <p id="fileStatus"></p>
             </label>
             <input type="file" id="fileInput" class="file-input" accept=".txt,.csv,.TXT,.CSV" multiple>
@@ -68,7 +70,7 @@
                     (z.&nbsp;B. <code>Kurs 08-10 Spa Ben</code>) &ndash; unterscheidet Kurse in IServ von Klassen
                 </label>
                 <label>
-                    <input type="checkbox" id="optBereitschaft">
+                    <input type="checkbox" id="optBereitschaft" checked>
                     Bereitschaftsstunden der Klasse <code>BER</code> zuordnen
                     (in GPU001 erhalten Datens&auml;tze mit dem Fach <code>BER</code> dieselbe Kennung als Klasse;
                     ohne Klasse zeigt IServ diese Stunden nicht an)
@@ -91,7 +93,7 @@
 
             <div id="konflikte" class="konflikt-box"></div>
 
-            <button id="downloadBtn" class="btn-primary" type="button"><span data-icon="download" class="inline-icon"></span>ZIP-Archiv f&uuml;r IServ herunterladen (GPU001 + GPU002)</button>
+            <button id="downloadBtn" class="btn-primary" type="button"><span data-icon="download" class="inline-icon"></span>ZIP-Archiv f&uuml;r IServ herunterladen</button>
 
             <div class="mapping">
                 <table>
