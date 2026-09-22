@@ -34,8 +34,8 @@
             unterschieden (z.&nbsp;B. <code>11-12 Lat Se (Di 1.+2.)</code>).
             Alle &uuml;brigen Daten bleiben unver&auml;ndert. Zum Schluss werden die Dateien als
             ZIP-Archiv f&uuml;r den IServ-Import heruntergeladen. Eine <strong>GPU009.TXT</strong>
-            (Pausenaufsichten) kann mit ausgew&auml;hlt werden &ndash; sie wandert unver&auml;ndert
-            mit ins Archiv.</p>
+            (Pausenaufsichten) kann mit ausgew&auml;hlt werden &ndash; sie wandert ebenfalls
+            ins Archiv, auf Wunsch mit korrigierten Pausenzeiten.</p>
 
             <!-- Die gesamte Box ist ein Label für das Datei-Input: Klick öffnet die Auswahl,
                  Drag-and-drop übernimmt script.js (ids uploadArea/fileInput unverändert) -->
@@ -74,6 +74,13 @@
                     Bereitschaftsstunden der Klasse <code>BER</code> zuordnen
                     (in GPU001 erhalten Datens&auml;tze mit dem Fach <code>BER</code> dieselbe Kennung als Klasse;
                     ohne Klasse zeigt IServ diese Stunden nicht an)
+                </label>
+                <label>
+                    <input type="checkbox" id="optPausenkorrektur" checked>
+                    Pausenzeiten korrigieren
+                    (in GPU009 r&uuml;ckt die Stunde jeder Pausenaufsicht um eins nach vorn, solange sie
+                    unter der 7.&nbsp;liegt &ndash; z.&nbsp;B. <code>4</code> &rarr; <code>3</code>;
+                    Untis gibt sie sonst eine Pause zu sp&auml;t an)
                 </label>
             </div>
 

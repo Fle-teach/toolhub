@@ -6,8 +6,8 @@ if (typeof require !== 'undefined' && typeof toolhubNormalisiereFach === 'undefi
 
 // Aufbereitung der Untis-Exportdateien GPU001.TXT (Stundenplan) und GPU002.TXT (Unterricht)
 // für den Import in IServ. Eine GPU009.TXT (Pausenaufsichten) kann zusätzlich mitgegeben
-// werden; sie wird unverändert ins ZIP übernommen, damit das Archiv nicht von Hand gepackt
-// werden muss. GPU001 bleibt unverändert; in GPU002 werden die Kursbezeichnungen
+// werden, damit das Archiv nicht von Hand gepackt werden muss; dort wird auf Wunsch die
+// Stunde der Pausen korrigiert. GPU001 bleibt unverändert; in GPU002 werden die Kursbezeichnungen
 // (Schülergruppen) normalisiert:
 //   <Klasse|Jahrgang|Jahrgangsspanne> <Fachkürzel> <Lehrerkürzel...> <ggf. Zeitangabe>
 //
@@ -28,6 +28,8 @@ if (typeof require !== 'undefined' && typeof toolhubNormalisiereFach === 'undefi
 //  - kursPraefix: den Kursbezeichnungen wird "Kurs " vorangestellt.
 //  - bereitschaftKlasse: in GPU001 erhalten Bereitschaftsstunden (Fach "BER") dieselbe
 //    Kennung als Klasse, sonst zeigt IServ sie mangels Klasse nicht an.
+//  - pausenKorrektur: in GPU009 rückt die Stunde der Pausenaufsichten um eins nach vorn,
+//    weil Untis sie eine Pause zu spät angibt.
 
 const FELD_UNR = 0;
 const FELD_KLASSE = 4;
@@ -42,6 +44,14 @@ const GPU001_LEHRER = 2;
 const GPU001_FACH = 3;
 const GPU001_TAG = 5;
 const GPU001_STUNDE = 6;
+
+// GPU009 (Pausenaufsichten): Aufsichtsbereich, Lehrkraft, Tag, Stunde, Dauer, leer.
+// Feld 4 nennt die Stunde, vor der die Pause liegt.
+const GPU009_STUNDE = 3;
+
+// Untis gibt diese Stunde eine zu hoch an, sodass die Aufsichten in IServ eine Pause zu spät
+// landen. Ab der 7. Stunde stimmen beide Zählungen überein – diese Werte bleiben unangetastet.
+const PAUSE_KORREKTUR_UNTER = 7;
 
 const OBERSTUFEN_KLASSEN = new Set(['11', '12']);
 const WOCHENTAGE = [null, 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -122,6 +132,30 @@ function transformiereGPU001(text, optionen = {}) {
         if (raw.length <= GPU001_FACH) return line;
         if (unquote(raw[GPU001_FACH]).toUpperCase() !== BEREITSCHAFT) return line;
         raw[GPU001_KLASSE] = quote(BEREITSCHAFT);
+        geaenderteZeilen++;
+        return raw.join(',');
+    });
+
+    return { inhalt: ausgabe.join(zeilenumbruch), geaenderteZeilen };
+}
+
+// Rückt die Stunde der Pausenaufsichten um eins nach vorn, solange sie unterhalb der
+// Mittagspause liegt (siehe PAUSE_KORREKTUR_UNTER). Alles andere – Anführungszeichen,
+// leere Lehrerfelder, Zeilenenden – bleibt zeichengenau erhalten.
+function transformiereGPU009(text, optionen = {}) {
+    const { pausenKorrektur = false } = optionen;
+    if (!pausenKorrektur) return { inhalt: text, geaenderteZeilen: 0 };
+
+    const zeilenumbruch = text.includes('\r\n') ? '\r\n' : '\n';
+    let geaenderteZeilen = 0;
+    const ausgabe = text.split(/\r?\n/).map((line) => {
+        if (line.trim() === '') return line;
+        const raw = splitRaw(line);
+        if (raw.length <= GPU009_STUNDE) return line;
+        const stunde = Number(unquote(raw[GPU009_STUNDE]));
+        // Die 0. Stunde bliebe sonst ohne sinnvolle Entsprechung, deshalb erst ab 1.
+        if (!Number.isInteger(stunde) || stunde < 1 || stunde >= PAUSE_KORREKTUR_UNTER) return line;
+        raw[GPU009_STUNDE] = String(stunde - 1);
         geaenderteZeilen++;
         return raw.join(',');
     });
@@ -519,8 +553,10 @@ if (typeof document !== 'undefined') {
     let gpu002Text = null;
     let gpu001Text = null;
     let gpu001Bytes = null; // Original für das ZIP-Archiv
-    let gpu009Bytes = null; // Pausenaufsichten, unverändert für das ZIP-Archiv
+    let gpu009Text = null;
+    let gpu009Bytes = null; // Original für das ZIP-Archiv
     let gpu009Zeilen = 0;
+    let gpu009Ergebnis = null;
     let ergebnis = null;
     let gpu001Ergebnis = null;
     let erkannteKodierung = null;
@@ -540,6 +576,7 @@ if (typeof document !== 'undefined') {
     const optFachNormalisieren = document.getElementById('optFachNormalisieren');
     const optKursPraefix = document.getElementById('optKursPraefix');
     const optBereitschaft = document.getElementById('optBereitschaft');
+    const optPausenkorrektur = document.getElementById('optPausenkorrektur');
     const fachCsvFallback = document.getElementById('fachCsvFallback');
     const fachCsvInput = document.getElementById('fachCsvInput');
 
@@ -577,6 +614,7 @@ if (typeof document !== 'undefined') {
     optFachNormalisieren.addEventListener('change', aktualisiere);
     optKursPraefix.addEventListener('change', aktualisiere);
     optBereitschaft.addEventListener('change', aktualisiere);
+    optPausenkorrektur.addEventListener('change', aktualisiere);
 
     // Unterscheidet die Dateien anhand der Spaltenzahl: GPU002 hat 47 Felder,
     // GPU001 neun, GPU009 (Pausenaufsichten) sechs. Der Dateiname dient nur als Rückfallebene.
@@ -608,7 +646,7 @@ if (typeof document !== 'undefined') {
                 gpu001Text = text;
                 gpu001Bytes = new Uint8Array(buffer);
             } else if (typ === 'GPU009') {
-                // Pausenaufsichten werden nicht verändert, sondern nur durchgereicht.
+                gpu009Text = text;
                 gpu009Bytes = new Uint8Array(buffer);
                 gpu009Zeilen = text.split(/\r?\n/).filter((l) => l.trim() !== '').length;
             } else {
@@ -646,6 +684,9 @@ if (typeof document !== 'undefined') {
             warnDiv.textContent = hinweise.join(' ');
             gpu001Ergebnis = gpu001Text !== null
                 ? transformiereGPU001(gpu001Text, { bereitschaftKlasse: optBereitschaft.checked })
+                : null;
+            gpu009Ergebnis = gpu009Text !== null
+                ? transformiereGPU009(gpu009Text, { pausenKorrektur: optPausenkorrektur.checked })
                 : null;
             ergebnis = normalisiereGPU002(gpu002Text, {
                 nurKlassenuebergreifend: optKlassenuebergreifend.checked,
@@ -745,7 +786,10 @@ if (typeof document !== 'undefined') {
                   `der Klasse <code>${BEREITSCHAFT}</code> zugeordnet</p>`
                 : '') +
             (gpu009Bytes
-                ? `<p>GPU009: <strong>${gpu009Zeilen}</strong> Pausenaufsichten, unverändert im ZIP</p>`
+                ? `<p>GPU009: <strong>${gpu009Zeilen}</strong> Pausenaufsichten` +
+                  (gpu009Ergebnis && gpu009Ergebnis.geaenderteZeilen > 0
+                      ? `, davon <strong>${gpu009Ergebnis.geaenderteZeilen}</strong> eine Stunde nach vorn gerückt`
+                      : ', unverändert') + '</p>'
                 : '') +
             `<p>Erkannte Kodierung: ${erkannteKodierung} (Ausgabe im ZIP als UTF-8)</p>`;
 
@@ -783,7 +827,15 @@ if (typeof document !== 'undefined') {
             { name: 'GPU001.TXT', daten: gpu001Daten },
             { name: 'GPU002.TXT', daten: new TextEncoder().encode(ergebnis.inhalt) },
         ];
-        if (gpu009Bytes) dateien.push({ name: 'GPU009.TXT', daten: gpu009Bytes });
+        if (gpu009Bytes) {
+            // Ohne Korrektur die Originalbytes durchreichen, sonst neu kodieren.
+            dateien.push({
+                name: 'GPU009.TXT',
+                daten: gpu009Ergebnis && gpu009Ergebnis.geaenderteZeilen > 0
+                    ? new TextEncoder().encode(gpu009Ergebnis.inhalt)
+                    : gpu009Bytes,
+            });
+        }
         const zip = erzeugeZip(dateien);
         toolhubDownload(new Blob([zip], { type: 'application/zip' }), 'untis_iserv_import.zip');
     });
@@ -796,6 +848,6 @@ if (typeof module !== 'undefined' && module.exports) {
         parseFachKuerzelCSV: toolhubParseFachkuerzelCsv,
         normalisiereFach: toolhubNormalisiereFach,
         istEinKlassenKurs, findeNamenskonflikt, findeFehlendeGruppen,
-        parseGPU001, transformiereGPU001, zeitAngabe, erzeugeZip, crc32,
+        parseGPU001, transformiereGPU001, transformiereGPU009, zeitAngabe, erzeugeZip, crc32,
     };
 }
