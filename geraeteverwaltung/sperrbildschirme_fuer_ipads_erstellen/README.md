@@ -66,11 +66,11 @@ Auflösung dasselbe Bild ergeben:
 
 | Element | Lage |
 | --- | --- |
-| Schriftgröße | 8,2 % der kürzeren Kante |
+| Schriftgröße | 8,2 % der kürzeren Kante, bei Bedarf kleiner (siehe unten) |
 | „iPad" | endet 1,4 % der kürzeren Kante vor dem linken Rand des Benutzerkreises |
 | Laufnummer | beginnt mit demselben Abstand hinter seinem rechten Rand |
 | Grundlinie | so, dass die Versalhöhe mittig zur Kreismitte steht (bei zwei Zeilen der Zeilenblock) |
-| Logo | Feld von 36 % × 17 % der kürzeren Kante, Mitte bei 75 % der Höhe |
+| Logo | Feld von 36 % × 17 % der kürzeren Kante, mittig zwischen Kreis und Seriennummer |
 
 Die Schrift ist Open Sans Bold aus `assets/fonts` – dieselbe wie in der Oberfläche.
 
@@ -88,9 +88,13 @@ auf die **kürzere** Bildkante fielen beide Ausrichtungen genau gleich aus:
 | --- | --- |
 | Durchmesser | 0,3115 (bei 2360 × 1640 also 511 Pixel) |
 | Mitte über der Bildmitte | 0,0248 (41 Pixel) |
+| Oberkante der Seriennummer über dem unteren Rand | 0,0453 (74 Pixel) |
 
-In der Vorschau lassen sich Kreis und Ausschnitt einblenden (voreingestellt); in den
-erzeugten Dateien steht davon nichts.
+Zwischen dem unteren Rand des Kreises und der Seriennummer bleibt eine freie Fläche –
+dort steht das Logo, mittig darin.
+
+In der Vorschau lassen sich Kreis, Ausschnitt und die Höhe der Seriennummer einblenden
+(voreingestellt); in den erzeugten Dateien steht davon nichts.
 
 ## Drehen ins Hochformat
 
@@ -102,10 +106,20 @@ Neben dem Kreis ist deshalb wenig Platz: vom Kreisrand bis zum Rand des Ausschni
 314 Pixel, von denen „iPad" allein 291 braucht. Daher der knappe Abstand von 1,4 %; mit
 ihm bleibt die Beschriftung ohne Präfix und mit kurzem Präfix (`C 01`) vollständig stehen.
 
-Ein Präfix von **mehr als drei Zeichen** setzt die Beschriftung zweizeilig – Präfix über
-der Nummer, beide linksbündig am Kreis. Damit wird `Kunst 01` von 550 auf 390 Pixel
-schmaler. Reicht auch das nicht, meldet die Vorschau, wie viele Pixel fehlen; gemessen
-wird dafür der tatsächlich gesetzte Schriftzug, nicht seine Zeichenzahl.
+Zwei Stufen halten die Beschriftung trotzdem im Bild:
+
+1. **Zweizeilig ab vier Zeichen Präfix.** Das Präfix steht über der Nummer, die Nummer
+   mittig darunter; den Abstand zum Kreis hält die breitere der beiden Zeilen. Damit wird
+   `Kunst 01` von 546 auf 391 Pixel schmaler.
+2. **Kleinere Schrift, wenn das noch nicht reicht.** Gemessen wird die breiteste
+   Beschriftung der Reihe – bei `Kunst` bleiben so 74 % der üblichen Größe. Verkleinert
+   wird für **alle** Bilder der Reihe gleich; sonst stünden `iPad 1` und `iPad 115`
+   nebeneinander in verschiedenen Größen. Die Vorschau sagt, wenn das eingegriffen hat.
+
+Unter 55 % geht es nicht weiter – kleiner wäre auf dem Gerät kaum zu lesen. Ein Präfix
+wie `Naturwissenschaften` wird deshalb weiterhin beschnitten; die Vorschau meldet dann,
+wie viele Pixel fehlen. Gemessen wird dafür der tatsächlich gesetzte Schriftzug, nicht
+seine Zeichenzahl.
 
 ## Dateien im Archiv
 

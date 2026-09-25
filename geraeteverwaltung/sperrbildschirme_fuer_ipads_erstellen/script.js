@@ -53,15 +53,27 @@ const HOECHSTZAHL = 500;
 const PRAEFIX_UMBRUCH = 3;
 
 /*
+ * So weit darf die Schrift höchstens verkleinert werden, wenn die Beschriftung selbst
+ * zweizeilig noch zu breit ist. Darunter wäre sie auf dem Gerät kaum noch abzulesen –
+ * dann bleibt es bei dieser Größe, und die Vorschau sagt, dass es trotzdem nicht reicht.
+ */
+const SCHRIFT_MINDESTANTEIL = 0.55;
+
+/*
  * Alle Maße als Anteil der kürzeren Bildkante – so trägt dasselbe Layout Quer- und
  * Hochformat und jede benutzerdefinierte Auflösung.
  */
 const LAYOUT = {
   schriftgroesse: 0.082,  // Höhe der Schrift
   zeilenabstand: 1.2,     // Abstand zweier Zeilen – Vielfaches der Schriftgröße
-  logoMitte: 0.75,        // Mitte des Logos – Anteil der *Höhe*
   logoBreite: 0.36,       // Feld, in das das Logo eingepasst wird; breit genug auch für
   logoHoehe: 0.17,        // einen querliegenden Schriftzug, hoch wie das Schulzeichen
+
+  /*
+   * Oberkante der Seriennummer, die iOS unten einblendet – Abstand zum unteren Bildrand.
+   * Ebenfalls an den Screenshots gemessen; zwischen ihr und dem Benutzerkreis steht das Logo.
+   */
+  seriennummer: 0.0453,
 
   /*
    * Der Kreis mit dem Benutzerbild, den iOS auf geteilten iPads über den Sperrbildschirm
@@ -224,6 +236,71 @@ function sichtbarNachDrehung(breite, hoehe) {
 }
 
 /*
+ * Breite eines Schriftzugs in der Ausgabeschrift. Gemessen wird auf einer Leinwand, mit
+ * derselben Schrift und Stärke, mit der das SVG ihn später setzt – die Vorschübe stammen
+ * damit aus derselben Quelle wie beim Zeichnen. Die Leinwand bleibt erhalten, sie wird
+ * bei jeder Änderung der Vorschau mehrfach gebraucht.
+ */
+const messfeld = document.createElement('canvas').getContext('2d');
+
+function textBreite(text, groesse) {
+  messfeld.font = `700 ${groesse}px "Open Sans", Helvetica, Arial, sans-serif`;
+  return messfeld.measureText(text).width;
+}
+
+/*
+ * Platz, der einer Beschriftung neben dem Kreis bleibt – links wie rechts gleich viel,
+ * weil Kreis und Ausschnitt beide mittig liegen. Im Querformat begrenzt der Ausschnitt,
+ * der nach dem Drehen übrig bleibt; im Hochformat wird waagerecht nicht beschnitten,
+ * dort ist es der Bildrand.
+ */
+function textPlatz(breite, hoehe) {
+  const kurz = Math.min(breite, hoehe);
+  const kreis = benutzerkreis(breite, hoehe);
+  const streifen = sichtbarNachDrehung(breite, hoehe);
+  const rand = streifen.achse === 'x' ? streifen.bis : breite;
+  return rand - (kreis.x + kreis.radius + kurz * LAYOUT.textAbstand);
+}
+
+/*
+ * Schriftgröße für die ganze Reihe: gewünscht sind LAYOUT.schriftgroesse der kurzen Kante.
+ * Passt der breiteste Schriftzug damit nicht in den Platz neben dem Kreis, wird verkleinert –
+ * und zwar für alle Bilder der Reihe gleich, sonst stünden "iPad 1" und "iPad 115"
+ * nebeneinander in verschiedenen Größen.
+ */
+function schriftgroesse(breite, hoehe, liste) {
+  const gewuenscht = Math.min(breite, hoehe) * LAYOUT.schriftgroesse;
+  const platz = textPlatz(breite, hoehe);
+  if (platz <= 0 || liste.length === 0) return gewuenscht;
+
+  const breiteste = Math.max(
+    textBreite(GERAETEWORT, gewuenscht),
+    ...liste.flatMap((eintrag) => eintrag.zeilen.map((zeile) => textBreite(zeile, gewuenscht)))
+  );
+  if (breiteste <= platz) return gewuenscht;
+  return gewuenscht * Math.max(SCHRIFT_MINDESTANTEIL, platz / breiteste);
+}
+
+/*
+ * Das Logo steht mittig zwischen dem unteren Rand des Benutzerkreises und der
+ * Seriennummer, die iOS unten einblendet – also in der freien Fläche darunter und nicht
+ * in einem festen Anteil der Bildhöhe.
+ */
+function logofeld(breite, hoehe) {
+  const kurz = Math.min(breite, hoehe);
+  const kreis = benutzerkreis(breite, hoehe);
+  const feldBreite = kurz * LAYOUT.logoBreite;
+  const feldHoehe = kurz * LAYOUT.logoHoehe;
+  const mitte = ((kreis.y + kreis.radius) + (hoehe - kurz * LAYOUT.seriennummer)) / 2;
+  return {
+    x: (breite - feldBreite) / 2,
+    y: mitte - feldHoehe / 2,
+    breite: feldBreite,
+    hoehe: feldHoehe
+  };
+}
+
+/*
  * Setzt das Logo in das Feld, das für es vorgesehen ist. Beide Wege passen es dort ein,
  * statt es zu verzerren (`preserveAspectRatio`), und beide legen seine Mitte auf die
  * Mitte des Feldes:
@@ -252,6 +329,8 @@ function logoMarkup(logo, feld, logoId) {
  *
  *   zeilen        Beschriftung rechts, ein- oder zweizeilig; ohne sie entsteht das
  *                 reine Hintergrundbild
+ *   groesse       Schriftgröße; ohne Angabe die gewünschte aus LAYOUT. Sie kommt von
+ *                 außen, weil sie für die ganze Reihe gilt (siehe schriftgroesse)
  *   logo          eingelesenes Logo (entfällt beim Hintergrundbild)
  *   logoFarbe     Farbe, auf die ein Vektorlogo gebracht wird; null = unverändert lassen
  *   logoId        id des eingebetteten Logos; nur die Vorschau braucht eine eigene
@@ -260,10 +339,10 @@ function logoMarkup(logo, feld, logoId) {
  *   hilfslinien   zeichnet Benutzerkreis und Hochformat-Ausschnitt ein; nur für die
  *                 Vorschau gedacht, in den Dateien hat das nichts zu suchen
  */
-function baueSvg({ breite, hoehe, hintergrund, farbe, zeilen, logo, logoFarbe,
+function baueSvg({ breite, hoehe, hintergrund, farbe, zeilen, groesse: vorgabe, logo, logoFarbe,
   logoId = LOGO_ID, schrift, hilfslinien = false }) {
   const kurz = Math.min(breite, hoehe);
-  const groesse = rund(kurz * LAYOUT.schriftgroesse);
+  const groesse = rund(vorgabe || kurz * LAYOUT.schriftgroesse);
   const mitText = Array.isArray(zeilen) && zeilen.length > 0;
   const mitLogo = mitText && logo;
   const faerben = mitLogo && logo.art === 'vektor' && logoFarbe;
@@ -316,28 +395,27 @@ function baueSvg({ breite, hoehe, hintergrund, farbe, zeilen, logo, logoFarbe,
     const mitten = zeilen.map((_, i) => kreis.y + (i - (zeilen.length - 1) / 2) * abstand);
     const grundlinie = (mitte) => rund(mitte + groesse * VERSALHOEHE_HALB);
 
+    /*
+     * Die Zeilen der Beschriftung stehen untereinander mittig zueinander: Die breiteste
+     * hält den Abstand zum Kreis, die kürzere (meist die Nummer) rückt in deren Mitte.
+     * Bei nur einer Zeile fällt beides zusammen.
+     */
+    const blockBreite = Math.max(...zeilen.map((zeile) => textBreite(zeile, groesse)));
+    const blockMitte = kreis.x + rand + blockBreite / 2;
+
     teile.push(`<g fill="${xmlText(farbe)}" font-family="'Open Sans', Helvetica, Arial, sans-serif" ` +
       `font-weight="700" font-size="${groesse}">`);
     // "iPad" bleibt einzeilig und steht auf Höhe der Kreismitte
     teile.push(`<text x="${rund(kreis.x - rand)}" y="${grundlinie(kreis.y)}" ` +
       `text-anchor="end">${xmlText(GERAETEWORT)}</text>`);
     zeilen.forEach((zeile, i) => {
-      teile.push(`<text x="${rund(kreis.x + rand)}" y="${grundlinie(mitten[i])}" ` +
-        `text-anchor="start">${xmlText(zeile)}</text>`);
+      teile.push(`<text x="${rund(blockMitte)}" y="${grundlinie(mitten[i])}" ` +
+        `text-anchor="middle">${xmlText(zeile)}</text>`);
     });
     teile.push('</g>');
   }
 
-  if (mitLogo) {
-    const feldBreite = kurz * LAYOUT.logoBreite;
-    const feldHoehe = kurz * LAYOUT.logoHoehe;
-    teile.push(logoMarkup(logo, {
-      x: (breite - feldBreite) / 2,
-      y: hoehe * LAYOUT.logoMitte - feldHoehe / 2,
-      breite: feldBreite,
-      hoehe: feldHoehe
-    }, logoId));
-  }
+  if (mitLogo) teile.push(logoMarkup(logo, logofeld(breite, hoehe), logoId));
 
   if (hilfslinien) teile.push(baueHilfslinien(breite, hoehe));
 
@@ -361,11 +439,15 @@ function baueHilfslinien(breite, hoehe) {
     ? `<line x1="${rund(wert)}" y1="0" x2="${rund(wert)}" y2="${hoehe}"/>`
     : `<line x1="0" y1="${rund(wert)}" x2="${breite}" y2="${rund(wert)}"/>`);
 
+  // Höhe, auf der iOS die Seriennummer einblendet – die untere Grenze für das Logo
+  const seriennummer = hoehe - kurz * LAYOUT.seriennummer;
+
   return '<g class="hilfslinien" fill="none" stroke="#ffffff" stroke-opacity="0.55" ' +
     `stroke-width="${strich}" stroke-dasharray="${rund(strich * 4)} ${rund(strich * 3)}">` +
     `<circle cx="${rund(kreis.x)}" cy="${rund(kreis.y)}" r="${rund(kreis.radius)}" ` +
     'fill="#ffffff" fill-opacity="0.18" stroke-dasharray="none"/>' +
     kante(streifen.von) + kante(streifen.bis) +
+    `<line x1="0" y1="${rund(seriennummer)}" x2="${breite}" y2="${rund(seriennummer)}"/>` +
     '</g>';
 }
 
@@ -485,10 +567,17 @@ function aktuellesLogo() {
   }
 }
 
-// Alles, was für jeden Sperrbildschirm gleich ist – Vorschau und Ausgabe teilen es sich
-function bildEinstellungen() {
+/*
+ * Alles, was für jeden Sperrbildschirm der Reihe gleich ist – Vorschau und Ausgabe teilen
+ * es sich. Die Schriftgröße gehört dazu: Sie richtet sich nach der breitesten Beschriftung
+ * der *ganzen* Reihe und ist deshalb für jedes einzelne Bild dieselbe.
+ */
+function bildEinstellungen(liste = []) {
+  const { breite, hoehe } = masse();
   return {
-    ...masse(),
+    breite,
+    hoehe,
+    groesse: schriftgroesse(breite, hoehe, liste),
     hintergrund: hintergrundFarbe.value,
     farbe: schriftFarbe.value,
     logo: aktuellesLogo(),
@@ -542,10 +631,11 @@ function aktualisiereVorschau() {
   }
   if (mitHintergrundbild.checked) bilder.push({ titel: 'Hintergrundbild', zeilen: null });
 
+  const gemeinsam = bildEinstellungen(liste || []);
   vorschauGitter.innerHTML = bilder.map((bild, i) => `
     <figure class="vorschau">
       <div class="vorschau-bild">${baueSvg({
-        ...bildEinstellungen(),
+        ...gemeinsam,
         zeilen: bild.zeilen,
         hilfslinien: hilfslinien.checked,
         // Die Vorschauen stehen in derselben Seite: eine eigene id je Bild, damit die
@@ -555,15 +645,18 @@ function aktualisiereVorschau() {
       <figcaption>${toolhubEscapeHtml(bild.titel)}</figcaption>
     </figure>`).join('');
 
-  pruefeDrehung(breite, hoehe);
+  pruefeDrehung(breite, hoehe, gemeinsam.groesse);
 }
 
 /*
- * Prüft an den fertig gesetzten Vorschauen, ob die Beschriftung über den Bereich
- * hinausragt, der nach dem Drehen des iPads noch zu sehen ist. Gemessen statt gerechnet,
- * weil die Breite eines Schriftzugs von den tatsächlichen Buchstaben abhängt.
+ * Kontrolliert an den fertig gesetzten Vorschauen, was nach dem Drehen des iPads vom
+ * Schriftzug übrig bleibt. Gemessen statt gerechnet: Erst am gezeichneten Text steht
+ * fest, wie breit er mit diesen Buchstaben wirklich ausfällt.
+ *
+ * Meldet außerdem, wenn die Schrift dafür verkleinert werden musste – das erklärt, warum
+ * die Beschriftung kleiner steht als sonst.
  */
-function pruefeDrehung(breite, hoehe) {
+function pruefeDrehung(breite, hoehe, groesse) {
   const streifen = sichtbarNachDrehung(breite, hoehe);
   const quer = streifen.achse === 'x';
   let ueberstand = 0;
@@ -575,11 +668,21 @@ function pruefeDrehung(breite, hoehe) {
     ueberstand = Math.max(ueberstand, streifen.von - von, bis - streifen.bis);
   });
 
-  toolhubMessage(drehungMeldung, ueberstand > 1
-    ? 'Beim Drehen ins Hochformat vergrößert iOS das Bild und schneidet die Ränder ab – ' +
-      `dabei fehlen der Beschriftung rund ${Math.round(ueberstand)} Pixel. Ein kürzeres ` +
-      'Präfix oder weniger Stellen in der Nummer halten sie vollständig im Bild.'
-    : '', 'warn', 'warnung');
+  if (ueberstand > 1) {
+    toolhubMessage(drehungMeldung,
+      'Beim Drehen ins Hochformat vergrößert iOS das Bild und schneidet die Ränder ab – ' +
+      `dabei fehlen der Beschriftung rund ${Math.round(ueberstand)} Pixel. Kleiner als ` +
+      `${Math.round(SCHRIFT_MINDESTANTEIL * 100)} Prozent wird die Schrift dafür nicht ` +
+      'gesetzt; ein kürzeres Präfix schafft Platz.', 'warn', 'warnung');
+    return;
+  }
+
+  const anteil = groesse / (Math.min(breite, hoehe) * LAYOUT.schriftgroesse);
+  toolhubMessage(drehungMeldung, anteil < 0.995
+    ? `Die Beschriftung steht auf ${Math.round(anteil * 100)} Prozent der üblichen ` +
+      'Schriftgröße – so bleibt sie neben dem Benutzerbild auch nach dem Drehen ins ' +
+      'Hochformat vollständig sichtbar.'
+    : '', 'info', 'haken');
 }
 
 // ---------------------------------------------------------------------------
@@ -650,7 +753,7 @@ erzeugenBtn.addEventListener('click', async () => {
   toolhubMessage(erzeugenMeldung, 'Sperrbildschirme werden erzeugt …', 'info', 'sanduhr');
 
   try {
-    const gemeinsam = { ...bildEinstellungen(), schrift: await schriftEinbettung() };
+    const gemeinsam = { ...bildEinstellungen(liste), schrift: await schriftEinbettung() };
 
     const aufgaben = liste.map((eintrag) => ({
       zeilen: eintrag.zeilen,
@@ -760,6 +863,15 @@ toolhubUpload({
 });
 
 aktualisiereVorschau();
+
+/*
+ * Die Schriftgröße hängt davon ab, wie breit die Beschriftung ausfällt – gemessen werden
+ * kann das erst, wenn Open Sans geladen ist. Bis dahin misst der Browser in einer
+ * Ersatzschrift; sobald die richtige da ist, wird noch einmal gerechnet.
+ */
+if (document.fonts) {
+  document.fonts.load('700 100px "Open Sans"').then(aktualisiereVorschau).catch(() => {});
+}
 
 // Das voreingestellte Schulzeichen kommt nach: Die Vorschau steht schon, sobald es da
 // ist, wird sie ein zweites Mal gezeichnet.
