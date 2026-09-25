@@ -31,7 +31,9 @@ const fuehrendeNullen = document.getElementById('fuehrendeNullen');
 const nummernMeldung = document.getElementById('nummernMeldung');
 const logoMeldung = document.getElementById('logoMeldung');
 const statistik = document.getElementById('statistik');
+const hilfslinien = document.getElementById('hilfslinien');
 const vorschauGitter = document.getElementById('vorschauGitter');
+const drehungMeldung = document.getElementById('drehungMeldung');
 const mitHintergrundbild = document.getElementById('mitHintergrundbild');
 const erzeugenBtn = document.getElementById('erzeugenBtn');
 const erzeugenMeldung = document.getElementById('erzeugenMeldung');
@@ -44,16 +46,40 @@ const GERAETEWORT = 'iPad';
 const HOECHSTZAHL = 500;
 
 /*
+ * Ab dieser Länge des Präfix steht die Beschriftung zweizeilig: Präfix über der Nummer.
+ * Ein langes Präfix ("Kunst 01") wird sonst so breit, dass es im gedrehten Hochformat
+ * abgeschnitten wird (siehe sichtbarNachDrehung).
+ */
+const PRAEFIX_UMBRUCH = 3;
+
+/*
  * Alle Maße als Anteil der kürzeren Bildkante – so trägt dasselbe Layout Quer- und
  * Hochformat und jede benutzerdefinierte Auflösung.
  */
 const LAYOUT = {
   schriftgroesse: 0.082,  // Höhe der Schrift
-  wortMitte: 1 / 3,       // "iPad" – Anteil der *Breite*
-  nummerMitte: 2 / 3,     // Laufnummer – Anteil der *Breite*
+  zeilenabstand: 1.2,     // Abstand zweier Zeilen – Vielfaches der Schriftgröße
   logoMitte: 0.75,        // Mitte des Logos – Anteil der *Höhe*
   logoBreite: 0.36,       // Feld, in das das Logo eingepasst wird; breit genug auch für
-  logoHoehe: 0.17         // einen querliegenden Schriftzug, hoch wie das Schulzeichen
+  logoHoehe: 0.17,        // einen querliegenden Schriftzug, hoch wie das Schulzeichen
+
+  /*
+   * Der Kreis mit dem Benutzerbild, den iOS auf geteilten iPads über den Sperrbildschirm
+   * legt. Beide Werte sind an Screenshots eines iPads ausgemessen (quer und hochkant) und
+   * fielen dort auf die kürzere Kante bezogen genau gleich aus: Durchmesser 0,3115 der
+   * kurzen Kante, Mitte 0,0248 darüber oben – der Kreis sitzt also etwas höher als die
+   * Bildmitte. Die Beschriftung richtet sich nach ihm, damit sie nicht dahinter verschwindet.
+   */
+  kreisRadius: 0.1558,
+  kreisHoeher: 0.0248,
+
+  /*
+   * Abstand der Beschriftung zum Kreisrand, links wie rechts gleich. Luftiger ginge, doch
+   * der Platz daneben ist knapp: Vom Kreisrand bis zum Rand des Ausschnitts, der nach dem
+   * Drehen bleibt, sind es bei 2360 × 1640 nur 314 Pixel, und "iPad" braucht davon 291.
+   * Bei diesem Wert steht es dort gerade noch vollständig (siehe sichtbarNachDrehung).
+   */
+  textAbstand: 0.014
 };
 
 /*
@@ -113,7 +139,11 @@ function masse() {
 }
 
 /*
- * Die Beschriftungen der Reihe, z. B. ["01", "02", … "15"] oder ["C 13", "C 14"].
+ * Die Beschriftungen der Reihe. Jede besteht aus
+ *
+ *   voll     wie sie zusammen gelesen wird ("C 13") – für Dateiname und Vorschautitel
+ *   zeilen   wie sie im Bild steht: ["C 13"] oder, bei langem Präfix, ["Kunst", "01"]
+ *
  * Die Zahl der Stellen richtet sich nach der größten Nummer, damit alle Bilder gleich
  * breite Nummern tragen.
  */
@@ -127,10 +157,21 @@ function beschriftungen() {
     return { fehler: `${anzahl} Sperrbildschirme sind zu viele – höchstens ${HOECHSTZAHL} auf einmal.` };
   }
 
+  // Das Leerzeichen am Ende trennt nur Präfix und Nummer; für die Länge zählt es nicht,
+  // und in der zweizeiligen Fassung übernimmt der Zeilenumbruch seine Aufgabe.
+  const vorsatz = praefix.value.replace(/\s+$/, '');
+  const zweizeilig = vorsatz.length > PRAEFIX_UMBRUCH;
+
   const stellen = fuehrendeNullen.checked ? String(ende).length : 1;
   const liste = [];
-  for (let n = start; n <= ende; n++) liste.push(praefix.value + String(n).padStart(stellen, '0'));
-  return { liste };
+  for (let n = start; n <= ende; n++) {
+    const nummer = String(n).padStart(stellen, '0');
+    liste.push({
+      voll: praefix.value + nummer,
+      zeilen: zweizeilig ? [vorsatz, nummer] : [praefix.value + nummer]
+    });
+  }
+  return { liste, zweizeilig };
 }
 
 // ---------------------------------------------------------------------------
@@ -148,6 +189,38 @@ function xmlText(wert) {
 // Eine Nachkommastelle reicht bei Bildern dieser Größe und hält das SVG lesbar
 function rund(wert) {
   return Math.round(wert * 10) / 10;
+}
+
+/*
+ * Lage und Größe des Kreises, den iOS auf geteilten iPads mit dem Benutzerbild über den
+ * Sperrbildschirm legt (siehe LAYOUT.kreisRadius).
+ */
+function benutzerkreis(breite, hoehe) {
+  const kurz = Math.min(breite, hoehe);
+  return {
+    x: breite / 2,
+    y: hoehe / 2 - kurz * LAYOUT.kreisHoeher,
+    radius: kurz * LAYOUT.kreisRadius
+  };
+}
+
+/*
+ * Wird das iPad gedreht, füllt iOS den Bildschirm mit demselben Bild: Es vergrößert es,
+ * bis die kurze Bildkante die lange Bildschirmkante deckt, und beschneidet den Überstand
+ * zu beiden Seiten. Stehen bleibt von der langen Bildkante nur das mittlere Stück
+ * kurz² / lang – bei 2360 × 1640 also knapp die halbe Breite.
+ *
+ * Rückgabe: der sichtbare Streifen entlang der langen Kante und die Achse, auf der er liegt.
+ */
+function sichtbarNachDrehung(breite, hoehe) {
+  const kurz = Math.min(breite, hoehe);
+  const lang = Math.max(breite, hoehe);
+  const stueck = (kurz * kurz) / lang;
+  return {
+    achse: breite >= hoehe ? 'x' : 'y',
+    von: (lang - stueck) / 2,
+    bis: (lang + stueck) / 2
+  };
 }
 
 /*
@@ -177,17 +250,22 @@ function logoMarkup(logo, feld, logoId) {
 /*
  * Erzeugt das SVG eines Sperrbildschirms.
  *
- *   text        Beschriftung rechts; ohne Angabe entsteht das reine Hintergrundbild
- *   logo        eingelesenes Logo (entfällt beim Hintergrundbild)
- *   logoFarbe   Farbe, auf die ein Vektorlogo gebracht wird; null = unverändert lassen
- *   logoId      id des eingebetteten Logos; nur die Vorschau braucht eine eigene
- *   schrift     Data-URL der eingebetteten Schriftdatei; ohne sie greift die Schrift
- *               der Umgebung – das genügt für die Vorschau innerhalb der Seite
+ *   zeilen        Beschriftung rechts, ein- oder zweizeilig; ohne sie entsteht das
+ *                 reine Hintergrundbild
+ *   logo          eingelesenes Logo (entfällt beim Hintergrundbild)
+ *   logoFarbe     Farbe, auf die ein Vektorlogo gebracht wird; null = unverändert lassen
+ *   logoId        id des eingebetteten Logos; nur die Vorschau braucht eine eigene
+ *   schrift       Data-URL der eingebetteten Schriftdatei; ohne sie greift die Schrift
+ *                 der Umgebung – das genügt für die Vorschau innerhalb der Seite
+ *   hilfslinien   zeichnet Benutzerkreis und Hochformat-Ausschnitt ein; nur für die
+ *                 Vorschau gedacht, in den Dateien hat das nichts zu suchen
  */
-function baueSvg({ breite, hoehe, hintergrund, farbe, text, logo, logoFarbe, logoId = LOGO_ID, schrift }) {
+function baueSvg({ breite, hoehe, hintergrund, farbe, zeilen, logo, logoFarbe,
+  logoId = LOGO_ID, schrift, hilfslinien = false }) {
   const kurz = Math.min(breite, hoehe);
   const groesse = rund(kurz * LAYOUT.schriftgroesse);
-  const mitLogo = text !== undefined && logo;
+  const mitText = Array.isArray(zeilen) && zeilen.length > 0;
+  const mitLogo = mitText && logo;
   const faerben = mitLogo && logo.art === 'vektor' && logoFarbe;
   const regeln = [];
   const teile = [];
@@ -195,7 +273,7 @@ function baueSvg({ breite, hoehe, hintergrund, farbe, text, logo, logoFarbe, log
   teile.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${breite}" height="${hoehe}" ` +
     `viewBox="0 0 ${breite} ${hoehe}">`);
 
-  if (text !== undefined && schrift) {
+  if (mitText && schrift) {
     // Die Schrift steckt im SVG selbst: beim Rastern über ein <img> wäre eine
     // Datei daneben nicht erreichbar, und ein weitergegebenes SVG bliebe sonst
     // auf die Schriften des fremden Rechners angewiesen.
@@ -223,12 +301,30 @@ function baueSvg({ breite, hoehe, hintergrund, farbe, text, logo, logoFarbe, log
 
   teile.push(`<rect width="${breite}" height="${hoehe}" fill="${xmlText(hintergrund)}"/>`);
 
-  if (text !== undefined) {
-    const grundlinie = rund(hoehe / 2 + groesse * VERSALHOEHE_HALB);
+  if (mitText) {
+    /*
+     * Beide Schriftzüge stehen neben dem Benutzerkreis, mit demselben Abstand zu seinem
+     * Rand: "iPad" endet links davor, die Nummer beginnt rechts dahinter. Senkrecht
+     * richten sie sich nach der Kreismitte – nicht nach der Bildmitte, denn der Kreis
+     * sitzt etwas höher.
+     */
+    const kreis = benutzerkreis(breite, hoehe);
+    const rand = kreis.radius + kurz * LAYOUT.textAbstand;
+    const abstand = groesse * LAYOUT.zeilenabstand;
+
+    // Mitte der Versalhöhe jeder Zeile; bei zwei Zeilen liegt die Kreismitte zwischen ihnen
+    const mitten = zeilen.map((_, i) => kreis.y + (i - (zeilen.length - 1) / 2) * abstand);
+    const grundlinie = (mitte) => rund(mitte + groesse * VERSALHOEHE_HALB);
+
     teile.push(`<g fill="${xmlText(farbe)}" font-family="'Open Sans', Helvetica, Arial, sans-serif" ` +
-      `font-weight="700" font-size="${groesse}" text-anchor="middle">`);
-    teile.push(`<text x="${rund(breite * LAYOUT.wortMitte)}" y="${grundlinie}">${xmlText(GERAETEWORT)}</text>`);
-    teile.push(`<text x="${rund(breite * LAYOUT.nummerMitte)}" y="${grundlinie}">${xmlText(text)}</text>`);
+      `font-weight="700" font-size="${groesse}">`);
+    // "iPad" bleibt einzeilig und steht auf Höhe der Kreismitte
+    teile.push(`<text x="${rund(kreis.x - rand)}" y="${grundlinie(kreis.y)}" ` +
+      `text-anchor="end">${xmlText(GERAETEWORT)}</text>`);
+    zeilen.forEach((zeile, i) => {
+      teile.push(`<text x="${rund(kreis.x + rand)}" y="${grundlinie(mitten[i])}" ` +
+        `text-anchor="start">${xmlText(zeile)}</text>`);
+    });
     teile.push('</g>');
   }
 
@@ -243,8 +339,34 @@ function baueSvg({ breite, hoehe, hintergrund, farbe, text, logo, logoFarbe, log
     }, logoId));
   }
 
+  if (hilfslinien) teile.push(baueHilfslinien(breite, hoehe));
+
   teile.push('</svg>');
   return teile.join('\n');
+}
+
+/*
+ * Nur für die Vorschau: der Kreis mit dem Benutzerbild und die Grenzen dessen, was nach
+ * dem Drehen des iPads übrig bleibt. Beides gehört nicht in die erzeugten Dateien –
+ * es soll beim Einrichten zeigen, wo das Bild später verdeckt oder beschnitten wird.
+ */
+function baueHilfslinien(breite, hoehe) {
+  const kurz = Math.min(breite, hoehe);
+  const kreis = benutzerkreis(breite, hoehe);
+  const strich = rund(kurz * 0.004);
+  const streifen = sichtbarNachDrehung(breite, hoehe);
+  const quer = streifen.achse === 'x';
+
+  const kante = (wert) => (quer
+    ? `<line x1="${rund(wert)}" y1="0" x2="${rund(wert)}" y2="${hoehe}"/>`
+    : `<line x1="0" y1="${rund(wert)}" x2="${breite}" y2="${rund(wert)}"/>`);
+
+  return '<g class="hilfslinien" fill="none" stroke="#ffffff" stroke-opacity="0.55" ' +
+    `stroke-width="${strich}" stroke-dasharray="${rund(strich * 4)} ${rund(strich * 3)}">` +
+    `<circle cx="${rund(kreis.x)}" cy="${rund(kreis.y)}" r="${rund(kreis.radius)}" ` +
+    'fill="#ffffff" fill-opacity="0.18" stroke-dasharray="none"/>' +
+    kante(streifen.von) + kante(streifen.bis) +
+    '</g>';
 }
 
 // ---------------------------------------------------------------------------
@@ -400,7 +522,7 @@ function aktualisiereVorschau() {
     <div class="stat-card">
       <h3>Sperrbildschirme</h3>
       <div class="value">${anzahl}</div>
-      <p>${anzahl > 0 ? `${toolhubEscapeHtml(liste[0])} bis ${toolhubEscapeHtml(liste[anzahl - 1])}` : 'keine'}</p>
+      <p>${anzahl > 0 ? `${toolhubEscapeHtml(liste[0].voll)} bis ${toolhubEscapeHtml(liste[anzahl - 1].voll)}` : 'keine'}</p>
     </div>
     <div class="stat-card klein">
       <h3>Aufl&ouml;sung</h3>
@@ -414,21 +536,50 @@ function aktualisiereVorschau() {
     </div>`;
 
   const bilder = [];
-  if (anzahl > 0) bilder.push({ titel: `${GERAETEWORT} ${liste[0]}`, text: liste[0] });
-  if (anzahl > 1) bilder.push({ titel: `${GERAETEWORT} ${liste[anzahl - 1]}`, text: liste[anzahl - 1] });
-  if (mitHintergrundbild.checked) bilder.push({ titel: 'Hintergrundbild', text: undefined });
+  if (anzahl > 0) bilder.push({ titel: `${GERAETEWORT} ${liste[0].voll}`, zeilen: liste[0].zeilen });
+  if (anzahl > 1) {
+    bilder.push({ titel: `${GERAETEWORT} ${liste[anzahl - 1].voll}`, zeilen: liste[anzahl - 1].zeilen });
+  }
+  if (mitHintergrundbild.checked) bilder.push({ titel: 'Hintergrundbild', zeilen: null });
 
   vorschauGitter.innerHTML = bilder.map((bild, i) => `
     <figure class="vorschau">
       <div class="vorschau-bild">${baueSvg({
         ...bildEinstellungen(),
-        text: bild.text,
+        zeilen: bild.zeilen,
+        hilfslinien: hilfslinien.checked,
         // Die Vorschauen stehen in derselben Seite: eine eigene id je Bild, damit die
         // Regel zum Einfärben nicht auf die Logos der Nachbarn übergreift
         logoId: `logo-vorschau-${i}`
       })}</div>
       <figcaption>${toolhubEscapeHtml(bild.titel)}</figcaption>
     </figure>`).join('');
+
+  pruefeDrehung(breite, hoehe);
+}
+
+/*
+ * Prüft an den fertig gesetzten Vorschauen, ob die Beschriftung über den Bereich
+ * hinausragt, der nach dem Drehen des iPads noch zu sehen ist. Gemessen statt gerechnet,
+ * weil die Breite eines Schriftzugs von den tatsächlichen Buchstaben abhängt.
+ */
+function pruefeDrehung(breite, hoehe) {
+  const streifen = sichtbarNachDrehung(breite, hoehe);
+  const quer = streifen.achse === 'x';
+  let ueberstand = 0;
+
+  vorschauGitter.querySelectorAll('.vorschau-bild svg > g > text').forEach((el) => {
+    const kasten = el.getBBox();
+    const von = quer ? kasten.x : kasten.y;
+    const bis = von + (quer ? kasten.width : kasten.height);
+    ueberstand = Math.max(ueberstand, streifen.von - von, bis - streifen.bis);
+  });
+
+  toolhubMessage(drehungMeldung, ueberstand > 1
+    ? 'Beim Drehen ins Hochformat vergrößert iOS das Bild und schneidet die Ränder ab – ' +
+      `dabei fehlen der Beschriftung rund ${Math.round(ueberstand)} Pixel. Ein kürzeres ` +
+      'Präfix oder weniger Stellen in der Nummer halten sie vollständig im Bild.'
+    : '', 'warn', 'warnung');
 }
 
 // ---------------------------------------------------------------------------
@@ -501,8 +652,11 @@ erzeugenBtn.addEventListener('click', async () => {
   try {
     const gemeinsam = { ...bildEinstellungen(), schrift: await schriftEinbettung() };
 
-    const aufgaben = liste.map((text) => ({ text, name: `${GERAETEWORT}-${text}` }));
-    if (mitHintergrundbild.checked) aufgaben.push({ text: undefined, name: 'Hintergrund' });
+    const aufgaben = liste.map((eintrag) => ({
+      zeilen: eintrag.zeilen,
+      name: `${GERAETEWORT}-${eintrag.voll}`
+    }));
+    if (mitHintergrundbild.checked) aufgaben.push({ zeilen: null, name: 'Hintergrund' });
 
     const zip = new JSZip();
     for (let i = 0; i < aufgaben.length; i++) {
@@ -510,7 +664,7 @@ erzeugenBtn.addEventListener('click', async () => {
       toolhubMessage(erzeugenMeldung,
         `Bild ${i + 1} von ${aufgaben.length} wird erzeugt …`, 'info', 'sanduhr');
 
-      const svg = baueSvg({ ...gemeinsam, text: aufgabe.text });
+      const svg = baueSvg({ ...gemeinsam, zeilen: aufgabe.zeilen });
       if (alsPng) {
         zip.file(dateiname(aufgabe.name, 'png'), await svgZuPng(svg, breite, hoehe));
       } else {
@@ -569,7 +723,7 @@ farbePaaren(logoFarbe, logoHex);
   feld.addEventListener('input', aktualisiereVorschau);
 });
 
-[fuehrendeNullen, mitHintergrundbild, logoEinfaerben].forEach((feld) => {
+[fuehrendeNullen, mitHintergrundbild, logoEinfaerben, hilfslinien].forEach((feld) => {
   feld.addEventListener('change', aktualisiereVorschau);
 });
 

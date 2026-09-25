@@ -97,16 +97,18 @@
         <path d="M3.9 15h15"/>
       </svg>
       <h2>Beschriftung</h2>
-      <p class="hint">Links steht immer das Wort <code>iPad</code>, rechts die Laufnummer. Erzeugt wird ein
-      Sperrbildschirm je Nummer von der Start- bis zur Endnummer.</p>
+      <p class="hint">Links steht immer das Wort <code>iPad</code>, rechts die Laufnummer &ndash; beide
+      neben dem Benutzerbild geteilter iPads (siehe Vorschau). Erzeugt wird ein Sperrbildschirm je
+      Nummer von der Start- bis zur Endnummer.</p>
 
       <div class="setting-group">
         <div class="setting-label">Laufnummer</div>
         <div class="feld-zeile">
           <label for="praefix">Pr&auml;fix:</label>
           <input type="text" id="praefix" value="" size="10" spellcheck="false" autocomplete="off">
-          <span class="hinweis-klein">steht unver&auml;ndert vor der Nummer &ndash; <code>C&nbsp;</code> mit
-          Leerzeichen am Ende ergibt <code>C 13</code></span>
+          <span class="hinweis-klein">steht vor der Nummer &ndash; <code>C&nbsp;</code> mit Leerzeichen
+          am Ende ergibt <code>C 13</code>. Ab vier Zeichen r&uuml;ckt die Nummer in eine zweite Zeile,
+          damit der Schriftzug beim Drehen nicht abgeschnitten wird.</span>
         </div>
         <div class="feld-zeile">
           <label for="startNummer">Start:</label>
@@ -177,9 +179,21 @@
     <section class="panel">
       <span data-icon="auge" class="panel-icon"></span>
       <h2>Vorschau</h2>
+      <p class="hint">Auf geteilten iPads legt iOS mittig einen Kreis mit dem Benutzerbild
+      &uuml;ber den Sperrbildschirm; die Beschriftung weicht ihm nach links und rechts aus.
+      Dreht man das Ger&auml;t, vergr&ouml;&szlig;ert iOS das Bild auf die neue H&ouml;he und
+      schneidet die R&auml;nder ab &ndash; die gestrichelten Linien zeigen, was dann noch zu
+      sehen ist.</p>
+
+      <label class="radio-row">
+        <input type="checkbox" id="hilfslinien" checked>
+        <span>Benutzerbild und Hochformat-Ausschnitt andeuten &ndash; nur hier in der Vorschau,
+        nicht in den Dateien</span>
+      </label>
 
       <div class="stats" id="statistik"></div>
       <div class="vorschau-gitter" id="vorschauGitter"></div>
+      <div id="drehungMeldung"></div>
     </section>
 
     <section class="panel">

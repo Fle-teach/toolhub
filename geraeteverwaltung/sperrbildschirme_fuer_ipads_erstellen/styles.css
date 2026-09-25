@@ -28,6 +28,7 @@
 /* Meldungen brauchen Luft zum Element darüber (leer: kein Abstand) */
 #nummernMeldung:not(:empty),
 #logoMeldung:not(:empty),
+#drehungMeldung:not(:empty),
 #erzeugenMeldung:not(:empty) {
   margin-top: 18px;
 }

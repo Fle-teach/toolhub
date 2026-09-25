@@ -1,8 +1,9 @@
 # Sperrbildschirme für iPads erstellen
 
 Erzeugt zu einer fortlaufenden Gerätenummer je einen Sperrbildschirm: einfarbiger
-Hintergrund, auf halber Höhe links das Wort **iPad** und rechts die Nummer, darunter
-das Logo der Schule. Heraus kommt ein ZIP-Archiv mit allen Bildern – als PNG oder SVG.
+Hintergrund, links das Wort **iPad** und rechts die Nummer – beide neben dem Kreis, den
+iOS auf geteilten iPads mit dem Benutzerbild darüberlegt –, darunter das Logo der Schule.
+Heraus kommt ein ZIP-Archiv mit allen Bildern – als PNG oder SVG.
 
 Es wird nichts hochgeladen: Das Logo wird im Browser gelesen, gerechnet wird ebenfalls
 dort. Ohne Internetzugang funktioniert das Tool genauso.
@@ -14,7 +15,7 @@ dort. Ohne Internetzugang funktioniert das Tool genauso.
 | Auflösung | `2360 × 1640` (iPads ohne Home-Button), `2160 × 1620` (mit Home-Button) oder eigene Werte |
 | Ausrichtung | ordnet die beiden Werte der Auflösung an – Querformat legt die längere Kante waagerecht |
 | Farben | Hintergrund und Schrift, je über den Farbwähler oder als Hex-Wert |
-| Präfix | steht unverändert vor der Nummer; `C ` (mit Leerzeichen) ergibt `C 13` |
+| Präfix | steht vor der Nummer; `C ` (mit Leerzeichen) ergibt `C 13`. Ab vier Zeichen rückt die Nummer in eine zweite Zeile |
 | Start / Ende | die erste und die letzte Nummer der Reihe (höchstens 500 Bilder) |
 | Führende Nullen | füllt jede Nummer auf die Stellenzahl der größten auf (`01` … `15`, aber `001` … `120`) |
 | Logo | Schulzeichen (voreingestellt), eigenes Logo oder keines |
@@ -66,11 +67,45 @@ Auflösung dasselbe Bild ergeben:
 | Element | Lage |
 | --- | --- |
 | Schriftgröße | 8,2 % der kürzeren Kante |
-| „iPad" | Mitte bei ⅓ der Breite, Grundlinie so, dass die Versalhöhe auf halber Höhe mittig steht |
-| Laufnummer | Mitte bei ⅔ der Breite, gleiche Grundlinie |
+| „iPad" | endet 1,4 % der kürzeren Kante vor dem linken Rand des Benutzerkreises |
+| Laufnummer | beginnt mit demselben Abstand hinter seinem rechten Rand |
+| Grundlinie | so, dass die Versalhöhe mittig zur Kreismitte steht (bei zwei Zeilen der Zeilenblock) |
 | Logo | Feld von 36 % × 17 % der kürzeren Kante, Mitte bei 75 % der Höhe |
 
 Die Schrift ist Open Sans Bold aus `assets/fonts` – dieselbe wie in der Oberfläche.
+
+## Geteilte iPads: der Benutzerkreis
+
+Auf geteilten iPads legt iOS mittig einen Kreis mit dem Benutzerbild über den
+Sperrbildschirm. Die Beschriftung weicht ihm aus: „iPad" links davor, die Nummer rechts
+dahinter, beide mit demselben Abstand zum Kreisrand und senkrecht auf seine Mitte
+ausgerichtet – nicht auf die Bildmitte, denn der Kreis sitzt etwas höher.
+
+Lage und Größe sind an Screenshots eines iPads ausgemessen, quer und hochkant. Bezogen
+auf die **kürzere** Bildkante fielen beide Ausrichtungen genau gleich aus:
+
+| Maß | Anteil der kürzeren Kante |
+| --- | --- |
+| Durchmesser | 0,3115 (bei 2360 × 1640 also 511 Pixel) |
+| Mitte über der Bildmitte | 0,0248 (41 Pixel) |
+
+In der Vorschau lassen sich Kreis und Ausschnitt einblenden (voreingestellt); in den
+erzeugten Dateien steht davon nichts.
+
+## Drehen ins Hochformat
+
+Wird ein iPad mit einem Querformat-Bild gedreht, vergrößert iOS das Bild auf die neue
+Höhe und schneidet die Ränder ab. Von der langen Bildkante bleibt nur das mittlere Stück
+`kurz² / lang` stehen – bei 2360 × 1640 sind das 48 % der Breite.
+
+Neben dem Kreis ist deshalb wenig Platz: vom Kreisrand bis zum Rand des Ausschnitts
+314 Pixel, von denen „iPad" allein 291 braucht. Daher der knappe Abstand von 1,4 %; mit
+ihm bleibt die Beschriftung ohne Präfix und mit kurzem Präfix (`C 01`) vollständig stehen.
+
+Ein Präfix von **mehr als drei Zeichen** setzt die Beschriftung zweizeilig – Präfix über
+der Nummer, beide linksbündig am Kreis. Damit wird `Kunst 01` von 550 auf 390 Pixel
+schmaler. Reicht auch das nicht, meldet die Vorschau, wie viele Pixel fehlen; gemessen
+wird dafür der tatsächlich gesetzte Schriftzug, nicht seine Zeichenzahl.
 
 ## Dateien im Archiv
 
