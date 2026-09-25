@@ -66,9 +66,10 @@ Auflösung dasselbe Bild ergeben:
 
 | Element | Lage |
 | --- | --- |
-| Schriftgröße | 8,2 % der kürzeren Kante, bei Bedarf kleiner (siehe unten) |
+| Schriftgröße | 8,2 % der kürzeren Kante, so weit verkleinert, wie der Platz es verlangt (siehe unten) |
 | „iPad" | endet 1,4 % der kürzeren Kante vor dem linken Rand des Benutzerkreises |
 | Laufnummer | beginnt mit demselben Abstand hinter seinem rechten Rand |
+| Abstand nach außen | mindestens 2 % der kürzeren Kante zum Bildrand bzw. zur Schnittkante |
 | Grundlinie | so, dass die Versalhöhe mittig zur Kreismitte steht (bei zwei Zeilen der Zeilenblock) |
 | Logo | Feld von 36 % × 17 % der kürzeren Kante, mittig zwischen Kreis und Seriennummer |
 
@@ -102,9 +103,12 @@ Wird ein iPad mit einem Querformat-Bild gedreht, vergrößert iOS das Bild auf d
 Höhe und schneidet die Ränder ab. Von der langen Bildkante bleibt nur das mittlere Stück
 `kurz² / lang` stehen – bei 2360 × 1640 sind das 48 % der Breite.
 
-Neben dem Kreis ist deshalb wenig Platz: vom Kreisrand bis zum Rand des Ausschnitts
-314 Pixel, von denen „iPad" allein 291 braucht. Daher der knappe Abstand von 1,4 %; mit
-ihm bleibt die Beschriftung ohne Präfix und mit kurzem Präfix (`C 01`) vollständig stehen.
+Neben dem Kreis ist deshalb wenig Platz: vom Kreisrand bis zum Rand des Ausschnitts sind
+es 314 Pixel. Davon bleiben 2 % der kurzen Kante als Abstand zum Rand frei – bündig
+angeschnitten sieht ein Schriftzug nach Versehen aus –, sodass 258 Pixel für die Schrift
+bleiben. „iPad" bräuchte in voller Größe 291; im Querformat steht die Beschriftung
+deshalb von vornherein auf etwa 89 % der gewünschten Größe. Im Hochformat wird waagerecht
+nicht beschnitten, dort bleibt es bei den vollen 8,2 %.
 
 Zwei Stufen halten die Beschriftung trotzdem im Bild:
 
@@ -112,9 +116,11 @@ Zwei Stufen halten die Beschriftung trotzdem im Bild:
    mittig darunter; den Abstand zum Kreis hält die breitere der beiden Zeilen. Damit wird
    `Kunst 01` von 546 auf 391 Pixel schmaler.
 2. **Kleinere Schrift, wenn das noch nicht reicht.** Gemessen wird die breiteste
-   Beschriftung der Reihe – bei `Kunst` bleiben so 74 % der üblichen Größe. Verkleinert
-   wird für **alle** Bilder der Reihe gleich; sonst stünden `iPad 1` und `iPad 115`
-   nebeneinander in verschiedenen Größen. Die Vorschau sagt, wenn das eingegriffen hat.
+   Beschriftung der Reihe – bei `Kunst` bleiben so drei Viertel der Größe, die das Format
+   sonst hergibt. Verkleinert wird für **alle** Bilder der Reihe gleich; sonst stünden
+   `iPad 1` und `iPad 115` nebeneinander in verschiedenen Größen. Die Vorschau sagt, wenn
+   das eingegriffen hat – verglichen wird dafür mit der Größe, die in diesem Format
+   ohnehin herauskommt, nicht mit den gewünschten 8,2 %.
 
 Unter 55 % geht es nicht weiter – kleiner wäre auf dem Gerät kaum zu lesen. Ein Präfix
 wie `Naturwissenschaften` wird deshalb weiterhin beschnitten; die Vorschau meldet dann,

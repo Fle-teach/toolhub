@@ -86,12 +86,19 @@ const LAYOUT = {
   kreisHoeher: 0.0248,
 
   /*
-   * Abstand der Beschriftung zum Kreisrand, links wie rechts gleich. Luftiger ginge, doch
-   * der Platz daneben ist knapp: Vom Kreisrand bis zum Rand des Ausschnitts, der nach dem
-   * Drehen bleibt, sind es bei 2360 × 1640 nur 314 Pixel, und "iPad" braucht davon 291.
-   * Bei diesem Wert steht es dort gerade noch vollständig (siehe sichtbarNachDrehung).
+   * Abstand der Beschriftung zum Kreisrand, links wie rechts gleich. Er bleibt knapp:
+   * Vom Kreisrand bis zum Rand des Ausschnitts, der nach dem Drehen bleibt, sind es bei
+   * 2360 × 1640 nur 314 Pixel, und was hier abgeht, fehlt der Schrift (siehe
+   * schriftgroesse). Der Schriftzug soll über den Raum hinweg lesbar bleiben.
    */
-  textAbstand: 0.014
+  textAbstand: 0.014,
+
+  /*
+   * Abstand, den die Beschriftung nach außen hält – zum Bildrand und zu der Kante, an der
+   * nach dem Drehen beschnitten wird. Bündig am Rand sieht ein Schriftzug nach Versehen
+   * aus; passt er mit diesem Abstand nicht mehr, wird die Schrift kleiner gesetzt.
+   */
+  randAbstand: 0.02
 };
 
 /*
@@ -250,15 +257,15 @@ function textBreite(text, groesse) {
 
 /*
  * Platz, der einer Beschriftung neben dem Kreis bleibt – links wie rechts gleich viel,
- * weil Kreis und Ausschnitt beide mittig liegen. Im Querformat begrenzt der Ausschnitt,
- * der nach dem Drehen übrig bleibt; im Hochformat wird waagerecht nicht beschnitten,
- * dort ist es der Bildrand.
+ * weil Kreis und Ausschnitt beide mittig liegen. Nach außen begrenzt im Querformat der
+ * Ausschnitt, der nach dem Drehen übrig bleibt; im Hochformat wird waagerecht nicht
+ * beschnitten, dort ist es der Bildrand. Von beiden bleibt LAYOUT.randAbstand frei.
  */
 function textPlatz(breite, hoehe) {
   const kurz = Math.min(breite, hoehe);
   const kreis = benutzerkreis(breite, hoehe);
   const streifen = sichtbarNachDrehung(breite, hoehe);
-  const rand = streifen.achse === 'x' ? streifen.bis : breite;
+  const rand = (streifen.achse === 'x' ? streifen.bis : breite) - kurz * LAYOUT.randAbstand;
   return rand - (kreis.x + kreis.radius + kurz * LAYOUT.textAbstand);
 }
 
@@ -267,11 +274,14 @@ function textPlatz(breite, hoehe) {
  * Passt der breiteste Schriftzug damit nicht in den Platz neben dem Kreis, wird verkleinert –
  * und zwar für alle Bilder der Reihe gleich, sonst stünden "iPad 1" und "iPad 115"
  * nebeneinander in verschiedenen Größen.
+ *
+ * Ohne Beschriftungen kommt die Größe heraus, die das Format überhaupt hergibt: "iPad"
+ * steht immer da und ist allein schon breiter als eine kurze Nummer.
  */
-function schriftgroesse(breite, hoehe, liste) {
+function schriftgroesse(breite, hoehe, liste = []) {
   const gewuenscht = Math.min(breite, hoehe) * LAYOUT.schriftgroesse;
   const platz = textPlatz(breite, hoehe);
-  if (platz <= 0 || liste.length === 0) return gewuenscht;
+  if (platz <= 0) return gewuenscht;
 
   const breiteste = Math.max(
     textBreite(GERAETEWORT, gewuenscht),
@@ -677,11 +687,16 @@ function pruefeDrehung(breite, hoehe, groesse) {
     return;
   }
 
-  const anteil = groesse / (Math.min(breite, hoehe) * LAYOUT.schriftgroesse);
+  /*
+   * Verglichen wird mit der Größe, die dieses Format ohnehin zulässt – nicht mit der
+   * gewünschten. Sonst meldete sich die Zeile bei jedem Querformat, denn dort ist der
+   * Platz neben dem Kreis schon für "iPad" allein zu knapp.
+   */
+  const anteil = groesse / schriftgroesse(breite, hoehe);
   toolhubMessage(drehungMeldung, anteil < 0.995
-    ? `Die Beschriftung steht auf ${Math.round(anteil * 100)} Prozent der üblichen ` +
-      'Schriftgröße – so bleibt sie neben dem Benutzerbild auch nach dem Drehen ins ' +
-      'Hochformat vollständig sichtbar.'
+    ? `Wegen der langen Beschriftung steht die Schrift auf ${Math.round(anteil * 100)} ` +
+      'Prozent ihrer sonstigen Größe – so bleibt sie neben dem Benutzerbild und mit ' +
+      'Abstand zum Rand vollständig sichtbar.'
     : '', 'info', 'haken');
 }
 
