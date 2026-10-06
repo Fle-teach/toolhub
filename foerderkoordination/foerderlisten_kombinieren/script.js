@@ -97,44 +97,56 @@ function renderCounts(tables) {
 	countsCard.classList.remove("hidden");
 }
 
-function getHeaderDifferences(baseHeader, tableHeader, fileName) {
-	const differences = [];
-	const maxLength = Math.max(baseHeader.length, tableHeader.length);
-	for (let index = 0; index < maxLength; index += 1) {
-		const expected = baseHeader[index] ?? "(nicht vorhanden)";
-		const found = tableHeader[index] ?? "(nicht vorhanden)";
-		if (expected !== found) {
-			differences.push({
-				fileName,
-				column: index + 1,
-				expected,
-				found
-			});
-		}
-	}
-	return differences;
+// Spalten werden über ihre Überschrift zugeordnet, nicht über ihre Position – die Reihenfolge
+// darf deshalb je Datei abweichen. Die Gesamtkopfzeile folgt der ersten Datei; Spalten, die
+// erst in späteren Dateien auftauchen, werden hinten angehängt.
+function buildCombinedHeader(tables) {
+	const header = [];
+	tables.forEach((table) => {
+		table.header.forEach((column) => {
+			if (!header.includes(column)) {
+				header.push(column);
+			}
+		});
+	});
+	return header;
 }
 
-function renderHeader(header) {
+function findMissingColumns(tables, header) {
+	return header
+		.map((column) => ({
+			column,
+			missingIn: tables.filter((table) => !table.header.includes(column)).map((table) => table.fileName)
+		}))
+		.filter((entry) => entry.missingIn.length);
+}
+
+function hasDifferentOrder(tables) {
+	const reference = tables[0].header.join("\u0000");
+	return tables.some((table) => table.header.join("\u0000") !== reference);
+}
+
+function renderHeader(header, missingColumns) {
 	headerList.innerHTML = "";
 	header.forEach((column) => {
 		const span = document.createElement("span");
-		span.className = "pill";
+		span.className = missingColumns.includes(column) ? "pill pill-partial" : "pill";
 		span.textContent = column || "(leer)";
+		if (missingColumns.includes(column)) {
+			span.title = "Kommt nicht in allen Dateien vor";
+		}
 		headerList.appendChild(span);
 	});
 	headerCard.classList.remove("hidden");
 }
 
-function renderDiffs(differences) {
+function renderDiffs(missing) {
 	diffBody.innerHTML = "";
-	differences.forEach((diff) => {
+	missing.forEach((entry) => {
 		const tr = document.createElement("tr");
 		tr.innerHTML = `
-			<td>${toolhubEscapeHtml(diff.fileName)}</td>
-			<td>${diff.column}</td>
-			<td>${toolhubEscapeHtml(diff.expected)}</td>
-			<td>${toolhubEscapeHtml(diff.found)}</td>
+			<td>${toolhubEscapeHtml(entry.column || "(leer)")}</td>
+			<td>${entry.missingIn.map(toolhubEscapeHtml).join("<br>")}</td>
 		`;
 		diffBody.appendChild(tr);
 	});
@@ -252,7 +264,8 @@ function mergeAndSortTables(tables, sortColumns) {
 	return rows.sort((rowA, rowB) => {
 		for (const columnIndex of sortColumns) {
 			const columnName = referenceHeader[columnIndex];
-			const result = compareValues(rowA[columnName], rowB[columnName]);
+			// Fehlt einer Datei die Spalte, hat ihr Datensatz dort keinen Wert – wie leer behandeln
+			const result = compareValues(rowA[columnName] ?? "", rowB[columnName] ?? "");
 			if (result !== 0) {
 				return result;
 			}
@@ -309,17 +322,24 @@ analyzeBtn.addEventListener("click", async () => {
 
 	renderCounts(parsedTables);
 
-	referenceHeader = parsedTables[0].header;
-	const allDifferences = parsedTables.slice(1).flatMap((table) => getHeaderDifferences(referenceHeader, table.header, table.fileName));
+	referenceHeader = buildCombinedHeader(parsedTables);
+	const missing = findMissingColumns(parsedTables, referenceHeader);
 
-	if (allDifferences.length) {
-		showStatus("Kopfzeilen sind nicht identisch. Die Unterschiede sind unten aufgelistet.", true);
-		renderDiffs(allDifferences);
-		return;
+	if (missing.length) {
+		// Nur eine Warnung: Beim Zusammenführen bleibt die Zelle leer, wo einer Datei die Spalte fehlt
+		statusCard.className = "panel";
+		toolhubMessage(statusCard, [
+			"Nicht alle Spalten kommen in allen Dateien vor (Übersicht unten).",
+			"Zusammenführen ist trotzdem möglich – fehlende Werte bleiben leer."
+		], "warn", "warnung");
+		renderDiffs(missing);
+	} else if (hasDifferentOrder(parsedTables)) {
+		showStatus("Alle Dateien enthalten dieselben Spalten, teils in anderer Reihenfolge. Sie werden über die Überschrift zugeordnet.", false);
+	} else {
+		showStatus("Kopfzeilen sind identisch.", false);
 	}
 
-	showStatus("Kopfzeilen sind identisch.", false);
-	renderHeader(referenceHeader);
+	renderHeader(referenceHeader, missing.map((entry) => entry.column));
 	renderSortOptions(referenceHeader);
 });
 

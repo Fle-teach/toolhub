@@ -10,6 +10,7 @@
 
 /* Meldung füllt die Status-Karte komplett aus */
 #statusCard > .error,
+#statusCard > .warn,
 #statusCard > .success {
 	margin-bottom: 0;
 }
@@ -31,6 +32,12 @@
 	padding: 4px 12px;
 	font-size: 0.85rem;
 	font-weight: 600;
+}
+
+/* Spalte fehlt in mindestens einer Datei */
+.pill-partial {
+	background: transparent;
+	border-style: dashed;
 }
 
 /* ----- Sortierung ----- */
