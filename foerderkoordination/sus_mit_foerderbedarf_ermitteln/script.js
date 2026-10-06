@@ -8,7 +8,8 @@ const DEFAULT_SETTINGS = {
 // DOM-Elemente
 const analyzeBtn = document.getElementById('analyzeBtn');
 const analyzeLabel = document.getElementById('analyzeLabel');
-const exportTopBtn = document.getElementById('exportTopBtn');
+const exportSection = document.getElementById('exportSection');
+const exportInfo = document.getElementById('exportInfo');
 const nebenfaecherCard = document.getElementById('nebenfaecherCard');
 const nebenfaecherOutput = document.getElementById('nebenfaecher');
 const messageDiv = document.getElementById('message');
@@ -287,7 +288,8 @@ function extractFoerderbedarf(workbook, settings) {
 
 function displayResults() {
     resultsSection.classList.add('visible');
-    exportTopBtn.style.display = resultEntries.length > 0 ? 'inline-flex' : 'none';
+    exportSection.classList.toggle('visible', resultEntries.length > 0);
+    updateExportInfo();
 
     const klassen = [...new Set(resultEntries.map(e => e.klasse))];
     const schueler = new Set(resultEntries.map(e => `${e.klasse}|${e.schueler}`));
@@ -351,28 +353,93 @@ function showMessage(text, type) {
 
 function hideResults() {
     resultsSection.classList.remove('visible');
-    exportTopBtn.style.display = 'none';
+    exportSection.classList.remove('visible');
 }
 
 exportBtn.addEventListener('click', exportResults);
-exportTopBtn.addEventListener('click', exportResults);
+document.querySelectorAll('input[name="exportGruppierung"]').forEach(radio => {
+    radio.addEventListener('change', updateExportInfo);
+});
 
-function exportResults() {
+const EXPORT_PREFIX = 'Übersicht_Förderbedarf';
+
+function selectedGruppierung() {
+    return document.querySelector('input[name="exportGruppierung"]:checked').value;
+}
+
+// Jahrgang = erste Zahl der Klassenbezeichnung; führende Nullen fallen weg,
+// damit „05A" und „5b" im selben Jahrgang landen
+function jahrgangVon(klasse) {
+    const treffer = String(klasse).match(/\d+/);
+    return treffer ? String(Number(treffer[0])) : null;
+}
+
+// Teilt die Ergebnisse in Gruppen auf, je Gruppe entsteht eine Datei
+function exportGruppen(gruppierung) {
+    if (gruppierung === 'alle') {
+        const klassen = [...new Set(resultEntries.map(e => e.klasse))];
+        return [{ dateiname: `${EXPORT_PREFIX}${klassen.map(k => `_${k}`).join('')}`, entries: resultEntries }];
+    }
+
+    const gruppen = new Map();
+    resultEntries.forEach(entry => {
+        const schluessel = gruppierung === 'klasse' ? entry.klasse : jahrgangVon(entry.klasse);
+        if (!gruppen.has(schluessel)) gruppen.set(schluessel, []);
+        gruppen.get(schluessel).push(entry);
+    });
+
+    return [...gruppen.entries()]
+        .sort(([a], [b]) => String(a ?? '').localeCompare(String(b ?? ''), 'de', { numeric: true }))
+        .map(([schluessel, entries]) => ({
+            dateiname: gruppierung === 'klasse'
+                ? `${EXPORT_PREFIX}_${schluessel}`
+                : `${EXPORT_PREFIX}_Jahrgang_${schluessel ?? 'unbekannt'}`,
+            entries
+        }));
+}
+
+function updateExportInfo() {
+    if (resultEntries.length === 0) return;
+    const anzahl = exportGruppen(selectedGruppierung()).length;
+    exportInfo.textContent = anzahl === 1
+        ? 'Ergebnis: eine XLSX-Datei.'
+        : `Ergebnis: ${anzahl} XLSX-Dateien, zusammengefasst in einem ZIP-Archiv.`;
+}
+
+// Schrägstriche o. Ä. in Klassenbezeichnungen würden im ZIP Unterordner erzeugen
+function sichererDateiname(name) {
+    return name.replace(/[\\/:*?"<>|]/g, '-');
+}
+
+async function exportResults() {
     if (resultEntries.length === 0) {
         showMessage('Keine Daten zum Exportieren.', 'error');
         return;
     }
 
-    const rows = [['Klasse', 'Schüler_in', 'Fach', 'Fachlehrkraft', 'Note', 'Angebot']];
-    resultEntries.forEach(entry => {
-        rows.push([entry.klasse, entry.schueler, entry.fach, entry.lehrkraft, entry.note, '']);
+    const gruppierung = selectedGruppierung();
+    const dateien = exportGruppen(gruppierung).map(gruppe => {
+        const rows = [['Klasse', 'Schüler_in', 'Fach', 'Fachlehrkraft', 'Note', 'Angebot']];
+        gruppe.entries.forEach(entry => {
+            rows.push([entry.klasse, entry.schueler, entry.fach, entry.lehrkraft, entry.note, '']);
+        });
+        // Übrige Spalten passen sich dem Inhalt an; „Angebot" bleibt leer und wird später
+        // von Hand ausgefüllt, braucht dafür also von vornherein Platz (70 Zeichen ≈ 13 cm)
+        return {
+            name: `${sichererDateiname(gruppe.dateiname)}.xlsx`,
+            sheets: [{ name: 'Förderbedarf', rows, cols: [null, null, null, null, null, 70] }]
+        };
     });
 
-    const alleKlassen = [...new Set(resultEntries.map(e => e.klasse))].map(k => `_${k}`).join('');
-    // Übrige Spalten passen sich dem Inhalt an; „Angebot" bleibt leer und wird später
-    // von Hand ausgefüllt, braucht dafür also von vornherein Platz (70 Zeichen ≈ 13 cm)
-    toolhubWriteXlsx([{ name: 'Förderbedarf', rows, cols: [null, null, null, null, null, 70] }],
-        `Übersicht_Förderbedarf${alleKlassen}.xlsx`);
+    if (dateien.length === 1) {
+        toolhubWriteXlsx(dateien[0].sheets, dateien[0].name);
+        return;
+    }
+
+    const zip = new JSZip();
+    dateien.forEach(datei => zip.file(datei.name, toolhubXlsxBlob(datei.sheets)));
+    const zipName = gruppierung === 'klasse' ? 'nach_Klassen' : 'nach_Jahrgängen';
+    toolhubDownload(await zip.generateAsync({ type: 'blob' }), `${EXPORT_PREFIX}_${zipName}.zip`);
 }
 
 resetBtn.addEventListener('click', () => {

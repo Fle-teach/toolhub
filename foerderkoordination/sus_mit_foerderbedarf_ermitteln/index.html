@@ -34,7 +34,7 @@
         <li>Bei Bedarf die Kriterien unter <em>Einstellungen</em> anpassen (Noten jeweils durch Komma getrennt, z.&nbsp;B. <code>4-, 5+, 5-, 6+</code>). Noten ab 5 (also 5 und 6) z&auml;hlen immer als F&ouml;rderbedarf.</li>
         <li>Beliebig viele von DIVIS generierte Noten&uuml;bersichten (im XLSX-Format) per Klick oder Drag&nbsp;&amp;&nbsp;Drop in das Upload-Feld laden &ndash; pro Klasse eine Datei.</li>
         <li>Auf <em>Auswerten</em> klicken. Die gefundenen F&ouml;rderbedarfe werden direkt auf dieser Seite angezeigt, gruppiert nach Klassen.</li>
-        <li>&Uuml;ber <em>Als XLSX exportieren</em> (neben <em>Auswerten</em> oder unter den Ergebnissen) die tabellarische &Uuml;bersicht herunterladen (Dateiname: <code>&Uuml;bersicht_F&ouml;rderbedarf_&lt;betroffene_Klassen&gt;.xlsx</code>, liegt danach im Downloads-Ordner).</li>
+        <li>Im Bereich <em>Exportieren</em> w&auml;hlen, ob alle Ergebnisse in eine Tabelle kommen oder je Klasse bzw. je Jahrgang eine eigene, und auf <em>Exportieren</em> klicken. Eine einzelne Tabelle wird als XLSX-Datei heruntergeladen (<code>&Uuml;bersicht_F&ouml;rderbedarf_&lt;betroffene_Klassen&gt;.xlsx</code>), mehrere als ZIP-Archiv mit einer XLSX-Datei je Gruppe. Die Dateien liegen danach im Downloads-Ordner.</li>
       </ol>
 
     </div>
@@ -88,11 +88,34 @@
     <div class="file-list" id="fileList"></div>
     <div class="analyze-row">
       <button class="btn-primary" id="analyzeBtn" type="button" disabled><span class="btn-spinner" aria-hidden="true"></span><span id="analyzeLabel">Auswerten</span></button>
-      <button class="btn-primary" id="exportTopBtn" type="button" style="display: none;"><span data-icon="download" class="inline-icon"></span>Als XLSX exportieren</button>
     </div>
   </section>
 
   <div id="message"></div>
+
+  <section class="panel section" id="exportSection">
+    <span data-icon="download" class="panel-icon"></span>
+    <h2>Exportieren</h2>
+    <div class="setting-group">
+      <div class="setting-label">Aufteilung</div>
+      <label class="radio-row">
+        <input type="radio" name="exportGruppierung" value="alle" checked>
+        Alle Ergebnisse in einer Tabelle
+      </label>
+      <label class="radio-row">
+        <input type="radio" name="exportGruppierung" value="klasse">
+        Eine Tabelle je Klasse
+      </label>
+      <label class="radio-row">
+        <input type="radio" name="exportGruppierung" value="jahrgang">
+        Eine Tabelle je Jahrgang (Zahl aus der Klassenbezeichnung)
+      </label>
+    </div>
+    <p class="export-info" id="exportInfo"></p>
+    <div class="button-group">
+      <button class="btn-primary" id="exportBtn" type="button"><span data-icon="download" class="inline-icon"></span>Exportieren</button>
+    </div>
+  </section>
 
   <section class="panel results-section" id="resultsSection">
     <span data-icon="diagramm" class="panel-icon"></span>
@@ -118,7 +141,6 @@
     <div id="tableContainer"></div>
 
     <div class="button-group">
-      <button class="btn-primary" id="exportBtn" type="button"><span data-icon="download" class="inline-icon"></span>Als XLSX exportieren</button>
       <button class="btn-secondary" id="resetBtn" type="button">Zur&uuml;cksetzen</button>
     </div>
   </section>
@@ -126,6 +148,7 @@
 </main>
 
 <script src="../../assets/vendor/xlsx.full.min.js"></script>
+<script src="../../assets/vendor/jszip.min.js"></script>
 <script src="../../assets/toolhub-io.js"></script>
 <script src="../../assets/toolhub-xlsx.js"></script>
 <script src="script.js"></script>

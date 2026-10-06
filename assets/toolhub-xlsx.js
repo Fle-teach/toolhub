@@ -82,8 +82,19 @@ function toolhubSheetName(name) {
  * wie im Excel-Dialog „Spaltenbreite“). `null` oder eine fehlende Angabe lässt die
  * jeweilige Spalte bei der automatischen Breite.
  * Blattnamen werden über toolhubSheetName() bereinigt.
+ * toolhubXlsxBlob() nimmt dieselben Angaben und gibt die Datei als Blob zurück.
  */
 function toolhubWriteXlsx(sheets, filename) {
+  XLSX.writeFile(toolhubBuildWorkbook(sheets), filename);
+}
+
+// Wie toolhubWriteXlsx(), liefert die Datei aber als Blob, z. B. für ein ZIP-Archiv
+function toolhubXlsxBlob(sheets) {
+  const daten = XLSX.write(toolhubBuildWorkbook(sheets), { type: 'array', bookType: 'xlsx' });
+  return new Blob([daten], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
+function toolhubBuildWorkbook(sheets) {
   const liste = Array.isArray(sheets)
     ? sheets
     : Object.entries(sheets).map(([name, rows]) => ({ name, rows }));
@@ -98,5 +109,5 @@ function toolhubWriteXlsx(sheets, filename) {
       : auto;
     XLSX.utils.book_append_sheet(wb, ws, toolhubSheetName(name));
   });
-  XLSX.writeFile(wb, filename);
+  return wb;
 }

@@ -317,6 +317,18 @@ details.help-section {
   margin: 0;
 }
 
+/* ----- Exportieren ----- */
+
+.export-info {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 16px 0 0;
+}
+
+#exportSection .button-group {
+  margin-top: 14px;
+}
+
 /* Ergebnis-Buttons schließen direkt an die Tabelle an */
 .button-group {
   margin-top: 10px;
