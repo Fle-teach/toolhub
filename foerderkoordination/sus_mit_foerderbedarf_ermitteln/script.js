@@ -7,6 +7,10 @@ const DEFAULT_SETTINGS = {
 
 // DOM-Elemente
 const analyzeBtn = document.getElementById('analyzeBtn');
+const analyzeLabel = document.getElementById('analyzeLabel');
+const exportTopBtn = document.getElementById('exportTopBtn');
+const nebenfaecherCard = document.getElementById('nebenfaecherCard');
+const nebenfaecherOutput = document.getElementById('nebenfaecher');
 const messageDiv = document.getElementById('message');
 const resultsSection = document.getElementById('resultsSection');
 const tableContainer = document.getElementById('tableContainer');
@@ -21,6 +25,15 @@ const notenNebenfachInput = document.getElementById('notenNebenfach');
 const hauptfaecherInput = document.getElementById('hauptfaecher');
 
 let resultEntries = []; // {klasse, schueler, fach, lehrkraft, note}
+
+// Jede Datei wird nur einmal eingelesen: schon beim Hochladen (für die Liste der
+// Nebenfächer), beim Auswerten liegt die Arbeitsmappe dann bereits vor.
+const workbookCache = new WeakMap();
+
+function loadWorkbook(file) {
+    if (!workbookCache.has(file)) workbookCache.set(file, toolhubReadWorkbook(file));
+    return workbookCache.get(file);
+}
 
 // --- Einstellungen ---
 
@@ -47,7 +60,41 @@ function readSettings() {
 }
 
 applyDefaultSettings();
-resetSettingsBtn.addEventListener('click', applyDefaultSettings);
+resetSettingsBtn.addEventListener('click', () => {
+    applyDefaultSettings();
+    renderNebenfaecher();
+});
+hauptfaecherInput.addEventListener('input', renderNebenfaecher);
+
+// --- Nebenfächer (nur Anzeige, Gegenstück zu den Hauptfächern) ---
+
+let faecherInDateien = []; // Fachkürzel aller hochgeladenen Notenübersichten, in Spaltenreihenfolge
+let faecherStand = 0;      // verwirft Ergebnisse überholter Uploads
+
+async function updateFaecherInDateien(files) {
+    const stand = ++faecherStand;
+    const faecher = [];
+    for (const file of files) {
+        try {
+            const parsed = parseNotenuebersicht(await loadWorkbook(file));
+            parsed.faecher.forEach(fach => {
+                if (fach.hatNoten && fach.kuerzel && !faecher.includes(fach.kuerzel)) faecher.push(fach.kuerzel);
+            });
+        } catch (error) {
+            // Fehlerhafte Dateien meldet erst die Auswertung
+        }
+    }
+    if (stand !== faecherStand) return;
+    faecherInDateien = faecher;
+    renderNebenfaecher();
+}
+
+function renderNebenfaecher() {
+    nebenfaecherCard.classList.toggle('hidden', upload.files.length === 0);
+    const hauptfaecher = parseListInput(hauptfaecherInput.value);
+    const nebenfaecher = faecherInDateien.filter(fach => !hauptfaecher.includes(fach));
+    nebenfaecherOutput.textContent = nebenfaecher.length > 0 ? nebenfaecher.join(', ') : '–';
+}
 
 // --- Dateiauswahl (gemeinsame Upload-Komponente aus toolhub.js) ---
 
@@ -66,6 +113,8 @@ const upload = toolhubUpload({
     },
     onChange: (files) => {
         analyzeBtn.disabled = files.length === 0;
+        renderNebenfaecher();
+        updateFaecherInDateien(files);
         if (ungueltigGemeldet) {
             ungueltigGemeldet = false;
         } else {
@@ -95,21 +144,33 @@ async function analyzeFiles() {
     messageDiv.innerHTML = '';
     resultEntries = [];
     const errors = [];
+    const files = upload.files.slice();
 
-    for (const file of upload.files) {
-        try {
-            const workbook = await toolhubReadWorkbook(file);
-            const entries = extractFoerderbedarf(workbook, settings);
-            resultEntries.push(...entries);
-        } catch (error) {
-            errors.push(`${file.name}: ${error.message}`);
+    setBusy(true);
+    try {
+        for (const [index, file] of files.entries()) {
+            analyzeLabel.textContent = files.length > 1
+                ? `Wird ausgewertet … (${index + 1}/${files.length})`
+                : 'Wird ausgewertet …';
+            // dem Browser Zeit geben, Beschriftung und Drehkreis zu zeichnen,
+            // bevor das Einlesen der Datei den Hauptthread blockiert
+            await nextFrame();
+            try {
+                const workbook = await loadWorkbook(file);
+                const entries = extractFoerderbedarf(workbook, settings);
+                resultEntries.push(...entries);
+            } catch (error) {
+                errors.push(`${file.name}: ${error.message}`);
+            }
         }
+    } finally {
+        setBusy(false);
     }
 
     if (errors.length > 0) {
         showMessage(['Fehler bei der Auswertung:', ...errors], 'error');
         if (resultEntries.length === 0) {
-            resultsSection.classList.remove('visible');
+            hideResults();
             return;
         }
     }
@@ -117,7 +178,24 @@ async function analyzeFiles() {
     displayResults();
 }
 
-function extractFoerderbedarf(workbook, settings) {
+function setBusy(busy) {
+    analyzeBtn.classList.toggle('busy', busy);
+    analyzeBtn.disabled = busy || upload.files.length === 0;
+    analyzeBtn.setAttribute('aria-busy', String(busy));
+    if (!busy) analyzeLabel.textContent = 'Auswerten';
+}
+
+// requestAnimationFrame ruht in verdeckten Tabs – ohne den Zeitgeber als Rückfallebene
+// bliebe die Auswertung stehen, sobald man währenddessen den Tab wechselt
+function nextFrame() {
+    return new Promise(resolve => {
+        requestAnimationFrame(() => setTimeout(resolve, 0));
+        setTimeout(resolve, 100);
+    });
+}
+
+// Liest Klasse, Fachspalten und Schülerzeilen aus einer DIVIS-Notenübersicht
+function parseNotenuebersicht(workbook) {
     const jsonData = toolhubSheetRows(workbook, { header: false });
 
     // Festes Layout der DIVIS-Notenübersicht:
@@ -145,44 +223,62 @@ function extractFoerderbedarf(workbook, settings) {
         throw new Error('Schlagwort "Angebot" nicht gefunden – ist dies eine von DIVIS generierte Notenübersicht?');
     }
 
-    const entries = [];
-
+    const schuelerZeilen = [];
     for (let rowIndex = pupilIndex + 1; rowIndex < jsonData.length; rowIndex++) {
         const row = jsonData[rowIndex];
         // Zeilen mit 'Total' überspringen (Fußzeile der Tabelle)
         if (row.some(cell => typeof cell === 'string' && cell.toLowerCase().includes('total'))) continue;
+        if (!row[1]) continue; // Leere Spalte überspringen
+        schuelerZeilen.push(row);
+    }
 
-        const pupilName = row[1]; // Leere Spalte überspringen
-        if (!pupilName) continue;
+    const faecher = subjectIndexes.map(subjectIndex => {
+        const subjectName = jsonData[pupilIndex - 1][subjectIndex];
 
-        subjectIndexes.forEach(subjectIndex => {
-            const subjectName = jsonData[pupilIndex - 1][subjectIndex];
-            const mark = row[subjectIndex];
-            const lehrer = lehrerZeile[subjectIndex];
+        // Fachkürzel steht ggf. in einer verbundenen Zelle weiter links
+        let kuerzel = fachZeile[subjectIndex];
+        let i = subjectIndex - 1;
+        while (subjectName && !kuerzel && i > 0) {
+            kuerzel = fachZeile[i];
+            i--;
+        }
 
-            // Fachkürzel steht ggf. in einer verbundenen Zelle weiter links
-            let fachKuerzel = fachZeile[subjectIndex];
-            let i = subjectIndex - 1;
-            while (subjectName && !fachKuerzel && i > 0) {
-                fachKuerzel = fachZeile[i];
-                i--;
-            }
+        return {
+            index: subjectIndex,
+            kuerzel: kuerzel,
+            lehrer: lehrerZeile[subjectIndex],
+            // Unter den Spalten sind auch Nummer und Name der Schüler; als Fach zählt
+            // für die Nebenfächer-Liste nur eine Spalte, in der tatsächlich Noten stehen
+            hatNoten: schuelerZeilen.some(row => /^[1-6][+-]?$/.test(String(row[subjectIndex] ?? '').trim()))
+        };
+    });
 
-            const foerderbedarf = settings.hauptfaecher.includes(fachKuerzel)
+    return { klasse, faecher, schuelerZeilen };
+}
+
+function extractFoerderbedarf(workbook, settings) {
+    const { klasse, faecher, schuelerZeilen } = parseNotenuebersicht(workbook);
+    const entries = [];
+
+    schuelerZeilen.forEach(row => {
+        faecher.forEach(fach => {
+            const mark = row[fach.index];
+
+            const foerderbedarf = settings.hauptfaecher.includes(fach.kuerzel)
                 ? settings.foerderbedarfHauptfach
                 : settings.foerderbedarfNebenfach;
 
             if (mark && (foerderbedarf.includes(mark) || mark > 4)) {
                 entries.push({
                     klasse: klasse,
-                    schueler: pupilName,
-                    fach: fachKuerzel,
-                    lehrkraft: lehrer,
+                    schueler: row[1],
+                    fach: fach.kuerzel,
+                    lehrkraft: fach.lehrer,
                     note: mark
                 });
             }
         });
-    }
+    });
 
     return entries;
 }
@@ -191,6 +287,7 @@ function extractFoerderbedarf(workbook, settings) {
 
 function displayResults() {
     resultsSection.classList.add('visible');
+    exportTopBtn.style.display = resultEntries.length > 0 ? 'inline-flex' : 'none';
 
     const klassen = [...new Set(resultEntries.map(e => e.klasse))];
     const schueler = new Set(resultEntries.map(e => `${e.klasse}|${e.schueler}`));
@@ -208,11 +305,11 @@ function displayResults() {
     klassen.forEach(klasse => {
         const klassenEntries = resultEntries.filter(e => e.klasse === klasse);
         html += `
-            <div class="group-section">
-                <div class="group-header">
+            <details class="group-section" open>
+                <summary class="group-header">
                     <h3>Klasse ${toolhubEscapeHtml(klasse)}</h3>
                     <div class="count">${klassenEntries.length} ${klassenEntries.length === 1 ? 'Eintrag' : 'Einträge'}</div>
-                </div>
+                </summary>
                 <table class="pairs-table">
                     <thead>
                         <tr>
@@ -239,7 +336,7 @@ function displayResults() {
         html += `
                     </tbody>
                 </table>
-            </div>
+            </details>
         `;
     });
 
@@ -252,7 +349,15 @@ function showMessage(text, type) {
 
 // --- Export & Zurücksetzen ---
 
-exportBtn.addEventListener('click', () => {
+function hideResults() {
+    resultsSection.classList.remove('visible');
+    exportTopBtn.style.display = 'none';
+}
+
+exportBtn.addEventListener('click', exportResults);
+exportTopBtn.addEventListener('click', exportResults);
+
+function exportResults() {
     if (resultEntries.length === 0) {
         showMessage('Keine Daten zum Exportieren.', 'error');
         return;
@@ -264,13 +369,16 @@ exportBtn.addEventListener('click', () => {
     });
 
     const alleKlassen = [...new Set(resultEntries.map(e => e.klasse))].map(k => `_${k}`).join('');
-    toolhubWriteXlsx({ 'Förderbedarf': rows }, `Übersicht_Förderbedarf${alleKlassen}.xlsx`);
-});
+    // Übrige Spalten passen sich dem Inhalt an; „Angebot" bleibt leer und wird später
+    // von Hand ausgefüllt, braucht dafür also von vornherein Platz (70 Zeichen ≈ 13 cm)
+    toolhubWriteXlsx([{ name: 'Förderbedarf', rows, cols: [null, null, null, null, null, 70] }],
+        `Übersicht_Förderbedarf${alleKlassen}.xlsx`);
+}
 
 resetBtn.addEventListener('click', () => {
     resultEntries = [];
     tableContainer.innerHTML = '';
-    resultsSection.classList.remove('visible');
+    hideResults();
     // leert die Auswahl und setzt über onChange auch Button und Meldung zurück
     upload.clear();
 });

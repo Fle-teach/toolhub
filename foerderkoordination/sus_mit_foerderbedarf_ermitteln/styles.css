@@ -13,8 +13,15 @@ details.help-section {
   overflow: hidden;
 }
 
+/* Das Wasserzeichen sitzt im <summary>, damit es auch eingeklappt zu sehen ist
+ * (wie bei .advanced-panel); der Inhalt darunter legt sich darüber. */
+.help-section summary,
+.help-content {
+  position: relative;
+}
+
 .help-section summary {
-  padding: 16px 24px;
+  padding: 16px 70px 16px 24px;
   cursor: pointer;
   font-weight: 700;
   font-size: 1.05rem;
@@ -80,11 +87,19 @@ details.help-section {
 
 /* ----- Einstellungen ----- */
 
+/* Zwei feste Spalten: links alles zum Hauptfach, rechts das Gegenstück zum Nebenfach –
+ * so steht der Kasten „Nebenfächer" stets unter „Noten Nebenfach" und neben „Hauptfächer". */
 .settings-grid {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .setting-card {
@@ -122,6 +137,19 @@ details.help-section {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
+/* Nur Anzeige: wirkt wie ein Eingabefeld, aber gedämpft und ohne Rahmen zum Hineinklicken */
+.setting-card .readonly-field {
+  display: block;
+  min-height: 2.45em;
+  padding: 9px 12px;
+  border: 1px dashed var(--card-border);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+  cursor: default;
+}
+
 .setting-card .setting-hint {
   font-size: 0.8rem;
   color: var(--text-muted);
@@ -145,11 +173,48 @@ details.help-section {
 .analyze-row {
   position: relative;
   margin-top: 16px;
-  text-align: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
 }
 
 .analyze-row .btn-primary {
   padding: 12px 36px;
+}
+
+/* Während der Auswertung: Drehkreis im Button, damit sichtbar ist, dass noch gearbeitet wird */
+.btn-spinner {
+  display: none;
+  width: 1em;
+  height: 1em;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+}
+
+#analyzeBtn.busy {
+  cursor: progress;
+}
+
+#analyzeBtn.busy:disabled {
+  opacity: 0.8;
+}
+
+#analyzeBtn.busy .btn-spinner {
+  display: inline-block;
+  animation: drehen 0.8s linear infinite;
+}
+
+/* Ohne Bewegung bleibt der Kreis stehen; die Beschriftung zeigt den Fortschritt weiterhin */
+@media (prefers-reduced-motion: reduce) {
+  #analyzeBtn.busy .btn-spinner {
+    animation: none;
+  }
+}
+
+@keyframes drehen {
+  to { transform: rotate(360deg); }
 }
 
 /* ----- Ergebnisse ----- */
@@ -162,9 +227,14 @@ details.help-section {
   display: block;
 }
 
+/* Jede Klasse ist ein <details>: die Kopfzeile (<summary>) klappt die Tabelle ein */
 .group-section {
   position: relative;
   margin-bottom: 28px;
+}
+
+.group-section:not([open]) {
+  margin-bottom: 12px;
 }
 
 .group-header {
@@ -175,14 +245,39 @@ details.help-section {
   padding: 12px 16px;
   margin-bottom: 10px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+
+.group-section:not([open]) > .group-header {
+  margin-bottom: 0;
+}
+
+.group-header::-webkit-details-marker {
+  display: none;
+}
+
+.group-header::before {
+  content: '▸';
+  color: var(--accent);
+  transition: transform 0.2s ease;
+}
+
+.group-section[open] > .group-header::before {
+  transform: rotate(90deg);
+}
+
+.group-header:hover {
+  filter: brightness(1.05);
 }
 
 .group-header h3 {
   margin: 0;
   font-size: 1.05rem;
+  flex: 1;
 }
 
 .group-header .count {

@@ -19,51 +19,58 @@
 <main>
 
   <details class="help-section">
-    <summary>Hinweise zur Nutzung</summary>
+    <summary>
+      <!-- Motiv: Info-Zeichen (Hinweise) -->
+      <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="8.5"/>
+        <path d="M12 11v5.5"/>
+        <path d="M12 7.8h.01"/>
+      </svg>
+      Hinweise zur Nutzung
+    </summary>
     <div class="help-content">
-      <h3>Schritt 1 &ndash; Noten&uuml;bersichten auswerten</h3>
+      <h3>Noten&uuml;bersichten auswerten</h3>
       <ol>
         <li>Bei Bedarf die Kriterien unter <em>Einstellungen</em> anpassen (Noten jeweils durch Komma getrennt, z.&nbsp;B. <code>4-, 5+, 5-, 6+</code>). Noten ab 5 (also 5 und 6) z&auml;hlen immer als F&ouml;rderbedarf.</li>
         <li>Beliebig viele von DIVIS generierte Noten&uuml;bersichten (im XLSX-Format) per Klick oder Drag&nbsp;&amp;&nbsp;Drop in das Upload-Feld laden &ndash; pro Klasse eine Datei.</li>
         <li>Auf <em>Auswerten</em> klicken. Die gefundenen F&ouml;rderbedarfe werden direkt auf dieser Seite angezeigt, gruppiert nach Klassen.</li>
-        <li>&Uuml;ber <em>Als XLSX exportieren</em> die tabellarische &Uuml;bersicht herunterladen (Dateiname: <code>&Uuml;bersicht_F&ouml;rderbedarf_&lt;betroffene_Klassen&gt;.xlsx</code>, liegt danach im Downloads-Ordner).</li>
+        <li>&Uuml;ber <em>Als XLSX exportieren</em> (neben <em>Auswerten</em> oder unter den Ergebnissen) die tabellarische &Uuml;bersicht herunterladen (Dateiname: <code>&Uuml;bersicht_F&ouml;rderbedarf_&lt;betroffene_Klassen&gt;.xlsx</code>, liegt danach im Downloads-Ordner).</li>
       </ol>
 
-      <h3>Schritt 2 &ndash; Personalisierte Lernf&ouml;rdervereinbarungen (Seriendruck in Word)</h3>
-      <ol>
-        <li><code>LFVblanco_SERIENDRUCK_NEU.doc</code> &ouml;ffnen.</li>
-        <li>Falls die Meldung &bdquo;Word konnte die Datenquelle &hellip; nicht finden.&ldquo; erscheint: auf <em>Datenquelle suchen&hellip;</em> klicken, die zuvor exportierte &Uuml;bersicht ausw&auml;hlen und mit <em>OK</em> best&auml;tigen.</li>
-        <li>Andernfalls die Datenquelle manuell &auml;ndern: <em>Sendungen</em> &rarr; <em>Empf&auml;nger ausw&auml;hlen</em> &rarr; <em>Vorhandene Liste verwenden&hellip;</em> &rarr; exportierte &Uuml;bersicht ausw&auml;hlen &rarr; <em>OK</em>.</li>
-        <li><em>Fertig stellen und zusammenf&uuml;hren</em> &rarr; <em>Dokumente drucken&hellip;</em> und als PDF (unten links) speichern: Dateinamen und Speicherort w&auml;hlen, dann <em>Sichern</em> &rarr; <em>Ja</em> &rarr; <em>OK</em>.</li>
-      </ol>
     </div>
   </details>
 
-  <section class="panel">
-    <span data-icon="einstellungen" class="panel-icon"></span>
-    <h2>Einstellungen: Wann liegt F&ouml;rderbedarf vor?</h2>
-    <div class="settings-grid">
-      <div class="setting-card">
-        <label for="notenHauptfach">Noten Hauptfach</label>
-        <input type="text" id="notenHauptfach">
-        <div class="setting-hint">Noten, die in einem Hauptfach als F&ouml;rderbedarf z&auml;hlen (durch Komma getrennt)</div>
+  <details class="advanced-panel" id="settingsPanel" open>
+    <summary><span data-icon="einstellungen" class="panel-icon"></span>Einstellungen: Wann liegt F&ouml;rderbedarf vor?</summary>
+    <div class="advanced-content">
+      <div class="settings-grid">
+        <div class="setting-card">
+          <label for="notenHauptfach">Noten Hauptfach</label>
+          <input type="text" id="notenHauptfach">
+          <div class="setting-hint">Noten, die in einem Hauptfach als F&ouml;rderbedarf z&auml;hlen (durch Komma getrennt)</div>
+        </div>
+        <div class="setting-card">
+          <label for="notenNebenfach">Noten Nebenfach</label>
+          <input type="text" id="notenNebenfach">
+          <div class="setting-hint">Noten, die in einem Nebenfach als F&ouml;rderbedarf z&auml;hlen (durch Komma getrennt)</div>
+        </div>
+        <div class="setting-card">
+          <label for="hauptfaecher">Hauptf&auml;cher</label>
+          <input type="text" id="hauptfaecher">
+          <div class="setting-hint">Fachk&uuml;rzel der Hauptf&auml;cher (durch Komma getrennt) &ndash; alle &uuml;brigen F&auml;cher gelten als Nebenf&auml;cher</div>
+        </div>
+        <div class="setting-card hidden" id="nebenfaecherCard">
+          <label for="nebenfaecher">Nebenf&auml;cher</label>
+          <output id="nebenfaecher" class="readonly-field"></output>
+          <div class="setting-hint">Alle &uuml;brigen F&auml;cher der hochgeladenen Noten&uuml;bersichten &ndash; ergibt sich aus den Hauptf&auml;chern und l&auml;sst sich nicht bearbeiten</div>
+        </div>
       </div>
-      <div class="setting-card">
-        <label for="notenNebenfach">Noten Nebenfach</label>
-        <input type="text" id="notenNebenfach">
-        <div class="setting-hint">Noten, die in einem Nebenfach als F&ouml;rderbedarf z&auml;hlen (durch Komma getrennt)</div>
-      </div>
-      <div class="setting-card">
-        <label for="hauptfaecher">Hauptf&auml;cher</label>
-        <input type="text" id="hauptfaecher">
-        <div class="setting-hint">Fachk&uuml;rzel der Hauptf&auml;cher (durch Komma getrennt) &ndash; alle &uuml;brigen F&auml;cher gelten als Nebenf&auml;cher</div>
+      <div class="settings-footer">
+        <button class="btn-secondary" id="resetSettingsBtn" type="button">Auf Standardwerte zur&uuml;cksetzen</button>
+        <span class="default-info">Standard: Hauptfach 4-, 5+, 5-, 6+ &nbsp;&bull;&nbsp; Nebenfach 5+, 5-, 6+ &nbsp;&bull;&nbsp; Hauptf&auml;cher D, Ma, E</span>
       </div>
     </div>
-    <div class="settings-footer">
-      <button class="btn-secondary" id="resetSettingsBtn" type="button">Auf Standardwerte zur&uuml;cksetzen</button>
-      <span class="default-info">Standard: Hauptfach 4-, 5+, 5-, 6+ &nbsp;&bull;&nbsp; Nebenfach 5+, 5-, 6+ &nbsp;&bull;&nbsp; Hauptf&auml;cher D, Ma, E</span>
-    </div>
-  </section>
+  </details>
 
   <section class="panel">
     <span data-icon="setzling" class="panel-icon"></span>
@@ -80,20 +87,15 @@
     <input class="file-input" type="file" id="fileInput" accept=".xlsx" multiple />
     <div class="file-list" id="fileList"></div>
     <div class="analyze-row">
-      <button class="btn-primary" id="analyzeBtn" type="button" disabled>Auswerten</button>
+      <button class="btn-primary" id="analyzeBtn" type="button" disabled><span class="btn-spinner" aria-hidden="true"></span><span id="analyzeLabel">Auswerten</span></button>
+      <button class="btn-primary" id="exportTopBtn" type="button" style="display: none;"><span data-icon="download" class="inline-icon"></span>Als XLSX exportieren</button>
     </div>
   </section>
 
   <div id="message"></div>
 
   <section class="panel results-section" id="resultsSection">
-    <!-- Motiv: Balkendiagramm (Ergebnisse) -->
-    <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M4 20V10"/>
-      <path d="M10 20V4"/>
-      <path d="M16 20v-8"/>
-      <path d="M22 20H2"/>
-    </svg>
+    <span data-icon="diagramm" class="panel-icon"></span>
     <h2>Ergebnisse</h2>
     <div class="stats">
       <div class="stat-card">
