@@ -8,6 +8,8 @@
  *   toolhubParseFachkuerzelCsv(text)     Zuordnungstabelle aus fachkuerzel.csv aufbauen
  *   toolhubNormalisiereFach(fach, map)   einzelne Fach-Phrase vereinheitlichen
  *   toolhubLadeFachkuerzel(url)          fachkuerzel.csv laden (einmal je Seite, gecacht)
+ *   toolhubParseFachnamenCsv(text)       Zuordnung Kürzel/Variante -> ausgeschriebener Fachname
+ *   toolhubLadeFachnamen(url)            wie toolhubLadeFachkuerzel, aber mit Fachnamen als Ziel
  *   toolhubPadJahrgang(zahl)             Jahrgang zweistellig ("8" -> "08")
  *
  * Der Aufbau der vollständigen Kursbezeichnung bleibt bei den Tools: die Quelldaten
@@ -60,6 +62,26 @@ function toolhubNormalisiereFach(fach, fachMap) {
   return String(fach).replace(/\s+/g, '_');
 }
 
+/*
+ * Gegenstück zu toolhubParseFachkuerzelCsv: Ziel ist nicht das Kürzel, sondern der
+ * ausgeschriebene Fachname aus der ersten Spalte ("D", "Deu", "deutsch" -> "Deutsch").
+ */
+function toolhubParseFachnamenCsv(text) {
+  const map = new Map();
+  const lines = String(text).replace(/^\uFEFF/, '').split(/\r?\n/);
+  lines.slice(1).forEach((line) => {
+    if (!line.trim()) return;
+    const fields = line.split(';').map((f) => f.trim());
+    const name = fields[0];
+    if (!name) return;
+    fields.forEach((key) => {
+      if (!key) return;
+      map.set(key.toLowerCase().replace(/\s+/g, ' '), name);
+    });
+  });
+  return map;
+}
+
 // Jahrgang zweistellig, damit Kursnamen sich sortieren lassen ("8" -> "08")
 function toolhubPadJahrgang(jahrgang) {
   return String(jahrgang).padStart(2, '0');
@@ -74,22 +96,30 @@ function toolhubPadJahrgang(jahrgang) {
  * die Datei zur manuellen Auswahl an – der Umweg über einen lokalen Server ist der
  * eigentliche Fix (siehe CLAUDE.md, "Lokal testen").
  */
-let toolhubFachkuerzelPromise = null;
+let toolhubFachkuerzelTextPromise = null;
 
-function toolhubLadeFachkuerzel(url = TOOLHUB_FACHKUERZEL_URL) {
-  if (!toolhubFachkuerzelPromise) {
-    toolhubFachkuerzelPromise = fetch(url)
+// Die Datei wird nur einmal angefragt, auch wenn eine Seite Kürzel und Fachnamen braucht
+function toolhubLadeFachkuerzelText(url = TOOLHUB_FACHKUERZEL_URL) {
+  if (!toolhubFachkuerzelTextPromise) {
+    toolhubFachkuerzelTextPromise = fetch(url)
       .then((response) => {
         if (!response.ok) throw new Error('HTTP ' + response.status);
         return response.text();
       })
-      .then(toolhubParseFachkuerzelCsv)
       .catch((error) => {
-        toolhubFachkuerzelPromise = null; // erneuter Versuch bleibt möglich
+        toolhubFachkuerzelTextPromise = null; // erneuter Versuch bleibt möglich
         throw new Error(`fachkuerzel.csv konnte nicht geladen werden: ${error.message}`);
       });
   }
-  return toolhubFachkuerzelPromise;
+  return toolhubFachkuerzelTextPromise;
+}
+
+function toolhubLadeFachkuerzel(url = TOOLHUB_FACHKUERZEL_URL) {
+  return toolhubLadeFachkuerzelText(url).then(toolhubParseFachkuerzelCsv);
+}
+
+function toolhubLadeFachnamen(url = TOOLHUB_FACHKUERZEL_URL) {
+  return toolhubLadeFachkuerzelText(url).then(toolhubParseFachnamenCsv);
 }
 
 // Export für Tests unter Node.js
@@ -99,5 +129,7 @@ if (typeof module !== 'undefined' && module.exports) {
     toolhubNormalisiereFach,
     toolhubPadJahrgang,
     toolhubLadeFachkuerzel,
+    toolhubParseFachnamenCsv,
+    toolhubLadeFachnamen,
   };
 }

@@ -31,6 +31,9 @@ const upload = toolhubUpload({
 	extensions: [".xlsx", ".xls", ".xlsm"]
 });
 
+// Spalte, die das Tool zusätzlich anlegt; sie wird später von Hand befüllt
+const KURSANGEBOT_COLUMN = "Kursangebot";
+
 function resetOutput() {
 	statusCard.className = "panel hidden";
 	countsCard.classList.add("hidden");
@@ -110,6 +113,27 @@ function buildCombinedHeader(tables) {
 		});
 	});
 	return header;
+}
+
+// Die Förderlisten tragen das Fach als Kürzel ("D", "Ma"); ausgeschrieben wird es über
+// fachkuerzel.csv. Unbekannte Werte bleiben stehen und werden zurückgegeben.
+function expandSubjectNames(tables, fachnamen) {
+	const unknown = new Set();
+	tables.forEach((table) => {
+		const column = table.header.find((name) => name.toLowerCase() === "fach");
+		if (column === undefined) return;
+		table.rows.forEach((row) => {
+			const value = safeCellValue(row[column]);
+			if (!value) return;
+			const name = fachnamen.get(value.toLowerCase().replace(/\s+/g, " "));
+			if (name) {
+				row[column] = name;
+			} else {
+				unknown.add(value);
+			}
+		});
+	});
+	return [...unknown].sort((a, b) => a.localeCompare(b, "de"));
 }
 
 function findMissingColumns(tables, header) {
@@ -322,22 +346,41 @@ analyzeBtn.addEventListener("click", async () => {
 
 	renderCounts(parsedTables);
 
+	const messages = [];
+	let messageType = "success";
+	const warn = (text) => {
+		messages.push(text);
+		messageType = "warn";
+	};
+
+	try {
+		const unknownSubjects = expandSubjectNames(parsedTables, await toolhubLadeFachnamen());
+		if (unknownSubjects.length) {
+			warn(`Nicht in fachkuerzel.csv gefunden, bleibt als Kürzel stehen: ${unknownSubjects.join(", ")}`);
+		}
+	} catch (error) {
+		warn(`${error.message} – die Fächer bleiben als Kürzel stehen.`);
+	}
+
 	referenceHeader = buildCombinedHeader(parsedTables);
 	const missing = findMissingColumns(parsedTables, referenceHeader);
 
 	if (missing.length) {
 		// Nur eine Warnung: Beim Zusammenführen bleibt die Zelle leer, wo einer Datei die Spalte fehlt
-		statusCard.className = "panel";
-		toolhubMessage(statusCard, [
-			"Nicht alle Spalten kommen in allen Dateien vor (Übersicht unten).",
-			"Zusammenführen ist trotzdem möglich – fehlende Werte bleiben leer."
-		], "warn", "warnung");
+		warn("Nicht alle Spalten kommen in allen Dateien vor (Übersicht unten). Zusammenführen ist trotzdem möglich – fehlende Werte bleiben leer.");
 		renderDiffs(missing);
 	} else if (hasDifferentOrder(parsedTables)) {
-		showStatus("Alle Dateien enthalten dieselben Spalten, teils in anderer Reihenfolge. Sie werden über die Überschrift zugeordnet.", false);
+		messages.unshift("Alle Dateien enthalten dieselben Spalten, teils in anderer Reihenfolge. Sie werden über die Überschrift zugeordnet.");
 	} else {
-		showStatus("Kopfzeilen sind identisch.", false);
+		messages.unshift("Kopfzeilen sind identisch.");
 	}
+
+	if (!referenceHeader.includes(KURSANGEBOT_COLUMN)) {
+		referenceHeader.push(KURSANGEBOT_COLUMN);
+	}
+
+	statusCard.className = "panel";
+	toolhubMessage(statusCard, messages, messageType, messageType === "warn" ? "warnung" : "haken");
 
 	renderHeader(referenceHeader, missing.map((entry) => entry.column));
 	renderSortOptions(referenceHeader);
