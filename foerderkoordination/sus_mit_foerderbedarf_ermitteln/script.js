@@ -25,7 +25,7 @@ const notenHauptfachInput = document.getElementById('notenHauptfach');
 const notenNebenfachInput = document.getElementById('notenNebenfach');
 const hauptfaecherInput = document.getElementById('hauptfaecher');
 
-let resultEntries = []; // {klasse, schueler, fach, lehrkraft, note}
+let resultEntries = []; // {klasse, schueler, fach, fachName, lehrkraft, note}
 
 // Jede Datei wird nur einmal eingelesen: schon beim Hochladen (für die Liste der
 // Nebenfächer), beim Auswerten liegt die Arbeitsmappe dann bereits vor.
@@ -145,6 +145,16 @@ async function analyzeFiles() {
     messageDiv.innerHTML = '';
     resultEntries = [];
     const errors = [];
+    const warnings = [];
+
+    // Die Notenübersicht kennt nur Kürzel ("D", "Ma"); ausgeschrieben wird über fachkuerzel.csv.
+    // Ohne die Tabelle geht die Auswertung mit den Kürzeln weiter.
+    let fachnamen = new Map();
+    try {
+        fachnamen = await toolhubLadeFachnamen();
+    } catch (error) {
+        warnings.push(`${error.message} – die Fächer bleiben als Kürzel stehen.`);
+    }
     const files = upload.files.slice();
 
     setBusy(true);
@@ -158,7 +168,7 @@ async function analyzeFiles() {
             await nextFrame();
             try {
                 const workbook = await loadWorkbook(file);
-                const entries = extractFoerderbedarf(workbook, settings);
+                const entries = extractFoerderbedarf(workbook, settings, fachnamen);
                 resultEntries.push(...entries);
             } catch (error) {
                 errors.push(`${file.name}: ${error.message}`);
@@ -168,12 +178,19 @@ async function analyzeFiles() {
         setBusy(false);
     }
 
+    const unbekannt = [...new Set(resultEntries.filter(e => !e.fachName).map(e => e.fach))];
+    if (fachnamen.size > 0 && unbekannt.length > 0) {
+        warnings.push(`Nicht in fachkuerzel.csv gefunden, bleibt als Kürzel stehen: ${unbekannt.join(', ')}`);
+    }
+
     if (errors.length > 0) {
-        showMessage(['Fehler bei der Auswertung:', ...errors], 'error');
+        showMessage(['Fehler bei der Auswertung:', ...errors, ...warnings], 'error');
         if (resultEntries.length === 0) {
             hideResults();
             return;
         }
+    } else if (warnings.length > 0) {
+        toolhubMessage(messageDiv, warnings, 'warn', 'warnung');
     }
 
     displayResults();
@@ -257,7 +274,7 @@ function parseNotenuebersicht(workbook) {
     return { klasse, faecher, schuelerZeilen };
 }
 
-function extractFoerderbedarf(workbook, settings) {
+function extractFoerderbedarf(workbook, settings, fachnamen) {
     const { klasse, faecher, schuelerZeilen } = parseNotenuebersicht(workbook);
     const entries = [];
 
@@ -273,7 +290,8 @@ function extractFoerderbedarf(workbook, settings) {
                 entries.push({
                     klasse: klasse,
                     schueler: row[1],
-                    fach: fach.kuerzel,
+                    fach: fach.kuerzel, // Kürzel bleibt für die Hauptfach-Zuordnung maßgeblich
+                    fachName: fachnamen.get(String(fach.kuerzel ?? '').trim().toLowerCase().replace(/\s+/g, ' ')),
                     lehrkraft: fach.lehrer,
                     note: mark
                 });
@@ -328,7 +346,7 @@ function displayResults() {
             html += `
                 <tr>
                     <td>${toolhubEscapeHtml(entry.schueler)}</td>
-                    <td>${toolhubEscapeHtml(entry.fach)}</td>
+                    <td>${toolhubEscapeHtml(entry.fachName || entry.fach)}</td>
                     <td>${toolhubEscapeHtml(entry.lehrkraft)}</td>
                     <td><span class="note-badge">${toolhubEscapeHtml(entry.note)}</span></td>
                 </tr>
@@ -419,15 +437,16 @@ async function exportResults() {
 
     const gruppierung = selectedGruppierung();
     const dateien = exportGruppen(gruppierung).map(gruppe => {
-        const rows = [['Klasse', 'Schüler_in', 'Fach', 'Fachlehrkraft', 'Note', 'Angebot']];
+        const rows = [['Klasse', 'Schüler_in', 'Fach', 'Fachlehrkraft', 'Note', 'Angebot', 'Kursangebot']];
         gruppe.entries.forEach(entry => {
-            rows.push([entry.klasse, entry.schueler, entry.fach, entry.lehrkraft, entry.note, '']);
+            rows.push([entry.klasse, entry.schueler, entry.fachName || entry.fach, entry.lehrkraft, entry.note, '', '']);
         });
-        // Übrige Spalten passen sich dem Inhalt an; „Angebot" bleibt leer und wird später
-        // von Hand ausgefüllt, braucht dafür also von vornherein Platz (70 Zeichen ≈ 13 cm)
+        // Übrige Spalten passen sich dem Inhalt an; „Angebot" und „Kursangebot" bleiben leer und
+        // werden später von Hand ausgefüllt, brauchen dafür also von vornherein Platz
+        // (70 Zeichen ≈ 13 cm bzw. 30 Zeichen ≈ 5,5 cm)
         return {
             name: `${sichererDateiname(gruppe.dateiname)}.xlsx`,
-            sheets: [{ name: 'Förderbedarf', rows, cols: [null, null, null, null, null, 70] }]
+            sheets: [{ name: 'Förderbedarf', rows, cols: [null, null, null, null, null, 70, 30] }]
         };
     });
 
