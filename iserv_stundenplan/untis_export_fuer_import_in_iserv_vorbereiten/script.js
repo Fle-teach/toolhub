@@ -19,10 +19,15 @@ if (typeof require !== 'undefined' && typeof toolhubNormalisiereFach === 'undefi
 //  - Alle übrigen Felder der Datei bleiben unverändert.
 //
 // Optionen:
-//  - nurKlassenuebergreifend: Zeilen von Kursen, die genau eine Klasse betreffen, werden
-//    gelöscht (diese Unterrichte werden in IServ der Klasse statt einem Kurs zugeordnet).
+//  - einzelklassen: Umgang mit Kursen, die genau eine Klasse betreffen. Sie sollen in IServ
+//    der Klasse statt einem eigenen Kurs zugeordnet werden.
+//      'behalten' – wie jeder andere Kurs umbenennen,
+//      'leeren'   – Schülergruppe leeren; der Unterricht bleibt erhalten und IServ ordnet
+//                   ihn der Klasse zu. Vertretungen (GPU014) finden ihn so weiterhin.
+//      'loeschen' – Zeilen entfernen. Achtung: Vertretungen, die auf diese Unterrichte
+//                   verweisen, ignoriert IServ dann.
 //    Ausnahme: Oberstufenkurse (einzige "Klasse" ist der Jahrgang 11 oder 12) sind echte
-//    Parallelkurse und bleiben erhalten.
+//    Parallelkurse und bleiben stets als Kurs erhalten.
 //  - fachNormalisieren: Fachkürzel in der Kursbezeichnung werden anhand von
 //    fachkuerzel.csv (aus assets/) vereinheitlicht.
 //  - kursPraefix: den Kursbezeichnungen wird "Kurs " vorangestellt.
@@ -241,9 +246,9 @@ function basisName(zeilen, fachMap) {
         .join(' ');
 }
 
-// Kurse, die genau eine Klasse betreffen, werden in IServ direkt der Klasse zugeordnet
-// und aus der Datei entfernt — außer in der Oberstufe (Jahrgang 11/12), wo es sich um
-// echte Parallelkurse handelt.
+// Kurse, die genau eine Klasse betreffen, sollen in IServ direkt der Klasse zugeordnet
+// werden (siehe Option einzelklassen) — außer in der Oberstufe (Jahrgang 11/12), wo es
+// sich um echte Parallelkurse handelt.
 function istEinKlassenKurs(zeilen) {
     const klassen = new Set(zeilen.map((z) => z.klasse).filter((k) => k !== ''));
     if (klassen.size !== 1) return false;
@@ -330,7 +335,7 @@ function findeFehlendeGruppen(parsed, gpu001Map) {
 // Kernfunktion: berechnet Umbenennung/Filterung und gibt Datei-Inhalt + Mapping zurück.
 function normalisiereGPU002(text, optionen = {}) {
     const {
-        nurKlassenuebergreifend = false,
+        einzelklassen = 'behalten',
         fachNormalisieren = false,
         kursPraefix = false,
         fachMap = null,
@@ -362,12 +367,19 @@ function normalisiereGPU002(text, optionen = {}) {
     }
 
     // 2. Ein-Klassen-Kurse bestimmen und Basis-Namen der verbleibenden Kurse berechnen.
-    const mapping = new Map(); // alte Bezeichnung -> { neu, unterschieden, entfernt, konflikt }
+    // alte Bezeichnung -> { neu, unterschieden, entfernt, geleert, konflikt }
+    const mapping = new Map();
     const basisZuAlt = new Map(); // Basis-Name -> alte Bezeichnungen
     const namenskonflikte = [];
     for (const [alt, zeilenGruppe] of gruppen) {
-        if (nurKlassenuebergreifend && istEinKlassenKurs(zeilenGruppe)) {
-            mapping.set(alt, { neu: null, unterschieden: false, entfernt: true, konflikt: null });
+        if (einzelklassen !== 'behalten' && istEinKlassenKurs(zeilenGruppe)) {
+            mapping.set(alt, {
+                neu: null,
+                unterschieden: false,
+                entfernt: einzelklassen === 'loeschen',
+                geleert: einzelklassen === 'leeren',
+                konflikt: null,
+            });
             continue;
         }
         const konflikt = findeNamenskonflikt(zeilenGruppe, gpu001Map);
@@ -420,15 +432,17 @@ function normalisiereGPU002(text, optionen = {}) {
                 neu,
                 unterschieden: alte.length > 1,
                 entfernt: false,
+                geleert: false,
                 konflikt: namenskonflikte.find((k) => k.gruppe === alt) ?? null,
             });
         });
     }
 
     // 4. Zeilen neu zusammensetzen; Zeilen entfernter Kurse werden ausgelassen,
-    //    sonst wird nur das Schülergruppen-Feld ersetzt.
+    //    sonst wird nur das Schülergruppen-Feld ersetzt bzw. geleert.
     const ausgabe = [];
     let entfernteZeilen = 0;
+    let geleerteZeilen = 0;
     zeilen.forEach((line, i) => {
         const p = parsed[i];
         if (!p || p.gruppe === '') {
@@ -441,7 +455,9 @@ function normalisiereGPU002(text, optionen = {}) {
             return;
         }
         const raw = p.raw.slice();
-        raw[FELD_SCHUELERGRUPPE] = quote(eintrag.neu);
+        // Leer ohne Anführungszeichen – so schreibt Untis selbst Unterrichte ohne Schülergruppe.
+        raw[FELD_SCHUELERGRUPPE] = eintrag.geleert ? '' : quote(eintrag.neu);
+        if (eintrag.geleert) geleerteZeilen++;
         ausgabe.push(raw.join(','));
     });
 
@@ -455,6 +471,7 @@ function normalisiereGPU002(text, optionen = {}) {
         anzahlZeilen: parsed.filter((p) => p !== null).length,
         anzahlOhneGruppe: parsed.filter((p) => p !== null && p.gruppe === '').length,
         entfernteZeilen,
+        geleerteZeilen,
     };
 }
 
@@ -572,7 +589,7 @@ if (typeof document !== 'undefined') {
     const statsDiv = document.getElementById('stats');
     const konfliktDiv = document.getElementById('konflikte');
     const mappingBody = document.getElementById('mappingBody');
-    const optKlassenuebergreifend = document.getElementById('optKlassenuebergreifend');
+    const optEinzelklassen = document.querySelectorAll('input[name="einzelklassen"]');
     const optFachNormalisieren = document.getElementById('optFachNormalisieren');
     const optKursPraefix = document.getElementById('optKursPraefix');
     const optBereitschaft = document.getElementById('optBereitschaft');
@@ -610,7 +627,7 @@ if (typeof document !== 'undefined') {
         handleFiles(e.dataTransfer.files);
     });
     fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
-    optKlassenuebergreifend.addEventListener('change', aktualisiere);
+    optEinzelklassen.forEach((radio) => radio.addEventListener('change', aktualisiere));
     optFachNormalisieren.addEventListener('change', aktualisiere);
     optKursPraefix.addEventListener('change', aktualisiere);
     optBereitschaft.addEventListener('change', aktualisiere);
@@ -689,7 +706,7 @@ if (typeof document !== 'undefined') {
                 ? transformiereGPU009(gpu009Text, { pausenKorrektur: optPausenkorrektur.checked })
                 : null;
             ergebnis = normalisiereGPU002(gpu002Text, {
-                nurKlassenuebergreifend: optKlassenuebergreifend.checked,
+                einzelklassen: [...optEinzelklassen].find((radio) => radio.checked)?.value ?? 'behalten',
                 fachNormalisieren: optFachNormalisieren.checked,
                 kursPraefix: optKursPraefix.checked,
                 fachMap,
@@ -765,11 +782,12 @@ if (typeof document !== 'undefined') {
 
     function zeigeErgebnis() {
         const eintraege = [...ergebnis.mapping.entries()];
-        const behalten = eintraege.filter(([, e]) => !e.entfernt);
+        const behalten = eintraege.filter(([, e]) => !e.entfernt && !e.geleert);
         const entfernt = eintraege.filter(([, e]) => e.entfernt);
+        const geleert = eintraege.filter(([, e]) => e.geleert);
         const geaendert = behalten.filter(([alt, e]) => alt !== e.neu);
         // Reihenfolge der Vorschau: erst die Konflikte, dann die per Zeitangabe
-        // unterschiedenen Kurse, dann der Rest, zuletzt die entfernten.
+        // unterschiedenen Kurse, dann der Rest, zuletzt die Einzelklassen-Kurse.
         const konflikt = behalten.filter(([, e]) => e.konflikt);
         const unterschieden = behalten.filter(([, e]) => e.unterschieden && !e.konflikt);
         const normal = behalten.filter(([, e]) => !e.unterschieden && !e.konflikt);
@@ -779,8 +797,15 @@ if (typeof document !== 'undefined') {
             `(davon ${ergebnis.anzahlOhneGruppe} ohne Kursbezeichnung, bleiben unverändert)</p>` +
             `<p>Kurse: <strong>${eintraege.length}</strong> &middot; ` +
             `behalten: <strong>${behalten.length}</strong> (umbenannt: ${geaendert.length}, ` +
-            `mit Unterscheidungszusatz: ${behalten.filter(([, e]) => e.unterschieden).length}) &middot; ` +
-            `entfernt: <strong>${entfernt.length}</strong> (${ergebnis.entfernteZeilen} Zeilen)</p>` +
+            `mit Unterscheidungszusatz: ${behalten.filter(([, e]) => e.unterschieden).length})` +
+            (geleert.length > 0
+                ? ` &middot; als Klassenunterricht: <strong>${geleert.length}</strong> ` +
+                  `(${ergebnis.geleerteZeilen} Zeilen, Schülergruppe geleert)`
+                : '') +
+            (entfernt.length > 0
+                ? ` &middot; entfernt: <strong>${entfernt.length}</strong> (${ergebnis.entfernteZeilen} Zeilen)`
+                : '') +
+            '</p>' +
             (gpu001Ergebnis && gpu001Ergebnis.geaenderteZeilen > 0
                 ? `<p>GPU001: <strong>${gpu001Ergebnis.geaenderteZeilen}</strong> Bereitschaftsstunden ` +
                   `der Klasse <code>${BEREITSCHAFT}</code> zugeordnet</p>`
@@ -799,17 +824,21 @@ if (typeof document !== 'undefined') {
         unterschieden.sort((a, b) => a[1].neu.localeCompare(b[1].neu, 'de'));
         normal.sort((a, b) => a[1].neu.localeCompare(b[1].neu, 'de'));
         entfernt.sort((a, b) => a[0].localeCompare(b[0], 'de'));
+        geleert.sort((a, b) => a[0].localeCompare(b[0], 'de'));
 
         mappingBody.innerHTML = '';
-        for (const [alt, e] of [...konflikt, ...unterschieden, ...normal, ...entfernt]) {
+        for (const [alt, e] of [...konflikt, ...unterschieden, ...normal, ...geleert, ...entfernt]) {
             const tr = document.createElement('tr');
             if (e.entfernt) tr.className = 'entfernt';
+            else if (e.geleert) tr.className = 'geleert';
             else if (e.konflikt) tr.className = 'konflikt';
             else if (e.unterschieden) tr.className = 'unterschieden';
             const tdAlt = document.createElement('td');
             tdAlt.textContent = alt;
             const tdNeu = document.createElement('td');
-            tdNeu.textContent = e.entfernt ? '— entfernt (nur eine Klasse) —' : e.neu;
+            tdNeu.textContent = e.entfernt ? '— entfernt (nur eine Klasse) —'
+                : e.geleert ? '— Klassenunterricht (Schülergruppe geleert) —'
+                : e.neu;
             tr.append(tdAlt, tdNeu);
             mappingBody.appendChild(tr);
         }

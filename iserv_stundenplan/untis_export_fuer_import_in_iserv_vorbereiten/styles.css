@@ -58,11 +58,28 @@
     cursor: pointer;
 }
 
-.optionen input[type="checkbox"] {
+.optionen input[type="checkbox"],
+.optionen input[type="radio"] {
     accent-color: var(--accent);
     width: 15px;
     height: 15px;
     margin-right: 4px;
+}
+
+/* Auswahl mit mehreren Möglichkeiten: ohne Rahmen, Radios unter der Überschrift eingerückt */
+.optionsgruppe {
+    border: none;
+    margin: 6px 0 10px;
+    padding: 0;
+}
+
+.optionsgruppe legend {
+    padding: 0;
+    margin-bottom: 2px;
+}
+
+.optionsgruppe label {
+    margin: 4px 0 4px 20px;
 }
 
 #fachCsvFallback {
@@ -214,6 +231,12 @@
     text-decoration: line-through;
 }
 
+/* Bleibt im Import, nur ohne Kursnamen – daher gedämpft statt rot */
+.mapping tr.geleert td {
+    background: color-mix(in srgb, var(--text-muted) 10%, transparent);
+    color: var(--text-muted);
+}
+
 .legende {
     position: relative;
     font-size: 0.85rem;
@@ -229,6 +252,12 @@
 
 .legende .marker-konflikt {
     background: color-mix(in srgb, #e0803a 20%, transparent);
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.legende .marker-geleert {
+    background: color-mix(in srgb, var(--text-muted) 10%, transparent);
     padding: 1px 6px;
     border-radius: 4px;
 }

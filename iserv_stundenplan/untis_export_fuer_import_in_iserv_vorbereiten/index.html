@@ -47,12 +47,23 @@
             <input type="file" id="fileInput" class="file-input" accept=".txt,.csv,.TXT,.CSV" multiple>
 
             <div class="optionen">
-                <label>
-                    <input type="checkbox" id="optKlassenuebergreifend" checked>
-                    Nur klassen&uuml;bergreifende Kurse behalten
-                    (Kurse mit nur einer Klasse werden gel&ouml;scht und in IServ der Klasse zugeordnet;
-                    Oberstufenkurse der Jahrg&auml;nge 11/12 bleiben erhalten)
-                </label>
+                <fieldset class="optionsgruppe">
+                    <legend>Kurse mit nur einer Klasse
+                    (Oberstufenkurse der Jahrg&auml;nge 11/12 bleiben stets als Kurs erhalten):</legend>
+                    <label>
+                        <input type="radio" name="einzelklassen" value="leeren" checked>
+                        Sch&uuml;lergruppe leeren &ndash; IServ ordnet den Unterricht der Klasse zu,
+                        Vertretungen (GPU014) bleiben zuordenbar
+                    </label>
+                    <label>
+                        <input type="radio" name="einzelklassen" value="loeschen">
+                        Zeilen l&ouml;schen &ndash; Vertretungen f&uuml;r diese Unterrichte ignoriert IServ dann
+                    </label>
+                    <label>
+                        <input type="radio" name="einzelklassen" value="behalten">
+                        als eigenen Kurs behalten
+                    </label>
+                </fieldset>
                 <label>
                     <input type="checkbox" id="optFachNormalisieren" checked>
                     Fachk&uuml;rzel normalisieren
@@ -114,6 +125,8 @@
             Kurse, die zur Unterscheidung eine Zeitangabe (bzw. laufende Nummer) erhalten haben.
             &nbsp;<span class="marker-konflikt">Orange markiert:</span>
             Kurse mit mehrfach vergebener Sch&uuml;lergruppe (siehe Hinweis oben).
+            &nbsp;<span class="marker-geleert">Grau:</span>
+            Kurse mit nur einer Klasse, deren Sch&uuml;lergruppe geleert wurde.
             &nbsp;<span class="marker-entfernt">Rot markiert:</span>
             Kurse, deren Zeilen entfernt wurden (nur eine Klasse).</p>
         </section>
