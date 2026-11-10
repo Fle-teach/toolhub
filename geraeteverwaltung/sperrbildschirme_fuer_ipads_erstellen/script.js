@@ -740,6 +740,46 @@ function kofferGewaehlt() {
 function kofferFelderNachfuehren() {
   if (!zustand.kofferNummerEigen) kofferNummer.value = praefix.value.trim();
   if (!zustand.farbwortEigen) farbwort.value = farbwortVorschlag(hintergrundFarbe.value);
+  SCHRIFTFARBEN.forEach(schriftfarbeNachfuehren);
+}
+
+/*
+ * Stellen, an denen eine Kofferfarbe als Schrift steht und deshalb an ihren Grund angepasst
+ * wird (siehe mitKontrast in koffer.js). Jede hat im Panel eine Zeile mit Farbwähler,
+ * Hex-Feld, Häkchen "von Hand" und Kontrastangabe – die ids beginnen mit `name`.
+ *
+ *   farbe     die Kofferfarbe, von der die Anpassung ausgeht
+ *   grund     Farbe, auf der die Schrift steht
+ *   sichtbar  ob das Dokument mit dieser Stelle gewählt ist
+ */
+const SCHRIFTFARBEN = [
+  { name: 'schild', farbe: () => hintergrundFarbe.value, grund: '#ffffff', sichtbar: () => mitSchild.checked },
+  { name: 'deckelA', farbe: () => hintergrundFarbe.value, grund: KOFFERDECKEL, sichtbar: () => mitAnleitung.checked },
+  { name: 'deckelB', farbe: () => zweiteFarbe.value, grund: KOFFERDECKEL, sichtbar: () => mitAnleitung.checked }
+].map((stelle) => ({
+  ...stelle,
+  waehler: document.getElementById(`${stelle.name}Farbe`),
+  feld: document.getElementById(`${stelle.name}Hex`),
+  eigen: document.getElementById(`${stelle.name}Eigen`),
+  kontrast: document.getElementById(`${stelle.name}Kontrast`),
+  zeile: document.getElementById(`${stelle.name}Zeile`)
+}));
+
+/*
+ * Ohne Häkchen zeigt der Farbwähler die angepasste Farbe – so sieht man, wovon man ausgeht,
+ * wenn man nachkorrigiert. Mit Häkchen bleibt der eigene Wert stehen, auch wenn sich die
+ * Kofferfarbe danach ändert.
+ */
+function schriftfarbeNachfuehren(stelle) {
+  stelle.zeile.classList.toggle('hidden', !stelle.sichtbar());
+  if (!stelle.eigen.checked) {
+    stelle.waehler.value = mitKontrast(stelle.farbe(), stelle.grund, 3);
+    if (document.activeElement !== stelle.feld) stelle.feld.value = stelle.waehler.value;
+  }
+  const verhaeltnis = kontrast(stelle.waehler.value, stelle.grund);
+  stelle.kontrast.textContent = `Kontrast ${verhaeltnis.toFixed(1).replace('.', ',')} : 1` +
+    (verhaeltnis < 3 ? ' – schwer zu lesen' : '');
+  stelle.kontrast.classList.toggle('knapp', verhaeltnis < 3);
 }
 
 function kofferFehler() {
@@ -766,14 +806,18 @@ function kofferAngaben(liste) {
       nummer: kofferNummer.value.trim(),
       farbe: hintergrundFarbe.value,
       textfarbe: schriftFarbe.value,
-      ipadName: `${GERAETEWORT}-${liste.length ? liste[0].voll : ''}`
+      ipadName: `${GERAETEWORT}-${liste.length ? liste[0].voll : ''}`,
+      // Die Farbwähler halten immer den gültigen Wert – angepasst oder von Hand
+      schildfarbe: SCHRIFTFARBEN[0].waehler.value,
+      ziffernfarbe: SCHRIFTFARBEN[1].waehler.value
     },
     farbwort: farbwort.value,
     zweiter: {
       nummer: zweiteNummer.value.trim(),
       farbe: zweiteFarbe.value,
       textfarbe: lesbarAuf(zweiteFarbe.value),
-      ipadName: zweiterIpad.value.trim()
+      ipadName: zweiterIpad.value.trim(),
+      ziffernfarbe: SCHRIFTFARBEN[2].waehler.value
     }
   };
 }
@@ -1010,6 +1054,19 @@ farbePaaren(hintergrundFarbe, hintergrundHex);
 farbePaaren(schriftFarbe, schriftHex);
 farbePaaren(logoFarbe, logoHex);
 farbePaaren(zweiteFarbe, zweiteHex);
+
+/*
+ * Wer eine der Schriftfarben anfasst, legt sie damit von Hand fest – das Häkchen setzt
+ * sich selbst. Diese Zuhörer stehen vor farbePaaren, damit das Häkchen schon gesetzt ist,
+ * wenn die Vorschau neu gezeichnet wird. Nimmt man es heraus, rechnet das Tool wieder.
+ */
+SCHRIFTFARBEN.forEach((stelle) => {
+  [stelle.waehler, stelle.feld].forEach((el) => el.addEventListener('input', () => {
+    stelle.eigen.checked = true;
+  }));
+  farbePaaren(stelle.waehler, stelle.feld);
+  stelle.eigen.addEventListener('change', aktualisiereVorschau);
+});
 
 [eigenBreite, eigenHoehe, praefix, startNummer, endNummer, zweiteNummer, zweiterIpad].forEach((feld) => {
   feld.addEventListener('input', aktualisiereVorschau);

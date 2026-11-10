@@ -334,11 +334,13 @@ function ipadBeschriften(dokument, praefix, { farbe, textfarbe, ipadName }) {
  *   textfarbe   Schriftfarbe der Sperrbildschirme (für das abgebildete iPad)
  *   farbwort    "rotem", "dunkelblauem" … – steht im Satz des Hinweises
  *   ipadName    Beschriftung des abgebildeten iPads, etwa "iPad-101"
+ *   schildfarbe Farbe von Nummer und Farbwort; ohne Angabe die Kofferfarbe, bei zu wenig
+ *               Kontrast zum weißen Schild angepasst (siehe mitKontrast)
  */
-function baueSchild({ nummer, farbe, textfarbe, farbwort, ipadName }) {
+function baueSchild({ nummer, farbe, textfarbe, farbwort, ipadName, schildfarbe }) {
   const dokument = vorlageLesen(kofferZustand.vorlagen.schild);
   // Auf dem weißen Schild: Kontrast wie für große Schrift
-  const schriftfarbe = mitKontrast(farbe, '#ffffff', 3);
+  const schriftfarbe = schildfarbe || mitKontrast(farbe, '#ffffff', 3);
 
   // Koffernummer – rechts bis zum Seitenrand (13,5 mm wie links), sonst schmaler
   const zahl = dokument.getElementById('koffernummer');
@@ -424,6 +426,8 @@ function hinweisSetzen(feld, farbwort, farbe) {
  *   farbe       Bildschirm-, Pfeil- und Ziffernfarbe
  *   textfarbe   Schrift auf dem abgebildeten iPad
  *   ipadName    Beschriftung des iPads
+ *   ziffernfarbe  Farbe der Nummer auf dem Deckel; ohne Angabe die Kofferfarbe, bei zu
+ *                 wenig Kontrast zum dunklen Deckel angepasst
  *
  * a ist der Koffer der eingestellten Sperrbildschirme, b ein frei gewählter zum Vergleich.
  */
@@ -432,7 +436,7 @@ function baueAnleitung({ a, b }) {
 
   [['a', a], ['b', b]].forEach(([kennung, koffer]) => {
     // Die Ziffern stehen auf dem dunklen Deckel und brauchen dort genug Kontrast
-    const ziffernfarbe = mitKontrast(koffer.farbe, KOFFERDECKEL, 3);
+    const ziffernfarbe = koffer.ziffernfarbe || mitKontrast(koffer.farbe, KOFFERDECKEL, 3);
     const gruppe = dokument.getElementById(`koffer-${kennung}-nummer`);
     const nummer = deckelnummer(koffer.nummer, ziffernfarbe);
     gruppe.setAttribute('stroke', ziffernfarbe);

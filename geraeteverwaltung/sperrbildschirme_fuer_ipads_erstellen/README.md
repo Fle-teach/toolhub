@@ -183,6 +183,14 @@ genug abhebt (Kontrast 3 : 1): die Ziffern auf dem schwarzen Deckel, Nummer und
 Farbwort auf dem weißen Schild. Dunkelblau wäre auf dem Koffer sonst kaum zu sehen, Gelb
 auf dem Schild ebenso wenig.
 
+Gerade Gelb muss für 3 : 1 auf Weiß so weit abgedunkelt werden, dass es nach Oliv
+aussieht. Unter „Farbe als Schrift" lässt sich deshalb jede der drei Stellen (Schild,
+eigener Deckel, zweiter Deckel) von Hand festlegen: Der Farbwähler zeigt die angepasste
+Farbe, wer ihn ändert, setzt damit das Häkchen „von Hand", und der Wert bleibt stehen,
+auch wenn sich die Kofferfarbe ändert. Ohne Häkchen rechnet das Tool wieder selbst.
+Daneben steht das Kontrastverhältnis; unter 3 : 1 wird es hervorgehoben, aber nicht
+verhindert.
+
 ### Schrift und PDF
 
 Gesetzt wird in **Inter**, wie die Vorlagen entworfen sind. Die Schrift liegt in

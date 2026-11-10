@@ -260,6 +260,38 @@
         </div>
 
         <div class="setting-group">
+          <div class="setting-label">Farbe als Schrift</div>
+          <p class="hinweis-klein">Wo die Kofferfarbe als Schrift steht, wird sie aufgehellt bzw. abgedunkelt,
+          bis sie sich genug vom Grund abhebt (Kontrast 3&nbsp;:&nbsp;1). Gef&auml;llt das Ergebnis nicht, l&auml;sst
+          sich die Farbe hier selbst w&auml;hlen; ohne H&auml;kchen bei &bdquo;von Hand&ldquo; rechnet das Tool wieder
+          selbst.</p>
+          <div class="feld-zeile" id="schildZeile">
+            <label for="schildFarbe">Nummer und Farbwort auf dem Schild:</label>
+            <input type="color" id="schildFarbe" value="#e3262b">
+            <input type="text" id="schildHex" class="hex-feld" value="#e3262b" spellcheck="false"
+                   aria-label="Schriftfarbe auf dem Schild als Hex-Wert">
+            <label class="radio-row"><input type="checkbox" id="schildEigen"><span>von Hand</span></label>
+            <span class="hinweis-klein" id="schildKontrast"></span>
+          </div>
+          <div class="feld-zeile" id="deckelAZeile">
+            <label for="deckelAFarbe">Nummer auf dem Kofferdeckel:</label>
+            <input type="color" id="deckelAFarbe" value="#e3262b">
+            <input type="text" id="deckelAHex" class="hex-feld" value="#e3262b" spellcheck="false"
+                   aria-label="Farbe der Nummer auf dem Kofferdeckel als Hex-Wert">
+            <label class="radio-row"><input type="checkbox" id="deckelAEigen"><span>von Hand</span></label>
+            <span class="hinweis-klein" id="deckelAKontrast"></span>
+          </div>
+          <div class="feld-zeile" id="deckelBZeile">
+            <label for="deckelBFarbe">Nummer auf dem zweiten Koffer:</label>
+            <input type="color" id="deckelBFarbe" value="#56c22d">
+            <input type="text" id="deckelBHex" class="hex-feld" value="#56c22d" spellcheck="false"
+                   aria-label="Farbe der Nummer auf dem zweiten Koffer als Hex-Wert">
+            <label class="radio-row"><input type="checkbox" id="deckelBEigen"><span>von Hand</span></label>
+            <span class="hinweis-klein" id="deckelBKontrast"></span>
+          </div>
+        </div>
+
+        <div class="setting-group">
           <div class="setting-label">Dateiformat</div>
           <label class="radio-row">
             <input type="checkbox" id="kofferPdf" checked>
