@@ -29,6 +29,7 @@
 #nummernMeldung:not(:empty),
 #logoMeldung:not(:empty),
 #drehungMeldung:not(:empty),
+#kofferMeldung:not(:empty),
 #erzeugenMeldung:not(:empty) {
   margin-top: 18px;
 }
@@ -100,7 +101,8 @@ input[type="color"] {
   line-height: 0;
 }
 
-.vorschau-bild svg {
+.vorschau-bild svg,
+.vorschau-bild img {
   display: block;
   width: 100%;
   height: auto;
@@ -111,4 +113,29 @@ input[type="color"] {
   font-size: 0.85rem;
   color: var(--text-muted);
   text-align: center;
+}
+
+/* ----- Hinweisschild & Ladeanleitung ----- */
+
+/* DIN A4 braucht mehr Breite als ein Sperrbildschirm, um lesbar zu bleiben */
+.koffer-vorschau {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  margin-top: 22px;
+}
+
+/* Ein Blatt Papier ist weiß, auch im dunklen Design */
+.koffer-vorschau .vorschau-bild {
+  background: #ffffff;
+  border-radius: 4px;
+}
+
+/* Die Einstellungen stehen in einer eigenen Hülle, die sich ein- und ausblendet; die
+ * Regel .setting-group + .setting-group aus toolhub.css reicht deshalb nicht hinein */
+#kofferEinstellungen:not(.hidden) {
+  margin-top: 22px;
+}
+
+/* Erläuterungen innerhalb einer Gruppe: Den Abstand gibt die Gruppe vor, nicht der Absatz */
+.setting-group > p.hinweis-klein {
+  margin: 0;
 }

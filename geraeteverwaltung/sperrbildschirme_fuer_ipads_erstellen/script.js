@@ -35,6 +35,22 @@ const hilfslinien = document.getElementById('hilfslinien');
 const vorschauGitter = document.getElementById('vorschauGitter');
 const drehungMeldung = document.getElementById('drehungMeldung');
 const mitHintergrundbild = document.getElementById('mitHintergrundbild');
+const mitSchild = document.getElementById('mitSchild');
+const mitAnleitung = document.getElementById('mitAnleitung');
+const kofferEinstellungen = document.getElementById('kofferEinstellungen');
+const kofferNummer = document.getElementById('kofferNummer');
+const farbwortZeile = document.getElementById('farbwortZeile');
+const farbwortHinweis = document.getElementById('farbwortHinweis');
+const farbwort = document.getElementById('farbwort');
+const zweiterKofferGruppe = document.getElementById('zweiterKofferGruppe');
+const zweiteFarbe = document.getElementById('zweiteFarbe');
+const zweiteHex = document.getElementById('zweiteHex');
+const zweiteNummer = document.getElementById('zweiteNummer');
+const zweiterIpad = document.getElementById('zweiterIpad');
+const kofferPdf = document.getElementById('kofferPdf');
+const kofferSvg = document.getElementById('kofferSvg');
+const kofferVorschau = document.getElementById('kofferVorschau');
+const kofferMeldung = document.getElementById('kofferMeldung');
 const erzeugenBtn = document.getElementById('erzeugenBtn');
 const erzeugenMeldung = document.getElementById('erzeugenMeldung');
 
@@ -121,7 +137,14 @@ const LOGO_ID = 'logo';
 const zustand = {
   standardlogo: null,  // Schulzeichen, beim Laden der Seite geholt
   eigenesLogo: null,   // hochgeladenes Logo
-  schrift: null        // Data-URL der eingebetteten Schrift (wird einmal geladen)
+  schrift: null,       // Data-URL der eingebetteten Schrift (wird einmal geladen)
+
+  // Koffernummer und Farbwort folgen Präfix bzw. Hintergrundfarbe – bis sie von Hand
+  // geändert werden. Leert man das Feld, folgt es wieder.
+  kofferNummerEigen: false,
+  farbwortEigen: false,
+  kofferVorschauUrls: [],  // Blob-URLs der Vorschaubilder, werden beim Neuzeichnen freigegeben
+  kofferLauf: 0            // zählt Vorschau-Durchläufe; ein veralteter zeichnet nicht mehr
 };
 
 // ---------------------------------------------------------------------------
@@ -611,8 +634,10 @@ function aktualisiereVorschau() {
   const { breite, hoehe } = masse();
   const { liste, fehler } = beschriftungen();
 
+  kofferFelderNachfuehren();
   toolhubMessage(nummernMeldung, fehler || '', 'error', 'kreuz');
-  erzeugenBtn.disabled = Boolean(fehler);
+  erzeugenBtn.disabled = Boolean(fehler) || Boolean(kofferFehler());
+  aktualisiereKoffer();
 
   const anzahl = liste ? liste.length : 0;
   const dateien = anzahl + (mitHintergrundbild.checked ? 1 : 0);
@@ -701,6 +726,142 @@ function pruefeDrehung(breite, hoehe, groesse) {
 }
 
 // ---------------------------------------------------------------------------
+// Hinweisschild und Ladeanleitung (Zeichnen und Ausgabe: koffer.js)
+// ---------------------------------------------------------------------------
+
+function kofferGewaehlt() {
+  return mitSchild.checked || mitAnleitung.checked;
+}
+
+/*
+ * Koffernummer und Farbwort laufen mit, solange niemand sie von Hand geändert hat: die
+ * Nummer mit dem Präfix ("Kunst " → "Kunst"), das Farbwort mit der Hintergrundfarbe.
+ */
+function kofferFelderNachfuehren() {
+  if (!zustand.kofferNummerEigen) kofferNummer.value = praefix.value.trim();
+  if (!zustand.farbwortEigen) farbwort.value = farbwortVorschlag(hintergrundFarbe.value);
+}
+
+function kofferFehler() {
+  if (!kofferGewaehlt()) return '';
+  if (!kofferNummer.value.trim()) {
+    return 'Für Hinweisschild und Ladeanleitung fehlt die Koffernummer – ohne Präfix lässt ' +
+      'sie sich nicht übernehmen.';
+  }
+  if (!kofferPdf.checked && !kofferSvg.checked) {
+    return 'Für Hinweisschild und Ladeanleitung ist kein Dateiformat gewählt.';
+  }
+  return '';
+}
+
+/*
+ * Was Schild und Anleitung über die beiden Koffer wissen müssen. Der eigene Koffer übernimmt
+ * alles von den Sperrbildschirmen: Farbe, Schriftfarbe und als abgebildetes iPad das erste
+ * der Reihe. Der zweite (nur in der Anleitung) ist frei eingestellt; seine Schrift wird
+ * so gewählt, dass sie auf seiner Farbe zu lesen ist.
+ */
+function kofferAngaben(liste) {
+  return {
+    eigener: {
+      nummer: kofferNummer.value.trim(),
+      farbe: hintergrundFarbe.value,
+      textfarbe: schriftFarbe.value,
+      ipadName: `${GERAETEWORT}-${liste.length ? liste[0].voll : ''}`
+    },
+    farbwort: farbwort.value,
+    zweiter: {
+      nummer: zweiteNummer.value.trim(),
+      farbe: zweiteFarbe.value,
+      textfarbe: lesbarAuf(zweiteFarbe.value),
+      ipadName: zweiterIpad.value.trim()
+    }
+  };
+}
+
+// Die Dokumente, die gewählt sind – Vorschau und Ausgabe bauen dieselben
+function kofferDokumente(liste) {
+  const angaben = kofferAngaben(liste);
+  const nummer = angaben.eigener.nummer;
+  const dokumente = [];
+  if (mitSchild.checked) {
+    dokumente.push({
+      titel: `Hinweisschild iPad-Koffer ${nummer}`,
+      datei: `Hinweisschild-Koffer-${nummer}`,
+      svg: baueSchild({ ...angaben.eigener, farbwort: angaben.farbwort })
+    });
+  }
+  if (mitAnleitung.checked) {
+    dokumente.push({
+      titel: `Ladeanleitung iPad-Koffer ${nummer}`,
+      datei: `Ladeanleitung-Koffer-${nummer}`,
+      svg: baueAnleitung({ a: angaben.eigener, b: angaben.zweiter })
+    });
+  }
+  return dokumente;
+}
+
+/*
+ * Die Vorschau entsteht leicht verzögert: Der Farbwähler meldet beim Ziehen viele Werte
+ * hintereinander, und jedes Mal die ganze Anleitung samt Schrift neu zu bauen, ließe die
+ * Seite stocken.
+ */
+let kofferTimer;
+function aktualisiereKoffer() {
+  clearTimeout(kofferTimer);
+  kofferTimer = setTimeout(kofferVorschauZeichnen, 120);
+}
+
+/*
+ * Zeigt Schild und Anleitung so, wie sie heruntergeladen werden: als SVG mit eingebetteter
+ * Schrift in einem <img>. Eingesetzt in die Seite brächten die Vorlagen ihre ids mit, und
+ * die Schrift käme aus der Seite statt aus der Datei – die Vorschau zeigte dann nicht,
+ * was tatsächlich in der Datei steht.
+ */
+async function kofferVorschauZeichnen() {
+  const lauf = ++zustand.kofferLauf;
+  kofferEinstellungen.classList.toggle('hidden', !kofferGewaehlt());
+  zweiterKofferGruppe.classList.toggle('hidden', !mitAnleitung.checked);
+  farbwortZeile.classList.toggle('hidden', !mitSchild.checked);
+  farbwortHinweis.classList.toggle('hidden', !mitSchild.checked);
+
+  if (!kofferGewaehlt()) {
+    kofferVorschauLeeren();
+    toolhubMessage(kofferMeldung, '');
+    return;
+  }
+
+  try {
+    await kofferVorbereiten();
+  } catch (ausnahme) {
+    toolhubMessage(kofferMeldung, ausnahme.message, 'error', 'kreuz');
+    return;
+  }
+  // Während des Ladens kann sich schon wieder etwas geändert haben
+  if (lauf !== zustand.kofferLauf) return;
+
+  toolhubMessage(kofferMeldung, kofferFehler(), 'error', 'kreuz');
+  const { liste } = beschriftungen();
+  if (!liste) return;
+
+  kofferVorschauLeeren();
+  kofferVorschau.innerHTML = kofferDokumente(liste).map((dokument) => {
+    const url = URL.createObjectURL(new Blob([kofferSvgMitSchrift(dokument.svg)], { type: 'image/svg+xml' }));
+    zustand.kofferVorschauUrls.push(url);
+    return `
+      <figure class="vorschau">
+        <div class="vorschau-bild"><img src="${url}" alt="${toolhubEscapeHtml(dokument.titel)}"></div>
+        <figcaption>${toolhubEscapeHtml(dokument.titel)}</figcaption>
+      </figure>`;
+  }).join('');
+}
+
+function kofferVorschauLeeren() {
+  zustand.kofferVorschauUrls.forEach((url) => URL.revokeObjectURL(url));
+  zustand.kofferVorschauUrls = [];
+  kofferVorschau.innerHTML = '';
+}
+
+// ---------------------------------------------------------------------------
 // PNG rastern
 // ---------------------------------------------------------------------------
 
@@ -758,7 +919,7 @@ function groesseInText(bytes) {
 
 erzeugenBtn.addEventListener('click', async () => {
   const { liste, fehler } = beschriftungen();
-  if (fehler) return;
+  if (fehler || kofferFehler()) return;
 
   const { breite, hoehe } = masse();
   const format = auswahl('format');
@@ -790,11 +951,23 @@ erzeugenBtn.addEventListener('click', async () => {
       }
     }
 
+    if (kofferGewaehlt()) {
+      await kofferVorbereiten();
+      for (const dokument of kofferDokumente(liste)) {
+        if (kofferSvg.checked) zip.file(dateiname(dokument.datei, 'svg'), kofferSvgMitSchrift(dokument.svg));
+        if (kofferPdf.checked) {
+          toolhubMessage(erzeugenMeldung, `${dokument.titel} wird als PDF gesetzt …`, 'info', 'sanduhr');
+          zip.file(dateiname(dokument.datei, 'pdf'), await kofferAlsPdf(dokument.svg, dokument.titel));
+        }
+      }
+    }
+
     const archiv = await zip.generateAsync({ type: 'blob' });
     toolhubDownload(archiv, 'Sperrbildschirme.zip');
 
+    const anzahl = Object.values(zip.files).filter((eintrag) => !eintrag.dir).length;
     toolhubMessage(erzeugenMeldung,
-      `${aufgaben.length} Bilder als Sperrbildschirme.zip (${groesseInText(archiv.size)}) heruntergeladen.`,
+      `${anzahl} Dateien als Sperrbildschirme.zip (${groesseInText(archiv.size)}) heruntergeladen.`,
       'success', 'haken');
   } catch (ausnahme) {
     toolhubMessage(erzeugenMeldung, `Fehler beim Erzeugen: ${ausnahme.message}`, 'error', 'kreuz');
@@ -836,13 +1009,28 @@ function farbePaaren(waehler, feld) {
 farbePaaren(hintergrundFarbe, hintergrundHex);
 farbePaaren(schriftFarbe, schriftHex);
 farbePaaren(logoFarbe, logoHex);
+farbePaaren(zweiteFarbe, zweiteHex);
 
-[eigenBreite, eigenHoehe, praefix, startNummer, endNummer].forEach((feld) => {
+[eigenBreite, eigenHoehe, praefix, startNummer, endNummer, zweiteNummer, zweiterIpad].forEach((feld) => {
   feld.addEventListener('input', aktualisiereVorschau);
 });
 
-[fuehrendeNullen, mitHintergrundbild, logoEinfaerben, hilfslinien].forEach((feld) => {
+[fuehrendeNullen, mitHintergrundbild, logoEinfaerben, hilfslinien,
+  mitSchild, mitAnleitung, kofferPdf, kofferSvg].forEach((feld) => {
   feld.addEventListener('change', aktualisiereVorschau);
+});
+
+/*
+ * Koffernummer und Farbwort gelten als von Hand geändert, sobald etwas darin steht, das
+ * jemand eingetippt hat. Wird ein Feld geleert, folgt es wieder – aber erst beim Verlassen:
+ * Wer die Nummer löscht, um eine neue zu tippen, soll nicht sofort das Präfix zurückbekommen.
+ */
+[[kofferNummer, 'kofferNummerEigen'], [farbwort, 'farbwortEigen']].forEach(([feld, schalter]) => {
+  feld.addEventListener('input', () => {
+    zustand[schalter] = feld.value.trim() !== '';
+    if (zustand[schalter]) aktualisiereVorschau();
+  });
+  feld.addEventListener('blur', aktualisiereVorschau);
 });
 
 document.querySelectorAll('input[name="aufloesung"], input[name="ausrichtung"], input[name="logoQuelle"]')

@@ -5,6 +5,10 @@ Hintergrund, links das Wort **iPad** und rechts die Nummer – beide neben dem K
 iOS auf geteilten iPads mit dem Benutzerbild darüberlegt –, darunter das Logo der Schule.
 Heraus kommt ein ZIP-Archiv mit allen Bildern – als PNG oder SVG.
 
+Auf Wunsch kommen ein **Hinweisschild** für den iPad-Koffer und eine **Ladeanleitung**
+dazu, beide in der Farbe der Sperrbildschirme, als PDF (DIN A4 quer) und/oder SVG – siehe
+[Hinweisschild und Ladeanleitung](#hinweisschild-und-ladeanleitung).
+
 Es wird nichts hochgeladen: Das Logo wird im Browser gelesen, gerechnet wird ebenfalls
 dort. Ohne Internetzugang funktioniert das Tool genauso.
 
@@ -133,9 +137,85 @@ seine Zeichenzahl.
 Sperrbildschirme.zip
   iPad-01.png … iPad-15.png     ein Bild je Nummer
   Hintergrund.png               nur die Hintergrundfarbe (abwählbar)
+  Hinweisschild-Koffer-1.pdf    wenn gewählt, ebenso als .svg
+  Ladeanleitung-Koffer-1.pdf    wenn gewählt, ebenso als .svg
 ```
 
 Zeichen, die in Dateinamen Ärger machen, werden zu `-`: aus `C 13` wird `iPad-C-13.png`.
+
+## Hinweisschild und Ladeanleitung
+
+Für den Koffer, in dem die iPads geladen werden. Beide entstehen aus Vorlagen in
+[`vorlagen/`](vorlagen/) (DIN A4 quer, Einheiten in Millimetern):
+
+| Datei | Was sich ändert |
+| --- | --- |
+| `Hinweisschild_iPad-Koffer.svg` | Koffernummer, Farbe, Farbwort im Satz, das abgebildete iPad |
+| `Anleitung_iPad-Koffer_laden.svg` | nur Karte 1: zwei Koffer samt iPad und Pfeil; Karten 2–4 bleiben |
+
+**Koffernummer** – übernimmt das Präfix der Laufnummer (`Kunst ` → `Kunst`, `1` → `1`),
+solange das Feld nicht von Hand geändert ist; ein geleertes Feld folgt wieder dem Präfix.
+Ohne Präfix gibt es keine Nummer, dann muss sie eingetragen werden. Das abgebildete iPad
+heißt wie das erste der Reihe: Präfix `1`, Nummern `01` bis `15` → `iPad-101`.
+
+**Farbwort** – „… nur iPads mit *rotem* Bildschirmhintergrund". Aus dem Farbwert lässt
+sich nur grob ableiten, wie man eine Farbe nennt; das Tool schlägt deshalb ein Wort vor
+(rot, dunkelblau, hellgrün, orangefarben, …) und lässt es ändern.
+
+**Zweiter Koffer** – Karte 1 der Anleitung zeigt zum Vergleich einen weiteren Koffer,
+etwa den der Nachbarklasse. Farbe, Nummer und iPad sind frei; die Schrift auf seinem iPad
+wird schwarz oder weiß, je nachdem, was auf der Farbe zu lesen ist.
+
+### Nummern auf dem Kofferdeckel
+
+Auf den Deckeln steht die Nummer wie von Hand gemalt, einmal aufrecht und einmal
+kopfstehend. Die Vorlage hatte nur die „1" und die „3"; die übrigen Ziffern sind im
+selben Strich nachgezeichnet (`HANDZIFFERN` in `koffer.js`). Mehrstellige Nummern werden
+aus ihnen zusammengesetzt und schmaler, wenn sie nicht auf die Deckelhälfte passen.
+Enthält die Nummer Buchstaben, steht sie in Inter. Die Pfeilspitze rückt mit der Breite
+der Nummer, damit sie nie darauf liegt.
+
+### Farben und Kontrast
+
+Bildschirm und Pfeil tragen die Farbe exakt – an ihr erkennt man den Koffer. Wo die Farbe
+dagegen als Schrift steht, wird sie bei Bedarf aufgehellt bzw. abgedunkelt, bis sie sich
+genug abhebt (Kontrast 3 : 1): die Ziffern auf dem schwarzen Deckel, Nummer und
+Farbwort auf dem weißen Schild. Dunkelblau wäre auf dem Koffer sonst kaum zu sehen, Gelb
+auf dem Schild ebenso wenig.
+
+### Schrift und PDF
+
+Gesetzt wird in **Inter**, wie die Vorlagen entworfen sind. Die Schrift liegt in
+`assets/fonts` in fünf festen Stärken (400–800) als TTF, beschränkt auf den lateinischen
+Zeichensatz: jsPDF kann nur TrueType einbetten und keine variablen Schriften.
+
+Das PDF ist echte Vektorgrafik, erzeugt mit **jsPDF** und **svg2pdf.js** (beide in
+`assets/vendor`). Es bettet nur die Zeichen ein, die vorkommen, und bleibt deshalb klein
+(Schild ~30 kB, Anleitung ~120 kB). Das SVG bringt die Schrift dagegen vollständig mit.
+
+jsPDF unterschneidet nicht (kein Kerning) – Schriftzüge laufen im PDF dadurch bis zu 2 %
+breiter als im Browser. svg2pdf misst die Textstücke aber im Browser, der unterschneidet;
+ohne Abhilfe rückte deshalb ein fett gesetztes Wort in den Wortabstand davor. Während des
+Exports misst der Browser deshalb ohne Unterschneidung (`ohneUnterschneidungMessen` in
+`koffer.js`).
+
+### Vorlagen ändern
+
+Das Skript findet die Stellen über diese ids und Klassen; wer eine Vorlage neu zeichnet,
+muss sie wieder vergeben:
+
+| Vorlage | id / Klasse | Inhalt |
+| --- | --- | --- |
+| Schild | `koffernummer` | `<text>` der großen Nummer |
+| Schild | `hinweistext` | Gruppe des Satzes; `data-x`, `data-mitte`, `data-breite`, `data-groesse`, `data-zeilenabstand` beschreiben das Feld |
+| Schild | `ipad-bildschirm`, `ipad-name`, `.ipad-deko` | Bildschirm, Beschriftung und Verzierung des iPads |
+| Anleitung | `koffer-a-nummer`, `koffer-b-nummer` | Gruppe mit zwei Untergruppen (Lage per `transform`), deren Inhalt ersetzt wird |
+| Anleitung | `pfeil-a`, `pfeil-b` | Pfeile; der erste Punkt ist das stumpfe Ende |
+| Anleitung | `ipad-a-…`, `ipad-b-…` | wie beim Schild, je iPad |
+
+a ist der Koffer der Sperrbildschirme (links, in der Vorlage rot), b der zweite (rechts,
+grün). Beim Umbau der Vorlagen wurden außerdem ihre C2PA-Metadaten entfernt (sie
+beschrieben den alten Inhalt) und `DejaVu Sans` durch Inter ersetzt.
 
 ## PNG oder SVG
 
@@ -152,8 +232,8 @@ Hintergrundbild an.
 
 ## Lokal testen
 
-Über einen Server öffnen, nicht per `file://` – sonst lassen sich weder Schriftdatei noch
-Schulzeichen lesen; das Erzeugen bricht dann mit einer Meldung ab:
+Über einen Server öffnen, nicht per `file://` – sonst lassen sich weder Schriftdateien
+noch Schulzeichen und Vorlagen lesen; das Erzeugen bricht dann mit einer Meldung ab:
 
 ```
 python3 -m http.server 8741

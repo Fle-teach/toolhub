@@ -100,8 +100,8 @@ Vor eigenen Hilfsfunktionen prüfen, ob es die Aufgabe schon gibt:
 | `assets/toolhub-xlsx.js` | Arbeitsmappen lesen und schreiben, Spaltenbreiten, Blattnamen |
 | `assets/toolhub-vorlagen.js` | Serienbrief-Vorlagen (DOCX/ODT): Felder `{{…}}` sowie Word- und Writer-Seriendruckfelder auswerten |
 | `assets/toolhub-kurse.js` | Fachkürzel-Tabelle und Normalisierung von Fach- und Kursbezeichnungen |
-| `assets/vendor/` | PapaParse, SheetJS (`xlsx`), vis-network, JSZip |
-| `assets/fonts/` | Open Sans (woff2); die `@font-face`-Regeln stehen in `toolhub.css` |
+| `assets/vendor/` | PapaParse, SheetJS (`xlsx`), vis-network, JSZip, jsPDF und svg2pdf.js (SVG als Vektor-PDF) |
+| `assets/fonts/` | Open Sans (woff2); die `@font-face`-Regeln stehen in `toolhub.css`. Dazu Inter in fünf festen Stärken als TTF (lateinischer Zeichensatz) – TTF, weil jsPDF nur TrueType und keine variablen Schriften einbetten kann; geladen wird sie dort, wo sie gebraucht wird |
 | `assets/favicon.svg` | Seitensymbol für den Browser-Tab; `toolhub.js` bindet es ein, kein `<link>` im Markup |
 | `assets/goa-logo.svg` | Schulzeichen als einzelner Pfad in `currentColor` – nimmt damit jede Farbe an, die die einbindende Stelle setzt |
 
