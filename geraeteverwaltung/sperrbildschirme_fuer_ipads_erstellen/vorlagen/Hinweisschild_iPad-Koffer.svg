@@ -2,7 +2,7 @@
 <rect width="297" height="210" fill="#ffffff"/>
 <g id="titel">
 <text x="13.5" y="84" font-size="30" font-weight="700" fill="#1d1f23" letter-spacing="-0.4">iPad-Koffer</text>
-<text id="koffernummer" x="184.86" y="84" font-size="82.47" font-weight="800" fill="#e3262b">1</text>
+<text id="koffernummer" x="184.86" y="84" font-size="82.47" font-weight="800" data-rechts="283.5" fill="#e3262b">1</text>
 </g>
 <g id="hinweis">
 <rect x="15" y="114" width="188" height="70" rx="5" fill="#f1f1f3"/>

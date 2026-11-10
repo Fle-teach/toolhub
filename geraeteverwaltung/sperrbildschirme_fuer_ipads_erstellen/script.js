@@ -825,20 +825,21 @@ function kofferAngaben(liste) {
 // Die Dokumente, die gewählt sind – Vorschau und Ausgabe bauen dieselben
 function kofferDokumente(liste) {
   const angaben = kofferAngaben(liste);
+  const ausrichtung = auswahl('kofferAusrichtung');
   const nummer = angaben.eigener.nummer;
   const dokumente = [];
   if (mitSchild.checked) {
     dokumente.push({
       titel: `Hinweisschild iPad-Koffer ${nummer}`,
       datei: `Hinweisschild-Koffer-${nummer}`,
-      svg: baueSchild({ ...angaben.eigener, farbwort: angaben.farbwort })
+      svg: baueSchild({ ...angaben.eigener, farbwort: angaben.farbwort, ausrichtung })
     });
   }
   if (mitAnleitung.checked) {
     dokumente.push({
       titel: `Ladeanleitung iPad-Koffer ${nummer}`,
       datei: `Ladeanleitung-Koffer-${nummer}`,
-      svg: baueAnleitung({ a: angaben.eigener, b: angaben.zweiter })
+      svg: baueAnleitung({ a: angaben.eigener, b: angaben.zweiter, ausrichtung })
     });
   }
   return dokumente;
@@ -1090,7 +1091,8 @@ SCHRIFTFARBEN.forEach((stelle) => {
   feld.addEventListener('blur', aktualisiereVorschau);
 });
 
-document.querySelectorAll('input[name="aufloesung"], input[name="ausrichtung"], input[name="logoQuelle"]')
+document.querySelectorAll('input[name="aufloesung"], input[name="ausrichtung"], input[name="logoQuelle"], ' +
+  'input[name="kofferAusrichtung"]')
   .forEach((feld) => feld.addEventListener('change', aktualisiereVorschau));
 
 toolhubUpload({

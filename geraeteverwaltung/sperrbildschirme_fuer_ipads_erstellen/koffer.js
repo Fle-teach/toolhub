@@ -1,9 +1,10 @@
 /*
  * koffer.js – Hinweisschild und Ladeanleitung für den iPad-Koffer.
  *
- * Beide entstehen aus Vorlagen in vorlagen/ (DIN A4 quer, Einheiten in Millimetern). Das
- * Skript füllt darin die Stellen, die eine feste id tragen – welche das sind, steht im
- * README. Ausgegeben wird als SVG (mit eingebetteter Schrift) oder als Vektor-PDF über
+ * Beide entstehen aus Vorlagen in vorlagen/ (DIN A4, quer und hochkant, Einheiten in
+ * Millimetern). Das Skript füllt darin die Stellen, die eine feste id tragen – welche das
+ * sind, steht im README. Beide Ausrichtungen tragen dieselben ids; das Füllen weiß nicht,
+ * welche es vor sich hat. Ausgegeben wird als SVG (mit eingebetteter Schrift) oder als Vektor-PDF über
  * jsPDF und svg2pdf.js.
  *
  * Gesetzt ist alles in Inter, wie die Vorlagen entworfen sind. Die Schnitte liegen als
@@ -12,21 +13,24 @@
  */
 
 const KOFFER_VORLAGEN = {
-  schild: 'vorlagen/Hinweisschild_iPad-Koffer.svg',
-  anleitung: 'vorlagen/Anleitung_iPad-Koffer_laden.svg'
+  quer: {
+    schild: 'vorlagen/Hinweisschild_iPad-Koffer.svg',
+    anleitung: 'vorlagen/Anleitung_iPad-Koffer_laden.svg'
+  },
+  hoch: {
+    schild: 'vorlagen/Hinweisschild_iPad-Koffer_hoch.svg',
+    anleitung: 'vorlagen/Anleitung_iPad-Koffer_laden_hoch.svg'
+  }
 };
 
 // Alle Stärken, die in den Vorlagen vorkommen (font-weight 400 bis 800)
 const INTER_STAERKEN = [400, 500, 600, 700, 800];
 
-// Seite der Vorlagen: DIN A4 quer, in Millimetern (= Einheiten der viewBox)
-const A4_QUER = { breite: 297, hoehe: 210 };
-
 // Farbe des Koffers in der Anleitung (Gewebe des Deckels) – Hintergrund der Kofferziffern
 const KOFFERDECKEL = '#24272c';
 
 const kofferZustand = {
-  vorlagen: null,   // { schild, anleitung } als SVG-Text
+  vorlagen: null,   // { quer: { schild, anleitung }, hoch: { … } } als SVG-Text
   inter: null,      // { [stärke]: base64 der TTF-Datei }
   laden: null       // laufendes Promise, damit gleichzeitige Aufrufe nur einmal laden
 };
@@ -55,10 +59,13 @@ function kofferVorbereiten() {
         return antwort;
       };
 
-      const [schild, anleitung] = await Promise.all([
-        holen(KOFFER_VORLAGEN.schild).then((a) => a.text()),
-        holen(KOFFER_VORLAGEN.anleitung).then((a) => a.text())
-      ]);
+      const vorlagen = {};
+      await Promise.all(Object.entries(KOFFER_VORLAGEN).flatMap(([ausrichtung, dateien]) => {
+        vorlagen[ausrichtung] = {};
+        return Object.entries(dateien).map(async ([art, url]) => {
+          vorlagen[ausrichtung][art] = await (await holen(url)).text();
+        });
+      }));
 
       const inter = {};
       await Promise.all(INTER_STAERKEN.map(async (staerke) => {
@@ -69,7 +76,7 @@ function kofferVorbereiten() {
         document.fonts.add(schnitt);
       }));
 
-      kofferZustand.vorlagen = { schild, anleitung };
+      kofferZustand.vorlagen = vorlagen;
       kofferZustand.inter = inter;
     })();
     // Ein gescheiterter Versuch soll beim nächsten Mal neu laden dürfen
@@ -336,20 +343,30 @@ function ipadBeschriften(dokument, praefix, { farbe, textfarbe, ipadName }) {
  *   ipadName    Beschriftung des abgebildeten iPads, etwa "iPad-101"
  *   schildfarbe Farbe von Nummer und Farbwort; ohne Angabe die Kofferfarbe, bei zu wenig
  *               Kontrast zum weißen Schild angepasst (siehe mitKontrast)
+ *   ausrichtung 'quer' oder 'hoch' – wählt die Vorlage
  */
-function baueSchild({ nummer, farbe, textfarbe, farbwort, ipadName, schildfarbe }) {
-  const dokument = vorlageLesen(kofferZustand.vorlagen.schild);
+function baueSchild({ nummer, farbe, textfarbe, farbwort, ipadName, schildfarbe, ausrichtung = 'quer' }) {
+  const dokument = vorlageLesen(kofferZustand.vorlagen[ausrichtung].schild);
   // Auf dem weißen Schild: Kontrast wie für große Schrift
   const schriftfarbe = schildfarbe || mitKontrast(farbe, '#ffffff', 3);
 
-  // Koffernummer – rechts bis zum Seitenrand (13,5 mm wie links), sonst schmaler
+  // Koffernummer – nach rechts bis zu der Grenze, die die Vorlage nennt (data-rechts):
+  // quer der Seitenrand, hochkant das iPad daneben. Passt sie nicht, wird sie schmaler.
   const zahl = dokument.getElementById('koffernummer');
   const groesse = Number(zahl.getAttribute('font-size'));
-  const platz = A4_QUER.breite - 13.5 - Number(zahl.getAttribute('x'));
+  const platz = Number(zahl.dataset.rechts) - Number(zahl.getAttribute('x'));
   const breite = interBreite(nummer, groesse, 800);
   zahl.textContent = nummer;
   zahl.setAttribute('fill', schriftfarbe);
-  if (breite > platz) zahl.setAttribute('font-size', rund(groesse * platz / breite));
+  if (breite > platz) {
+    const neu = groesse * platz / breite;
+    zahl.setAttribute('font-size', rund(neu));
+    // Nennt die Vorlage eine Mitte (data-mitte), bleibt die kleinere Nummer dort stehen –
+    // hochkant neben dem iPad. Sonst hält sie ihre Grundlinie, quer die des Titels.
+    if (zahl.dataset.mitte) {
+      zahl.setAttribute('y', rund(Number(zahl.dataset.mitte) + neu * INTER_VERSALHOEHE / 2));
+    }
+  }
 
   hinweisSetzen(dokument.getElementById('hinweistext'), farbwort, schriftfarbe);
   ipadBeschriften(dokument, 'ipad-', { farbe, textfarbe, ipadName });
@@ -430,9 +447,11 @@ function hinweisSetzen(feld, farbwort, farbe) {
  *                 wenig Kontrast zum dunklen Deckel angepasst
  *
  * a ist der Koffer der eingestellten Sperrbildschirme, b ein frei gewählter zum Vergleich.
+ * `ausrichtung` ('quer' oder 'hoch') wählt die Vorlage. Hochkant ist nur die Anordnung der
+ * Karten eine andere; das Bild von Karte 1 ist dasselbe, die Pfeilziele gelten deshalb weiter.
  */
-function baueAnleitung({ a, b }) {
-  const dokument = vorlageLesen(kofferZustand.vorlagen.anleitung);
+function baueAnleitung({ a, b, ausrichtung = 'quer' }) {
+  const dokument = vorlageLesen(kofferZustand.vorlagen[ausrichtung].anleitung);
 
   [['a', a], ['b', b]].forEach(([kennung, koffer]) => {
     // Die Ziffern stehen auf dem dunklen Deckel und brauchen dort genug Kontrast
@@ -477,7 +496,9 @@ function kofferSvgMitSchrift(svgText) {
 }
 
 /*
- * Vektor-PDF in DIN A4 quer. svg2pdf.js zeichnet das SVG mit jsPDF nach; die Schrift muss
+ * Vektor-PDF in DIN A4. Format und Ausrichtung der Seite stammen aus der viewBox des SVG
+ * (Millimeter) – so passt das PDF zu jeder Vorlage. svg2pdf.js zeichnet das SVG mit jsPDF
+ * nach; die Schrift muss
  * dafür in jsPDF angemeldet sein – je Stärke ein Schnitt, unter dem Namen, den die Vorlagen
  * als font-family nennen.
  *
@@ -485,7 +506,10 @@ function kofferSvgMitSchrift(svgText) {
  * müsste sich sonst durch mehrere hundert Kilobyte Data-URL arbeiten.
  */
 async function kofferAlsPdf(svgText, titel) {
-  const pdf = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
+  const [, , breite, hoehe] = /viewBox="([^"]+)"/.exec(svgText)[1].trim().split(/[\s,]+/).map(Number);
+  const pdf = new window.jspdf.jsPDF({
+    orientation: breite > hoehe ? 'landscape' : 'portrait', unit: 'mm', format: [breite, hoehe], compress: true
+  });
   INTER_STAERKEN.forEach((staerke) => {
     const datei = `Inter-${staerke}.ttf`;
     pdf.addFileToVFS(datei, kofferZustand.inter[staerke]);
@@ -500,7 +524,7 @@ async function kofferAlsPdf(svgText, titel) {
   document.body.appendChild(huelle);
   const zuruecksetzen = ohneUnterschneidungMessen();
   try {
-    await pdf.svg(huelle.firstElementChild, { x: 0, y: 0, width: A4_QUER.breite, height: A4_QUER.hoehe });
+    await pdf.svg(huelle.firstElementChild, { x: 0, y: 0, width: breite, height: hoehe });
   } finally {
     zuruecksetzen();
     huelle.remove();

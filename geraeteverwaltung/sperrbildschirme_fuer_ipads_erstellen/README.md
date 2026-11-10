@@ -6,7 +6,7 @@ iOS auf geteilten iPads mit dem Benutzerbild darüberlegt –, darunter das Logo
 Heraus kommt ein ZIP-Archiv mit allen Bildern – als PNG oder SVG.
 
 Auf Wunsch kommen ein **Hinweisschild** für den iPad-Koffer und eine **Ladeanleitung**
-dazu, beide in der Farbe der Sperrbildschirme, als PDF (DIN A4 quer) und/oder SVG – siehe
+dazu, beide in der Farbe der Sperrbildschirme, als PDF (DIN A4 quer oder hochkant) und/oder SVG – siehe
 [Hinweisschild und Ladeanleitung](#hinweisschild-und-ladeanleitung).
 
 Es wird nichts hochgeladen: Das Logo wird im Browser gelesen, gerechnet wird ebenfalls
@@ -146,12 +146,21 @@ Zeichen, die in Dateinamen Ärger machen, werden zu `-`: aus `C 13` wird `iPad-C
 ## Hinweisschild und Ladeanleitung
 
 Für den Koffer, in dem die iPads geladen werden. Beide entstehen aus Vorlagen in
-[`vorlagen/`](vorlagen/) (DIN A4 quer, Einheiten in Millimetern):
+[`vorlagen/`](vorlagen/) (DIN A4, Einheiten in Millimetern), je eine für Quer- und
+Hochformat:
 
 | Datei | Was sich ändert |
 | --- | --- |
-| `Hinweisschild_iPad-Koffer.svg` | Koffernummer, Farbe, Farbwort im Satz, das abgebildete iPad |
-| `Anleitung_iPad-Koffer_laden.svg` | nur Karte 1: zwei Koffer samt iPad und Pfeil; Karten 2–4 bleiben |
+| `Hinweisschild_iPad-Koffer.svg`, `…_hoch.svg` | Koffernummer, Farbe, Farbwort im Satz, das abgebildete iPad |
+| `Anleitung_iPad-Koffer_laden.svg`, `…_hoch.svg` | nur Karte 1: zwei Koffer samt iPad und Pfeil; Karten 2–4 bleiben |
+
+**Seitenformat** – Querformat ist der Entwurf, wie er vorlag. Hochkant stehen auf dem
+Schild der Titel oben, darunter die Nummer mit dem iPad daneben und der Hinweis über die
+volle Breite; in der Anleitung stehen die vier Schritte untereinander, das Bild links,
+Nummer und Text rechts. Die Bilder der Schritte sind dieselben, nur auf 92 % verkleinert;
+die Texte sind neu umbrochen. Die Hochformat-Vorlagen wurden aus den querformatigen
+abgeleitet, sind jetzt aber eigenständige Dateien – wer eine Fassung ändert, muss die
+andere selbst nachziehen.
 
 **Koffernummer** – übernimmt das Präfix der Laufnummer (`Kunst ` → `Kunst`, `1` → `1`),
 solange das Feld nicht von Hand geändert ist; ein geleertes Feld folgt wieder dem Präfix.
@@ -214,7 +223,7 @@ muss sie wieder vergeben:
 
 | Vorlage | id / Klasse | Inhalt |
 | --- | --- | --- |
-| Schild | `koffernummer` | `<text>` der großen Nummer |
+| Schild | `koffernummer` | `<text>` der großen Nummer; `data-rechts`: bis wohin sie reichen darf, sonst wird sie kleiner. `data-mitte` (hochkant): senkrechte Mitte, an der eine verkleinerte Nummer stehen bleibt – ohne die Angabe hält sie ihre Grundlinie |
 | Schild | `hinweistext` | Gruppe des Satzes; `data-x`, `data-mitte`, `data-breite`, `data-groesse`, `data-zeilenabstand` beschreiben das Feld |
 | Schild | `ipad-bildschirm`, `ipad-name`, `.ipad-deko` | Bildschirm, Beschriftung und Verzierung des iPads |
 | Anleitung | `koffer-a-nummer`, `koffer-b-nummer` | Gruppe mit zwei Untergruppen (Lage per `transform`), deren Inhalt ersetzt wird |
