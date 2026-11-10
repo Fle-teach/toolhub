@@ -11,6 +11,7 @@
   <script src="../../assets/vendor/jszip.min.js" defer></script>
   <script src="../../assets/vendor/jspdf.umd.min.js" defer></script>
   <script src="../../assets/vendor/svg2pdf.umd.min.js" defer></script>
+  <script src="../../assets/vendor/qrcode.js" defer></script>
   <script src="../../assets/toolhub-io.js" defer></script>
   <script src="koffer.js" defer></script>
   <script src="script.js" defer></script>
@@ -241,6 +242,20 @@
           </div>
           <p class="hinweis-klein" id="farbwortHinweis">Vorgeschlagen aus der Hintergrundfarbe &ndash; bitte
           pr&uuml;fen, wie die Farbe an der Schule genannt wird.</p>
+        </div>
+
+        <div class="setting-group" id="qrGruppe">
+          <div class="setting-label">QR-Code auf dem Schild</div>
+          <div class="feld-zeile">
+            <label for="qrLink">Link:</label>
+            <input type="url" id="qrLink" size="40" placeholder="https://&hellip;" spellcheck="false"
+                   autocomplete="off">
+          </div>
+          <p class="hinweis-klein" id="qrHinweis">Optional &ndash; etwa zur Seite mit St&ouml;rungsmeldung,
+          Buchung und Anleitungen. Mit Link teilt sich das Schild: Auf der einen H&auml;lfte steht es
+          verkleinert, auf der anderen der QR-Code mit handschriftlichen Notizen dazu.</p>
+          <p class="hinweis-klein knapp hidden" id="qrWarnung">Der Link beginnt nicht mit
+          <code>https://</code> &ndash; manche Handys bieten ihn dann nicht zum &Ouml;ffnen an.</p>
         </div>
 
         <div class="setting-group" id="zweiterKofferGruppe">

@@ -7,18 +7,21 @@
  * welche es vor sich hat. Ausgegeben wird als SVG (mit eingebetteter Schrift) oder als Vektor-PDF über
  * jsPDF und svg2pdf.js.
  *
- * Gesetzt ist alles in Inter, wie die Vorlagen entworfen sind. Die Schnitte liegen als
- * TTF in assets/fonts: jsPDF kann nur TrueType einbetten und keine variablen Schriften,
- * deshalb fünf feste Stärken statt einer variablen Datei.
+ * Gesetzt ist alles in Inter, wie die Vorlagen entworfen sind; die handschriftlichen Notizen
+ * am QR-Code in Caveat. Die Schnitte liegen als TTF in assets/fonts: jsPDF kann nur
+ * TrueType einbetten und keine variablen Schriften, deshalb feste Stärken statt einer
+ * variablen Datei.
  */
 
 const KOFFER_VORLAGEN = {
   quer: {
     schild: 'vorlagen/Hinweisschild_iPad-Koffer.svg',
+    schildQr: 'vorlagen/Hinweisschild_iPad-Koffer_qr.svg',
     anleitung: 'vorlagen/Anleitung_iPad-Koffer_laden.svg'
   },
   hoch: {
     schild: 'vorlagen/Hinweisschild_iPad-Koffer_hoch.svg',
+    schildQr: 'vorlagen/Hinweisschild_iPad-Koffer_qr_hoch.svg',
     anleitung: 'vorlagen/Anleitung_iPad-Koffer_laden_hoch.svg'
   }
 };
@@ -26,12 +29,16 @@ const KOFFER_VORLAGEN = {
 // Alle Stärken, die in den Vorlagen vorkommen (font-weight 400 bis 800)
 const INTER_STAERKEN = [400, 500, 600, 700, 800];
 
+// Die Handschrift gibt es nur fett: dünner wirkt sie aus der Entfernung wie Bleistift
+const HANDSCHRIFT = { familie: 'Caveat', staerke: 700, datei: '../../assets/fonts/caveat-latin-700.ttf' };
+
 // Farbe des Koffers in der Anleitung (Gewebe des Deckels) – Hintergrund der Kofferziffern
 const KOFFERDECKEL = '#24272c';
 
 const kofferZustand = {
   vorlagen: null,   // { quer: { schild, anleitung }, hoch: { … } } als SVG-Text
   inter: null,      // { [stärke]: base64 der TTF-Datei }
+  handschrift: null, // base64 der Caveat-Datei
   laden: null       // laufendes Promise, damit gleichzeitige Aufrufe nur einmal laden
 };
 
@@ -76,8 +83,14 @@ function kofferVorbereiten() {
         document.fonts.add(schnitt);
       }));
 
+      const handPuffer = await (await holen(HANDSCHRIFT.datei)).arrayBuffer();
+      const handSchnitt = new FontFace(HANDSCHRIFT.familie, handPuffer, { weight: String(HANDSCHRIFT.staerke) });
+      await handSchnitt.load();
+      document.fonts.add(handSchnitt);
+
       kofferZustand.vorlagen = vorlagen;
       kofferZustand.inter = inter;
+      kofferZustand.handschrift = base64VonPuffer(handPuffer);
     })();
     // Ein gescheiterter Versuch soll beim nächsten Mal neu laden dürfen
     kofferZustand.laden.catch(() => { kofferZustand.laden = null; });
@@ -344,11 +357,20 @@ function ipadBeschriften(dokument, praefix, { farbe, textfarbe, ipadName }) {
  *   schildfarbe Farbe von Nummer und Farbwort; ohne Angabe die Kofferfarbe, bei zu wenig
  *               Kontrast zum weißen Schild angepasst (siehe mitKontrast)
  *   ausrichtung 'quer' oder 'hoch' – wählt die Vorlage
+ *   link        Ziel des QR-Codes. Mit Link teilt sich die Seite: Das Schild der anderen
+ *               Ausrichtung steht verkleinert in der einen Hälfte, der QR-Code mit seinen
+ *               Notizen in der anderen. Ohne Link bleibt es beim Schild allein.
  */
-function baueSchild({ nummer, farbe, textfarbe, farbwort, ipadName, schildfarbe, ausrichtung = 'quer' }) {
-  const dokument = vorlageLesen(kofferZustand.vorlagen[ausrichtung].schild);
+function baueSchild({ nummer, farbe, textfarbe, farbwort, ipadName, schildfarbe, ausrichtung = 'quer', link = '' }) {
+  const vorlagen = kofferZustand.vorlagen[ausrichtung];
+  const dokument = vorlageLesen(link ? vorlagen.schildQr : vorlagen.schild);
   // Auf dem weißen Schild: Kontrast wie für große Schrift
   const schriftfarbe = schildfarbe || mitKontrast(farbe, '#ffffff', 3);
+
+  if (link) {
+    qrZeichnen(dokument.getElementById('qr-code'), link);
+    dokument.querySelectorAll('.notiz.akzent').forEach((notiz) => notiz.setAttribute('fill', schriftfarbe));
+  }
 
   // Koffernummer – nach rechts bis zu der Grenze, die die Vorlage nennt (data-rechts):
   // quer der Seitenrand, hochkant das iPad daneben. Passt sie nicht, wird sie schmaler.
@@ -437,6 +459,46 @@ function hinweisSetzen(feld, farbwort, farbe) {
 }
 
 /*
+ * Kodiert den Link als QR-Code (qrcode-generator in assets/vendor) und zeichnet ihn in den
+ * Platz, den die Vorlage am Element nennt (data-x, data-y, data-groesse). Der Platz schließt
+ * die Ruhezone ein – vier Module Weiß ringsum, wie die Norm sie verlangt –, ein langer Link
+ * macht die Module also kleiner, nicht den Code größer.
+ *
+ * Fehlerkorrektur Q: Ein Viertel des Codes darf zerkratzt oder verdeckt sein, das Schild
+ * hängt im Klassenraum. Gezeichnet wird ein einziger Pfad, je Reihe zusammenhängende Module
+ * als ein Rechteck – so bleibt das PDF klein und zeigt keine Haarlinien zwischen den Modulen.
+ */
+const QR_RUHEZONE = 4;
+
+function qrZeichnen(platz, link) {
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+  const code = qrcode(0, 'Q');
+  code.addData(link, 'Byte');
+  try {
+    code.make();
+  } catch {
+    throw new Error('Der Link ist zu lang für einen QR-Code.');
+  }
+
+  const anzahl = code.getModuleCount();
+  const modul = Number(platz.dataset.groesse) / (anzahl + 2 * QR_RUHEZONE);
+  const teile = [];
+  for (let zeile = 0; zeile < anzahl; zeile++) {
+    for (let spalte = 0; spalte < anzahl; spalte++) {
+      if (!code.isDark(zeile, spalte)) continue;
+      const anfang = spalte;
+      while (spalte + 1 < anzahl && code.isDark(zeile, spalte + 1)) spalte++;
+      teile.push(`M${anfang} ${zeile}h${spalte - anfang + 1}v1h-${spalte - anfang + 1}z`);
+    }
+  }
+
+  const x = Number(platz.dataset.x) + QR_RUHEZONE * modul;
+  const y = Number(platz.dataset.y) + QR_RUHEZONE * modul;
+  platz.innerHTML = `<path transform="translate(${rund(x)},${rund(y)}) scale(${modul.toFixed(5)})" ` +
+    `fill="#000000" d="${teile.join('')}"/>`;
+}
+
+/*
  * Ladeanleitung. Nur Karte 1 ändert sich: zwei Koffer mit ihren iPads, je mit
  *
  *   nummer      Koffernummer auf dem Deckel
@@ -490,7 +552,11 @@ function kofferSvgMitSchrift(svgText) {
     .filter((staerke) => kofferZustand.inter[staerke])
     .map((staerke) => '@font-face{font-family:"Inter";font-style:normal;' +
       `font-weight:${staerke};src:url(data:font/ttf;base64,${kofferZustand.inter[staerke]}) format("truetype");}`)
-    .join('');
+    .join('') +
+    (svgText.includes(`font-family="${HANDSCHRIFT.familie}"`)
+      ? `@font-face{font-family:"${HANDSCHRIFT.familie}";font-style:normal;font-weight:${HANDSCHRIFT.staerke};` +
+        `src:url(data:font/ttf;base64,${kofferZustand.handschrift}) format("truetype");}`
+      : '');
 
   return svgText.replace(/<svg\b[^>]*>/, (kopf) => `${kopf}<defs><style>${regeln}</style></defs>`);
 }
@@ -498,9 +564,8 @@ function kofferSvgMitSchrift(svgText) {
 /*
  * Vektor-PDF in DIN A4. Format und Ausrichtung der Seite stammen aus der viewBox des SVG
  * (Millimeter) – so passt das PDF zu jeder Vorlage. svg2pdf.js zeichnet das SVG mit jsPDF
- * nach; die Schrift muss
- * dafür in jsPDF angemeldet sein – je Stärke ein Schnitt, unter dem Namen, den die Vorlagen
- * als font-family nennen.
+ * nach; die Schrift muss dafür in jsPDF angemeldet sein – je Stärke ein Schnitt, unter dem
+ * Namen, den die Vorlagen als font-family nennen.
  *
  * Das SVG geht dabei *ohne* eingebettete Schrift hinein: svg2pdf liest <style> mit und
  * müsste sich sonst durch mehrere hundert Kilobyte Data-URL arbeiten.
@@ -515,6 +580,8 @@ async function kofferAlsPdf(svgText, titel) {
     pdf.addFileToVFS(datei, kofferZustand.inter[staerke]);
     pdf.addFont(datei, 'Inter', 'normal', staerke);
   });
+  pdf.addFileToVFS('Caveat.ttf', kofferZustand.handschrift);
+  pdf.addFont('Caveat.ttf', HANDSCHRIFT.familie, 'normal', HANDSCHRIFT.staerke);
   pdf.setProperties({ title: titel });
 
   // svg2pdf wertet Stile über das Dokument aus – das Element muss deshalb eingehängt sein
@@ -522,6 +589,7 @@ async function kofferAlsPdf(svgText, titel) {
   huelle.style.cssText = 'position:absolute;left:-10000px;top:0;width:0;height:0;overflow:hidden';
   huelle.innerHTML = svgText;
   document.body.appendChild(huelle);
+  gesperrteTexteZerlegen(huelle.firstElementChild);
   const zuruecksetzen = ohneUnterschneidungMessen();
   try {
     await pdf.svg(huelle.firstElementChild, { x: 0, y: 0, width: breite, height: hoehe });
@@ -530,6 +598,41 @@ async function kofferAlsPdf(svgText, titel) {
     huelle.remove();
   }
   return pdf.output('blob');
+}
+
+/*
+ * svg2pdf kennt kein letter-spacing und setzte gesperrte Beschriftungen (Aux1/Charge auf der
+ * Zeitschaltuhr) eng. Für den Export steht deshalb jeder Buchstabe als eigenes <text> an
+ * seiner Stelle: Vorschub ohne Unterschneidung – so zeichnet jsPDF – plus Sperrung. Die
+ * Sperrung hinter dem letzten Buchstaben zählt nicht mit, sonst stünde ein mittig
+ * ausgerichteter Schriftzug ein Stück zu weit links.
+ *
+ * Erfasst werden nur einfache Texte mit eigener Schriftgröße und ohne <tspan>.
+ */
+function gesperrteTexteZerlegen(svg) {
+  svg.querySelectorAll('text[letter-spacing]').forEach((text) => {
+    const sperrung = Number(text.getAttribute('letter-spacing'));
+    const groesse = Number(text.getAttribute('font-size'));
+    if (!sperrung || !groesse || text.children.length) return;
+
+    const staerke = text.getAttribute('font-weight') || 400;
+    const zeichen = [...text.textContent];
+    const vorschuebe = zeichen.map((z) => interBreite(z, groesse, staerke));
+    const gesamt = vorschuebe.reduce((summe, v) => summe + v, 0) + sperrung * (zeichen.length - 1);
+    const anker = text.getAttribute('text-anchor');
+    let x = Number(text.getAttribute('x')) - (anker === 'middle' ? gesamt / 2 : anker === 'end' ? gesamt : 0);
+
+    const gruppe = document.createElementNS(text.namespaceURI, 'g');
+    zeichen.forEach((z, i) => {
+      const einzeln = text.cloneNode(false);
+      ['letter-spacing', 'text-anchor'].forEach((name) => einzeln.removeAttribute(name));
+      einzeln.setAttribute('x', x);
+      einzeln.textContent = z;
+      gruppe.appendChild(einzeln);
+      x += vorschuebe[i] + sperrung;
+    });
+    text.replaceWith(gruppe);
+  });
 }
 
 /*

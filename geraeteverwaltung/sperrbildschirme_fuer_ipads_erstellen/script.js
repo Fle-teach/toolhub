@@ -41,6 +41,9 @@ const kofferEinstellungen = document.getElementById('kofferEinstellungen');
 const kofferNummer = document.getElementById('kofferNummer');
 const farbwortZeile = document.getElementById('farbwortZeile');
 const farbwortHinweis = document.getElementById('farbwortHinweis');
+const qrGruppe = document.getElementById('qrGruppe');
+const qrLink = document.getElementById('qrLink');
+const qrWarnung = document.getElementById('qrWarnung');
 const farbwort = document.getElementById('farbwort');
 const zweiterKofferGruppe = document.getElementById('zweiterKofferGruppe');
 const zweiteFarbe = document.getElementById('zweiteFarbe');
@@ -807,6 +810,7 @@ function kofferAngaben(liste) {
       farbe: hintergrundFarbe.value,
       textfarbe: schriftFarbe.value,
       ipadName: `${GERAETEWORT}-${liste.length ? liste[0].voll : ''}`,
+      link: qrLink.value.trim(),
       // Die Farbwähler halten immer den gültigen Wert – angepasst oder von Hand
       schildfarbe: SCHRIFTFARBEN[0].waehler.value,
       ziffernfarbe: SCHRIFTFARBEN[1].waehler.value
@@ -868,6 +872,9 @@ async function kofferVorschauZeichnen() {
   zweiterKofferGruppe.classList.toggle('hidden', !mitAnleitung.checked);
   farbwortZeile.classList.toggle('hidden', !mitSchild.checked);
   farbwortHinweis.classList.toggle('hidden', !mitSchild.checked);
+  qrGruppe.classList.toggle('hidden', !mitSchild.checked);
+  const link = qrLink.value.trim();
+  qrWarnung.classList.toggle('hidden', !link || /^https?:\/\//i.test(link));
 
   if (!kofferGewaehlt()) {
     kofferVorschauLeeren();
@@ -889,7 +896,14 @@ async function kofferVorschauZeichnen() {
   if (!liste) return;
 
   kofferVorschauLeeren();
-  kofferVorschau.innerHTML = kofferDokumente(liste).map((dokument) => {
+  let dokumente;
+  try {
+    dokumente = kofferDokumente(liste);
+  } catch (ausnahme) {
+    toolhubMessage(kofferMeldung, ausnahme.message, 'error', 'kreuz');
+    return;
+  }
+  kofferVorschau.innerHTML = dokumente.map((dokument) => {
     const url = URL.createObjectURL(new Blob([kofferSvgMitSchrift(dokument.svg)], { type: 'image/svg+xml' }));
     zustand.kofferVorschauUrls.push(url);
     return `
@@ -1069,7 +1083,7 @@ SCHRIFTFARBEN.forEach((stelle) => {
   stelle.eigen.addEventListener('change', aktualisiereVorschau);
 });
 
-[eigenBreite, eigenHoehe, praefix, startNummer, endNummer, zweiteNummer, zweiterIpad].forEach((feld) => {
+[eigenBreite, eigenHoehe, praefix, startNummer, endNummer, zweiteNummer, zweiterIpad, qrLink].forEach((feld) => {
   feld.addEventListener('input', aktualisiereVorschau);
 });
 

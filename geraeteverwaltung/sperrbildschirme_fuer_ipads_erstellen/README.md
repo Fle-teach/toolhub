@@ -152,6 +152,7 @@ Hochformat:
 | Datei | Was sich ändert |
 | --- | --- |
 | `Hinweisschild_iPad-Koffer.svg`, `…_hoch.svg` | Koffernummer, Farbe, Farbwort im Satz, das abgebildete iPad |
+| `Hinweisschild_iPad-Koffer_qr.svg`, `…_qr_hoch.svg` | dasselbe Schild mit QR-Feld – nur, wenn ein Link eingetragen ist |
 | `Anleitung_iPad-Koffer_laden.svg`, `…_hoch.svg` | nur Karte 1: zwei Koffer samt iPad und Pfeil; Karten 2–4 bleiben |
 
 **Seitenformat** – Querformat ist der Entwurf, wie er vorlag. Hochkant stehen auf dem
@@ -174,6 +175,31 @@ sich nur grob ableiten, wie man eine Farbe nennt; das Tool schlägt deshalb ein 
 **Zweiter Koffer** – Karte 1 der Anleitung zeigt zum Vergleich einen weiteren Koffer,
 etwa den der Nachbarklasse. Farbe, Nummer und iPad sind frei; die Schrift auf seinem iPad
 wird schwarz oder weiß, je nachdem, was auf der Farbe zu lesen ist.
+
+### QR-Code auf dem Schild
+
+Mit einem Link – etwa zur Seite mit Störungsmeldung, Buchung und Anleitungen – teilt sich
+das Schild: Die eine Hälfte nimmt das Schild der *anderen* Ausrichtung auf, um 1/√2
+verkleinert (A4 halbiert ist wieder A-Format, es passt genau), die andere Hälfte den
+QR-Code. Quer steht also links das Hochformat-Schild und rechts der Code, hochkant oben das
+Querformat-Schild und unten der Code. Ohne Link bleibt es beim Schild allein.
+
+Um den Code stehen handschriftliche Notizen mit Pfeilen darauf: „technische Probleme? Hier
+gibt es Hilfe!", „Störungsmeldung", „Buchung", „Ladeanleitung", „Anleitung zur An- und
+Abmeldung", „etc." und „Bitte auch bei spontaner Nutzung hier eine Buchung vornehmen!".
+Die erste und die letzte tragen die Schildfarbe, die übrigen stehen in Schwarz. Die
+Notizen sind fest in den Vorlagen gesetzt, nicht im Tool einstellbar.
+
+Kodiert wird mit **qrcode-generator** (`assets/vendor/qrcode.js`, MIT) in UTF-8 und mit
+Fehlerkorrektur Q – ein Viertel des Codes darf zerkratzt oder verdeckt sein. Der Platz in
+der Vorlage (52 mm) schließt die Ruhezone von vier Modulen ein; ein langer Link macht die
+Module kleiner, nicht den Code größer. Beginnt der Link nicht mit `https://`, weist das Tool
+darauf hin: Manche Handys bieten ihn dann nicht zum Öffnen an.
+
+Die Handschrift ist **Caveat** (OFL), als fester fetter Schnitt aus der variablen Datei
+erzeugt und wie Inter auf den lateinischen Zeichensatz beschränkt
+(`assets/fonts/caveat-latin-700.ttf`). Ihre Kontextvarianten sind entfernt: jsPDF wertet sie
+nicht aus, und der Browser zeigte sonst andere Buchstabenformen als das PDF.
 
 ### Nummern auf dem Kofferdeckel
 
@@ -216,6 +242,11 @@ ohne Abhilfe rückte deshalb ein fett gesetztes Wort in den Wortabstand davor. W
 Exports misst der Browser deshalb ohne Unterschneidung (`ohneUnterschneidungMessen` in
 `koffer.js`).
 
+`letter-spacing` kennt svg2pdf nicht. Gesperrte Beschriftungen (`Aux1/Charge` und `Aux2` auf
+der Zeitschaltuhr) zerlegt das Tool für den Export deshalb in einzeln gesetzte Buchstaben
+(`gesperrteTexteZerlegen`); das gilt für einfache `<text>` mit eigener `font-size` und ohne
+`<tspan>`.
+
 ### Vorlagen ändern
 
 Das Skript findet die Stellen über diese ids und Klassen; wer eine Vorlage neu zeichnet,
@@ -226,6 +257,8 @@ muss sie wieder vergeben:
 | Schild | `koffernummer` | `<text>` der großen Nummer; `data-rechts`: bis wohin sie reichen darf, sonst wird sie kleiner. `data-mitte` (hochkant): senkrechte Mitte, an der eine verkleinerte Nummer stehen bleibt – ohne die Angabe hält sie ihre Grundlinie |
 | Schild | `hinweistext` | Gruppe des Satzes; `data-x`, `data-mitte`, `data-breite`, `data-groesse`, `data-zeilenabstand` beschreiben das Feld |
 | Schild | `ipad-bildschirm`, `ipad-name`, `.ipad-deko` | Bildschirm, Beschriftung und Verzierung des iPads |
+| Schild mit QR | `qr-code` | leere Gruppe; `data-x`, `data-y`, `data-groesse` beschreiben das Quadrat samt Ruhezone, in das der Code gezeichnet wird |
+| Schild mit QR | `.notiz.akzent` | Notizen, die die Schildfarbe annehmen |
 | Anleitung | `koffer-a-nummer`, `koffer-b-nummer` | Gruppe mit zwei Untergruppen (Lage per `transform`), deren Inhalt ersetzt wird |
 | Anleitung | `pfeil-a`, `pfeil-b` | Pfeile; der erste Punkt ist das stumpfe Ende |
 | Anleitung | `ipad-a-…`, `ipad-b-…` | wie beim Schild, je iPad |
@@ -233,6 +266,21 @@ muss sie wieder vergeben:
 a ist der Koffer der Sperrbildschirme (links, in der Vorlage rot), b der zweite (rechts,
 grün). Beim Umbau der Vorlagen wurden außerdem ihre C2PA-Metadaten entfernt (sie
 beschrieben den alten Inhalt) und `DejaVu Sans` durch Inter ersetzt.
+
+Was im Browser richtig aussieht, muss svg2pdf noch lange nicht können. Beim Zeichnen
+deshalb meiden:
+
+* **Muster als Kontur** (`stroke="url(#…)"`): svg2pdf lässt die Linie weg. Die geflochtenen
+  Ladekabel in Bild 2 sind deshalb zwei Linien übereinander – hell durchgezogen, darüber
+  dunkel gestrichelt.
+* **Muster in einer vergrößerten Ansicht** (`patternTransform` oder Muster innerhalb eines
+  verschachtelten `<svg>` mit `slice`): svg2pdf setzt sie falsch zusammen. Die Noppen in der
+  Lupe von Bild 3 sind deshalb einzelne Kreise, so groß und so weit auseinander, wie die
+  Lupe vergrößert (4,5-fach).
+* **`letter-spacing`** nur an einfachen Texten (siehe oben).
+
+Danach die Anleitung einmal als PDF erzeugen und ansehen – die Vorschau im Tool zeigt das SVG,
+nicht das PDF.
 
 ## PNG oder SVG
 
